@@ -1,8 +1,10 @@
 var gulp		= require( 'gulp' )
 	, jshint	= require( 'gulp-jshint' )
 	, uglify	= require( 'gulp-uglify' )
-	,rename		= require( 'gulp-rename' )
-	, concat	= require( 'gulp-concat' );
+	, rename	= require( 'gulp-rename' )
+	, concat	= require( 'gulp-concat' )
+	, order		= require( 'gulp-order' )
+	, print		= require( 'gulp-print' );
 
 
 var paths		= {
@@ -13,7 +15,14 @@ var paths		= {
 
 gulp.task( 'scripts', function() {
 
-	return gulp.src( paths.jsSrc )
+	return gulp.src( [ paths.jsSrc ] )
+		.pipe( order( [
+			// As all other auto components inherit from jb-auto-input, it
+			// must be first
+			'autoinput/jb-auto-input.js',
+			'*/*.js'
+			], { base: './src/' } ) ) // does not seem to work without base –
+		.pipe( print() )
 		.pipe( jshint() )
 		.pipe( concat( 'jb-backoffice-forms.js' ) )
 		.pipe( gulp.dest( paths.jsDest ) )
