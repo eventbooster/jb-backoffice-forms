@@ -1,0 +1,26 @@
+{
+  "bitwise": true,
+  "loopfunc": true,
+  "smarttabs": true,
+  "browser": true,
+  "curly": true,
+  "eqeqeq": true,
+  "eqnull": true,
+  "esnext": true,
+  "immed": true,
+  "jquery": true,
+  "latedef": true,
+  "newcap": true,
+  "noarg": true,
+  "node": true,
+  "strict": false,
+  "trailing": true,
+  "laxcomma": true,
+  "devel": true,
+  "jquery": true,
+  "globals": {
+    "angular": true
+    , "AutoInputController": true
+    , "File": true
+  }
+}
