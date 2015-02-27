@@ -1240,6 +1240,53 @@ angular
 	);
 
 } );
+angular
+.module( 'jb.backofficeAutoFormElement' )
+
+.directive( 'backofficeLabel', [ '$templateCache', '$compile', function( $templateCache, $compile ) {
+	return {
+		link				: function( $scope, element, attrs ) {
+
+			var scope	= $scope.$new()
+				, tpl	= $( $templateCache.get( 'backofficeLabelTemplate.html' ) );
+
+			scope.valid = scope.required = scope.name = scope.entityName = undefined;
+
+
+			$scope.$watch( 'data', function( newValue ) {
+
+				if( !newValue ) {
+					scope.valid = scope.name = undefined;
+					return;
+				}
+
+				scope.valid		= newValue.valid;
+				scope.name		= newValue.name;
+			}, true );
+
+			$scope.$watch( 'entityName', function( newValue ) {
+				scope.entityName = newValue;
+			} );
+
+			$scope.$watch( 'optionData.required', function( newValue ) {
+				scope.required = newValue;
+			} );
+
+			element.replaceWith( tpl );
+			$compile( tpl )( scope );
+
+		}
+	};
+} ] )
+
+.run( function( $templateCache ) {
+	$templateCache.put( 'backofficeLabelTemplate.html',
+		'<label class=\'control-label col-md-3\' data-ng-class=\'{invalid: !valid}\'>' +
+			'<span data-ng-if=\'required\' class=\'required-indicator \'>*</span>' +
+			'<span data-translate=\'web.backoffice.{{ entityName }}.{{ name }}\'></span>' +
+		'</label>'
+	);
+} );
 'use strict';
 
 /**
@@ -2370,53 +2417,6 @@ angular
 
 
 } ] );
-angular
-.module( 'jb.backofficeAutoFormElement' )
-
-.directive( 'backofficeLabel', [ '$templateCache', '$compile', function( $templateCache, $compile ) {
-	return {
-		link				: function( $scope, element, attrs ) {
-
-			var scope	= $scope.$new()
-				, tpl	= $( $templateCache.get( 'backofficeLabelTemplate.html' ) );
-
-			scope.valid = scope.required = scope.name = scope.entityName = undefined;
-
-
-			$scope.$watch( 'data', function( newValue ) {
-
-				if( !newValue ) {
-					scope.valid = scope.name = undefined;
-					return;
-				}
-
-				scope.valid		= newValue.valid;
-				scope.name		= newValue.name;
-			}, true );
-
-			$scope.$watch( 'entityName', function( newValue ) {
-				scope.entityName = newValue;
-			} );
-
-			$scope.$watch( 'optionData.required', function( newValue ) {
-				scope.required = newValue;
-			} );
-
-			element.replaceWith( tpl );
-			$compile( tpl )( scope );
-
-		}
-	};
-} ] )
-
-.run( function( $templateCache ) {
-	$templateCache.put( 'backofficeLabelTemplate.html',
-		'<label class=\'control-label col-md-3\' data-ng-class=\'{invalid: !valid}\'>' +
-			'<span data-ng-if=\'required\' class=\'required-indicator \'>*</span>' +
-			'<span data-translate=\'web.backoffice.{{ entityName }}.{{ name }}\'></span>' +
-		'</label>'
-	);
-} );
 /**
 * Hidden input. Used to 
 * - add select statements to detailView (use for attribute)
@@ -2725,96 +2725,6 @@ angular
 			'<li data-ng-repeat=\'image in images\' data-ng-click=\'toggleActive(image)\' data-ng-class=\'{active: active===image}\'><img data-ng-attr-src=\'{{image.fileData}}\' data-ng-if=\'image.fileData\'/><img data-ng-attr-src=\'{{image.bucket.url}}{{image.url}}\' data-ng-if=\'image.url\'/><button class=\'remove\' data-ng-click=\'removeImage($event,image)\'>&times</button></li>' +
 		'</ul>'
 	);
-} );
-'use strict';
-
-
-/**
-* Renders all default stuff for a listview, including
-* - title
-* - notifications
-* - add button
-* Transcludes datatable for the entity.
-*/
-angular
-.module( 'jb.backofficeListView', [] )
-.directive( 'listView', [ '$location', '$filter', function( $location, $filter ) {
-
-	return {
-		link			: function( scope, element, attrs ) {
-
-
-			// Path (e.g. artist); remove leading slash
-			var entity = $location.path().substring( 1 );
-
-			// TRANSLATIONS
-			// Set translations
-			scope.titleText = $filter( 'translate' )( 'web.backoffice.' + entity + '.maintitle' );
-			scope.addText = $filter( 'translate' )( 'web.backoffice.' + entity + '.add' );
-
-			// FUNCTIONS
-			// Redirect functions for add and edit
-			scope.add = function() {
-				$location.path( '/' + entity + '/new' );
-			};
-
-			scope.edit = function( id ) {
-				$location.path( '/' + entity + '/' + id );
-			};
-
-
-			// Edit fields ( was initiated in ebBackoffice[EntityName])
-			// - Prepend with ID
-			// - Append edit button
-			if( scope.fields ) {
-				// ID
-				scope.fields.unshift( {
-					title		: 'ID'
-					, selector	: 'id'
-				} );
-				// Edit
-				scope.fields.push( {
-					content: function( data ) {
-						return '<button class="btn btn-default btn-sm" data-ng-click="edit('+data.id+')">' + $filter( 'translate' )( 'web.backoffice.edit' ) + '</button>';
-					}
-				} );
-			}
-
-
-		}
-		, templateUrl	: 'listViewTemplate.html'
-		, transclude	: true
-	};
-
-} ] )
-.run( function( $templateCache ) {
-
-	$templateCache.put( 'listViewTemplate.html',
-		'<div clas=\'col-xs-12\'>' +
-			'<h3>{{ titleText }}</h3>' +
-			'<div class=\'boxed\'>' +
-				'<div class=\'inner\'>' +
-
-					'<div notification></div>' +
-					'<div class=\'row list-menu\'>' +
-						'<div class=\'col-xs-12\'>' +
-							'<button type=\'button\' class=\'btn btn-sm btn-primary pull-right\' ng-click=\'add()\'>' +
-								'<i class=\'fa fa-plus\'></i>' +
-								'{{ addText }}' +
-							'</button>' +
-						'</div>' +
-					'</div>' +
-					'<div class=\'row\'>' +
-						'<div class=\'col-xs-12\'>' +
-							// Datatable goes here
-							'<div data-ng-transclude></div>' +
-						'</div>' +
-					'</div>' +
-				'</div>' +
-			'</div>' +
-		'</div>'
-	);
-
 } );
 /**
 * Directive for locales

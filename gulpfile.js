@@ -15,12 +15,11 @@ gulp.task( 'scripts', function() {
 
 	return gulp.src( paths.jsSrc )
 		.pipe( jshint() )
-		.pipe( concat( 'js-backoffice-forms.js' ) )
+		.pipe( concat( 'jb-backoffice-forms.js' ) )
 		.pipe( gulp.dest( paths.jsDest ) )
-		.pipe( rename( 'js-backoffice-forms.min.js' ) )
+		.pipe( rename( 'jb-backoffice-forms.min.js' ) )
 		.pipe( uglify() )
 		.pipe( gulp.dest( paths.jsDest ) );
-
 
 } );
 
