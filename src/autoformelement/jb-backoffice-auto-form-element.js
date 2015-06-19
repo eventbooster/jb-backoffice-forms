@@ -35,6 +35,7 @@ angular
 		, detailViewController;
 
 
+
 	/**
 	* Is called when OPTION data is gotten in detailViewController; inits the replacement of the element
 	*/

@@ -71,7 +71,7 @@ angular
 
 	$templateCache.put( 'autoCheckboxInputTemplate.html',
 		'<div class=\'form-group\'>' +
-			'<label data-backoffice-label></label>' +
+			'<label data-backoffice-label data-label-identifier=\'{{data.name}}\' data-is-valid=\'true\' data-is-required=\'false\'></label>' +
 			'<div class=\'col-md-9\'>' +
 				'<div class=\'checkbox\'>' +
 					'<input type=\'checkbox\' data-ng-model=\'data.value\'/>' +

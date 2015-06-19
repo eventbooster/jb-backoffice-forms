@@ -6,10 +6,15 @@
 
 var AutoLanguageInputController = function( $scope, $attrs ) {
 
+	// Holds current validity state
+	var valid = true;
+
 	AutoInputController.call( this, $scope, $attrs );
 
 	// Select: table
 	this.select = this.$scope.optionData.tableName + '.*';
+
+	console.log( 'AutoLanguageInputController: select is %o', this.select );
 
 	this.originalData = undefined;
 
@@ -22,8 +27,8 @@ var AutoLanguageInputController = function( $scope, $attrs ) {
 	// through ngmodel. 
 	this.$scope.locales = {};
 
-
 	$scope.fields = $scope.$eval( this.$scope.originalAttributes.fields );
+	$scope.tableName = this.$scope.optionData.tableName;
 
 
 	// Make data fit $scope.locales
@@ -33,10 +38,27 @@ var AutoLanguageInputController = function( $scope, $attrs ) {
 	}.bind( this ) );
 
 
+	// Used detailView. data-backoffice-label: 
+	// see $scope.isValid
+	this.isValid = function() {
+		return valid;
+	};
+
+	// Expose for back-office-label
+	$scope.isValid = this.isValid;
+
+	// Called from locale-component if validity changes.
+	$scope.setValidity = function( validity ) {
+		valid = validity;
+	};
+
+
 };
 
 AutoLanguageInputController.prototype = Object.create( AutoInputController.prototype );
 AutoLanguageInputController.prototype.constructor = AutoLanguageInputController;
+
+
 
 AutoLanguageInputController.prototype.getSaveCalls = function() {
 
@@ -110,7 +132,7 @@ AutoLanguageInputController.prototype.getSaveCalls = function() {
 
 AutoLanguageInputController.prototype.updateData = function( data ) {
 
-	console.log( 'AutoLanguageInput: updateData got %o', data );
+	console.log( 'AutoLanguageInput: updateData got %o for tableName %o', data, data[ this.$scope.optionData.tableName ] );
 
 	// No data available
 	if( !data ) {
@@ -118,6 +140,7 @@ AutoLanguageInputController.prototype.updateData = function( data ) {
 	}
 
 	var localeData = data[ this.$scope.optionData.tableName ];
+
 
 	if( !localeData || !angular.isArray( localeData ) ) {
 		console.error( 'AutoLanguageInput: data missing for locale. Key is %o, data is %o', this.$scope.optionData.tableName, data );
@@ -180,8 +203,9 @@ angular
 
 	$templateCache.put( 'autoLanguageInputTemplate.html',
 		'<div class=\'row\'>'+
-			'<label data-backoffice-label></label>' +
-				'<div data-locale-component class=\'col-md-9\' fields=\'fields\' data-model=\'locales\' data-entity-name=\'entityName\'>' +
+			// Component itself is never required and always valid. Only single fields may be required or invalid.
+			'<label data-backoffice-label data-label-identifier=\'{{data.name}}\' data-is-required=\'false\' data-is-valid=\'isValid()\'></label>' +
+				'<div data-locale-component class=\'col-md-9\' data-fields=\'fields\' data-table-name=\'tableName\' data-model=\'locales\' data-set-validity=\'setValidity(validity)\' data-entity-name=\'entityName\'>' +
 			'</div>' +
 		'</div>'
 	);

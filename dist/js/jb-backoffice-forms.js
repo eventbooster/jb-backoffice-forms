@@ -1,7 +1,12 @@
 'use strict';
 
 /**
-* Parent controller for all autoInputs. Provides basic functionality.
+* Parent controller for all autoInputs. Provides basic functionality like
+* - calls afterInit 
+* - registers itself at the detailViewController
+* - check if child controllers implement updateData()
+* - Make element, detailViewController, entityName and entityId available
+* - … (needs refactoring!)
 */
 var AutoInputController = function( $scope, $attrs ) {
 
@@ -11,6 +16,9 @@ var AutoInputController = function( $scope, $attrs ) {
 	// $scope always holds two objects gotten from auto-form-element: 
 	// - optionData
 	// - originalAttributes
+	// Is passed in from auto-form-element through a newly created 
+	// and isolated scope.
+
 	this.$scope				= $scope;
 
 	this.$scope.entityName	= undefined;
@@ -23,9 +31,10 @@ var AutoInputController = function( $scope, $attrs ) {
 		, valid		: true
 	};
 
-	this.isValid				= function() {
+	// Needs to be defined in controller.
+	/*this.isValid				= function() {
 		return $scope.data.valid;
-	};
+	};*/
 
 	this.element				= undefined;
 	this.detailViewController	= undefined;
@@ -45,7 +54,7 @@ AutoInputController.prototype.init = function( el, detViewController ) {
 	this.$scope.entityId		= detViewController.getEntityId();
 
 	// Register myself @ detailViewController 
-	// -> I'll be notified on save
+	// -> I'll be notified on save and when data is gotten
 	this.detailViewController.register( this );
 
 	// Call afterInit
@@ -55,6 +64,7 @@ AutoInputController.prototype.init = function( el, detViewController ) {
 		this.afterInit();
 	}
 
+	// Check if updateData method was implemented.
 	if( !this.updateData ) {
 		console.error( 'AutoInputController: updateData method missing in %o %o', this, el );
 	}
@@ -98,6 +108,7 @@ angular
 		,self					= this
 		, element
 		, detailViewController;
+
 
 
 	/**
@@ -300,7 +311,7 @@ angular
 
 	$templateCache.put( 'autoCheckboxInputTemplate.html',
 		'<div class=\'form-group\'>' +
-			'<label data-backoffice-label></label>' +
+			'<label data-backoffice-label data-label-identifier=\'{{data.name}}\' data-is-valid=\'true\' data-is-required=\'false\'></label>' +
 			'<div class=\'col-md-9\'>' +
 				'<div class=\'checkbox\'>' +
 					'<input type=\'checkbox\' data-ng-model=\'data.value\'/>' +
@@ -328,6 +339,14 @@ var AutoDateTimeInputController = function( $scope, $attrs ) {
 	// Display time only if type is datetime and not date
 	$scope.showTime				= this.$scope.optionData.time;
 
+	$scope.isRequired = function() {
+		return this.optionData.required;
+	};
+
+	$scope.isValid = function() {
+		return !this.optionData.required || ( this.optionData.required && this.$scope.date );
+	};
+
 };
 
 AutoDateTimeInputController.prototype = Object.create( AutoInputController.prototype );
@@ -335,7 +354,15 @@ AutoDateTimeInputController.prototype.constructor = AutoDateTimeInputController;
 
 AutoDateTimeInputController.prototype.updateData = function( data ) {
 
-	this.$scope.date = new Date( data[ this.$attrs.for] );
+	var value = data[ this.$attrs.for];
+
+	if( !value ) {
+		this.$scope.date = undefined;
+	}
+	else {
+		this.$scope.date = new Date( value );
+	}
+
 	this.originalData = this.$scope.date;
 
 };
@@ -391,7 +418,7 @@ angular
 
 	$templateCache.put( 'dateTimeInputTemplate.html',
 		'<div class=\'form-group form-group-sm\'>' +
-			'<label data-backoffice-label></label>' +
+			'<label data-backoffice-label data-label-identifier=\'{{data.name}}\' data-is-required=\'isRequired()\' data-is-valid=\'isValid()\'></label>' +
 			'<div data-ng-class=\'{ "col-md-9": !showTime, "col-md-5": showTime}\'>' +
 				'<input type=\'date\' class=\'form-control input-sm\' data-ng-model=\'date\'>' +
 			'</div>' +
@@ -416,7 +443,7 @@ var AutoImageInputController = function( $scope, $attrs, $q, APIWrapperService )
 	this.select				= 'image.*,image.bucket.url';
 	this.originalData		= undefined;
 
-	this.$q					= $q;
+	this.$q					= $q; // Pass $q to methods. 
 	this.APIWrapperService	= APIWrapperService;
 
 
@@ -437,11 +464,20 @@ AutoImageInputController.prototype.constructor = AutoImageInputController;
 
 AutoImageInputController.prototype.updateData = function( data ) {
 
+	// No image set: use empty array
+	// Don't use !angular.isArray( data.image ); it will create [ undefined ] if there's no data.image.
+	if( !data.image ) {
+		data.image = [];
+	}
+
+
 	// Image has a hasOne-relation: Is delivered as an object (instead of an array):
 	// Convert to array
 	if( !angular.isArray( data.image ) ) {
 		data.image = [ data.image ];
 	}
+
+
 
 	this.$scope.images = data.image ? data.image : [];
 
@@ -520,6 +556,11 @@ AutoImageInputController.prototype.beforeSaveTasks = function() {
 
 		var img		= this.$scope.images[ i ];
 
+		if( !img ) {
+			console.warn( 'AutoImageInputController: Can\'t get file property of undefined image %o', img );
+			continue;
+		}
+
 		// Only files added per drag and drop have a file property that's a file
 		if( img.file && img.file instanceof File ) {
 
@@ -539,11 +580,13 @@ AutoImageInputController.prototype.beforeSaveTasks = function() {
 
 AutoImageInputController.prototype._uploadFile = function( img ) {
 
+	console.log( 'AutoImageInputController: Upload file %o to /image through a POST request', img );
+
 	return this.APIWrapperService.request( {
 		method				: 'POST'
 		, data				: {
-			dataSource		: 'backoffice'
-			, image			: img.file
+			//dataSourceId	: 1
+			image			: img.file
 		}
 		, url				: '/image'
 	} )
@@ -559,8 +602,8 @@ AutoImageInputController.prototype._uploadFile = function( img ) {
 		return true;
 
 	}.bind( this ), function( err ) {
-		this.$q.reject( err );
-	} );
+		return this.$q.reject( err );
+	}.bind( this ) );
 
 };
 
@@ -598,7 +641,7 @@ angular
 
 	$templateCache.put( 'autoImageInputTemplate.html',
 		'<div class=\'row\'>' +
-			'<label data-backoffice-label></label>' +
+			'<label data-backoffice-label data-label-identifier=\'{{data.name}}\' data-is-required=\'false\' data-is-valid=\'true\'></label>' +
 			'<div class=\'col-md-9\' data-image-component data-images=\'images\'></div>' +
 		'</div>'
 	);
@@ -620,10 +663,15 @@ angular
 
 var AutoLanguageInputController = function( $scope, $attrs ) {
 
+	// Holds current validity state
+	var valid = true;
+
 	AutoInputController.call( this, $scope, $attrs );
 
 	// Select: table
 	this.select = this.$scope.optionData.tableName + '.*';
+
+	console.log( 'AutoLanguageInputController: select is %o', this.select );
 
 	this.originalData = undefined;
 
@@ -636,8 +684,8 @@ var AutoLanguageInputController = function( $scope, $attrs ) {
 	// through ngmodel. 
 	this.$scope.locales = {};
 
-
 	$scope.fields = $scope.$eval( this.$scope.originalAttributes.fields );
+	$scope.tableName = this.$scope.optionData.tableName;
 
 
 	// Make data fit $scope.locales
@@ -647,10 +695,27 @@ var AutoLanguageInputController = function( $scope, $attrs ) {
 	}.bind( this ) );
 
 
+	// Used detailView. data-backoffice-label: 
+	// see $scope.isValid
+	this.isValid = function() {
+		return valid;
+	};
+
+	// Expose for back-office-label
+	$scope.isValid = this.isValid;
+
+	// Called from locale-component if validity changes.
+	$scope.setValidity = function( validity ) {
+		valid = validity;
+	};
+
+
 };
 
 AutoLanguageInputController.prototype = Object.create( AutoInputController.prototype );
 AutoLanguageInputController.prototype.constructor = AutoLanguageInputController;
+
+
 
 AutoLanguageInputController.prototype.getSaveCalls = function() {
 
@@ -724,7 +789,7 @@ AutoLanguageInputController.prototype.getSaveCalls = function() {
 
 AutoLanguageInputController.prototype.updateData = function( data ) {
 
-	console.log( 'AutoLanguageInput: updateData got %o', data );
+	console.log( 'AutoLanguageInput: updateData got %o for tableName %o', data, data[ this.$scope.optionData.tableName ] );
 
 	// No data available
 	if( !data ) {
@@ -732,6 +797,7 @@ AutoLanguageInputController.prototype.updateData = function( data ) {
 	}
 
 	var localeData = data[ this.$scope.optionData.tableName ];
+
 
 	if( !localeData || !angular.isArray( localeData ) ) {
 		console.error( 'AutoLanguageInput: data missing for locale. Key is %o, data is %o', this.$scope.optionData.tableName, data );
@@ -794,8 +860,9 @@ angular
 
 	$templateCache.put( 'autoLanguageInputTemplate.html',
 		'<div class=\'row\'>'+
-			'<label data-backoffice-label></label>' +
-				'<div data-locale-component class=\'col-md-9\' fields=\'fields\' data-model=\'locales\' data-entity-name=\'entityName\'>' +
+			// Component itself is never required and always valid. Only single fields may be required or invalid.
+			'<label data-backoffice-label data-label-identifier=\'{{data.name}}\' data-is-required=\'false\' data-is-valid=\'isValid()\'></label>' +
+				'<div data-locale-component class=\'col-md-9\' data-fields=\'fields\' data-table-name=\'tableName\' data-model=\'locales\' data-set-validity=\'setValidity(validity)\' data-entity-name=\'entityName\'>' +
 			'</div>' +
 		'</div>'
 	);
@@ -838,6 +905,7 @@ var AutoRelationInputController = function( $scope, $attrs, $templateCache, $com
 		this.select.push( this.$scope.originalAttributes.for + '.' + select );
 	}.bind( this ) );
 
+	console.log( 'AutoRelationInputController: select is %o', this.select );
 
 
 
@@ -858,9 +926,15 @@ var AutoRelationInputController = function( $scope, $attrs, $templateCache, $com
 	this.isMultiSelect			= this.$scope.optionData.relationType !== 'single';
 
 
+	// User should be able to pass in a ngModel (to bind directive's selection to another controller). 
+	// If it's provided, use it's name as ngModel; else
+	//this.ngModelName 			= this.$scope.originalAttributes.ngModel || 'relations';
+
 
 	// Set valid on $scope.data (for backoffice-label)
-	this.scope.$watch( 'relations', function( newValue ) {
+	// Propagate changes to ngModel
+	/*this.scope.$watch( 'relations', function( newValue ) {
+
 		if( this.$scope.optionData.required && ( !newValue || newValue.length === 0 ) ) {
 			this.$scope.data.valid = false;
 		}
@@ -868,43 +942,23 @@ var AutoRelationInputController = function( $scope, $attrs, $templateCache, $com
 			this.$scope.data.valid = true;
 		}
 	}.bind( this ) );
+*/
 
+	$scope.isValid = function() {
+
+		if( $scope.optionData.required && ( !this.scope.relations || this.scope.relations.length === 0 ) ) {
+			return false;
+		}
+
+		return true;
+
+	}.bind( this );
 
 
 	// Holds model
 	this.scope.relations = [];
 
 
-
-
-/*	this.$scope.$on( 'dataUpdate', function( ev, data ) {
-
-		this.scope.relations = [];
-
-		// No data provided
-		if( !data[ $attrs.for ] ) {
-			return;
-		}
-		else {
-			// Fill up scope.data (model for relationInput)
-			if( this.isMultiSelect ) {
-				// Is already an array
-				this.scope.relations = data[ $attrs.for ];
-			}
-			else {
-				this.scope.relations.push( data[ $attrs.for ] );
-			}
-
-		}
-
-		// Copy data to originalData
-		// Is used to get changes on save()
-		this.originalData = this.scope.relations.slice();
-
-		console.log( 'AutoRelationInput: scope.data is %o', this.scope.relations );
-
-	}.bind( this ) );
-*/
 };
 
 
@@ -961,6 +1015,7 @@ AutoRelationInputController.prototype.getSaveCalls = function() {
 
 };
 
+
 AutoRelationInputController.prototype.getSingleSelectSaveCalls = function() {
 
 	// Relations missing; happens if relations were not set on server nor changed
@@ -987,10 +1042,12 @@ AutoRelationInputController.prototype.getSingleSelectSaveCalls = function() {
 			var data = {};
 			data[ this.$scope.optionData.relationKey ] = this.scope.relations[ 0 ].id;
 
+			// Post to /mainEntity/currentId/entityName/entityId, path needs to be entityName/entityId, 
+			// is automatically prefixed by DetailViewController 
 			return {
-				//url		: this.optionData + '/' +  // this.detailViewController.getEntityUrl() + '/' + this.$attrs.for + '/' + this.scope.relations[ 0 ].id
-				url			: ''
-				, data		: data
+				url			:  this.$attrs.for + '/' + this.scope.relations[ 0 ].id
+				, method	: 'POST'
+				//, data		: data
 			};
 	
 		}
@@ -1096,7 +1153,7 @@ angular
 .directive( 'autoRelationInput', [ function() {
 
 	return {
-		require			: [ 'autoRelationInput', '^^detailView' ]
+		require			: [ 'autoRelationInput', '^detailView' ]
 		, controller	: 'AutoRelationInputController'
 		, link			: function( scope, element, attrs, ctrl ) {
 			ctrl[ 0 ].init( element, ctrl[ 1 ] );
@@ -1116,7 +1173,7 @@ angular
 
 	$templateCache.put( 'autoRelationInputTemplate.html',
 		'<div class=\'form-group\'>' +
-			'<label data-backoffice-label></label>' +
+			'<label data-backoffice-label data-label-identifier=\'{{data.name}}\' data-is-valid=\'isValid()\'></label>' +
 			'<div data-relation-input ' +
 				'class=\'relation-select col-md-9\'' +
 				'data-ng-model=\'relations\'' +
@@ -1157,7 +1214,14 @@ var AutoTextInputController = function( $scope, $attrs ) {
 	// (that corresponds to data.name)
 	this.select = this.$scope.data.name;
 
-	this._validateInput();
+	$scope.isValid = function() {
+		if( this.$scope.optionData.required && !this.$scope.data.value ) {
+			return false;
+		}
+		return true;		
+	}.bind( this );
+
+	//this._validateInput();
 
 };
 
@@ -1185,7 +1249,7 @@ AutoTextInputController.prototype.getSaveCalls = function() {
 	
 };
 
-AutoTextInputController.prototype._validateInput = function() {
+/*AutoTextInputController.prototype._validateInput = function() {
 
 	// Update validity for label
 	this.$scope.$watch( 'data.value', function( newValue ) {
@@ -1195,11 +1259,10 @@ AutoTextInputController.prototype._validateInput = function() {
 		else {
 			this.$scope.data.valid = true;
 		}
+		console.log( 'AutoTextInputController: set validity to ' + this.$scope.data.valid );
 	}.bind( this ) );
 
-};
-
-
+};*/
 
 
 
@@ -1232,11 +1295,677 @@ angular
 
 	$templateCache.put( 'autoTextInputTemplate.html',
 		'<div class=\'form-group form-group-sm\'>' +
-			'<label data-backoffice-label></label>' +
+			'<label data-backoffice-label data-label-identifier=\'{{data.name}}\' data-is-valid=\'isValid()\'></label>' +
 			'<div class=\'col-md-9\'>' +
 				'<input type=\'text\' data-ng-attr-id=\'{{ entityName }}-{{ data.name }}-label\' class=\'form-control input-sm\' data-ng-attrs-required=\'isRequired()\' data-ng-model=\'data.value\'/>' +
 			'</div>' +
 		'</div>'
+	);
+
+} );
+( function() {
+
+	'use strict';
+
+	angular
+
+	// jb.backofficeFormElements: Namespace for new form elements (replacement for jb.backofficeAutoFormElement)
+	.module( 'jb.backofficeFormComponents', [] );
+
+} )();
+
+/**
+* Newer version of jb-auto-relation-input. Is not automatically replaced by auto-form-element any more, 
+* but needs to be used manually. Gives more freedom in usage. 
+* Don't use ngModel as it can't properly deep-watch, especially not through $render
+*/
+( function() {
+
+	'use strict';
+
+	angular
+
+	.module( 'jb.backofficeFormComponents' )
+
+	/**
+	* <input data-backoffice-relation-component
+	*	data-suggestion-template="[[property]]"
+	* 	data-search-field="property"
+	*	data-ng-model="model" // Optional
+	*	data-for="enity">
+	*/
+	.directive( 'backofficeRelationComponent', [ function() {
+
+		return {
+			require				: [ 'backofficeRelationComponent', '^detailView' ]
+			, controller		: 'BackofficeRelationComponentController'
+			, controllerAs		: 'backofficeRelationComponent'
+			, bindToController	: true
+			, link				: function( scope, element, attrs, ctrl ) {
+				ctrl[ 0 ].init( element, ctrl[ 1 ] );
+			}
+			, scope: {
+				'suggestionTemplate'	: '@'
+				, 'searchField'			: '@'
+				, 'propertyName'		: '@for'
+				, 'relationModel'		: '=ngModel'
+			}
+
+		};
+
+	} ] )
+
+	.controller( 'BackofficeRelationComponentController', [ '$scope', '$compile', '$templateCache', function( $scope, $compile, $templateCache ) {
+
+		var self = this
+			, element
+			, detailViewController
+
+			// Data gotten from options call: 
+			// - is value required? 
+			// - is relation deletable? 
+			// - is it a multi or single select field?
+			, required
+			, deletable
+			, multiSelect
+
+			// Original data gotten from server; needed to calculate differences
+			// (when storing data)
+			, originalData;
+
+
+		
+		// Model for relationInput
+		self.relationModel = undefined;
+
+
+
+		/**
+		* Called by link function
+		*/
+		self.init = function( el, detailViewCtrl ) {
+
+			element = el;
+			detailViewController = detailViewCtrl;
+
+			// Registers itself with detailViewController
+			detailViewController.registerOptionsDataHandler( self.updateOptionsData );
+			detailViewController.registerGetDataHandler( self.updateData );
+
+		};
+
+
+
+
+
+		/**
+		* GET data gotten from detailView
+		*/
+		self.updateData = function( data ) {
+			var modelValue = angular.isArray( data[ self.propertyName ] ) ? data[ self.propertyName ] : [ data[ self.propertyName ] ];
+			self.relationModel = modelValue; 
+
+			// Store data in originalData to calculate differences when saving
+			originalData = angular.copy( modelValue );
+
+			console.log( 'BackofficeRelationComponentController: Model updated (updateData) to %o', self.relationModel );
+		};
+
+
+
+
+		/**
+		* Parse option data gotten from detailViewController
+		*/
+		self.updateOptionsData = function( data ) {
+			
+			console.log( 'BackofficeRelationComponentController: Got options data %o', data[ self.propertyName ] );
+
+			var elementData		= data[ self.propertyName ];
+
+			deletable			= elementData.originalRelation !== 'belongsTo';	
+			required			= elementData.required;
+			multiSelect			= elementData.relationType !== 'single';
+
+			self.replaceElement( multiSelect, deletable );
+
+			// Now let detailViewController know we're ready to get GET data
+			detailViewController.register( self );
+
+		};
+
+
+		/**
+		* Returns the select statement for the GET call
+		*/
+		self.getSelectFields = function() {
+			return self.propertyName + '.*';
+		};
+
+
+
+		/**
+		* Replaces itself with the relation-input element
+		*/
+		self.replaceElement = function( multiSelect, deletable ) {
+
+			var template = $( $templateCache.get( 'backofficeRelationComponentTemplate.html') );
+
+			template
+				.find( '[data-relation-input]')
+				.attr( 'data-relation-entity-endpoint', self.propertyName )
+				.attr( 'data-relation-entity-search-field', self.searchField )
+				.attr( 'data-relation-suggestion-template', self.suggestionTemplate )
+				.attr( 'data-ng-model', 'backofficeRelationComponent.relationModel' )
+				.attr( 'data-multi-select', multiSelect )
+				.attr( 'data-deletable', deletable );
+
+			element.replaceWith( template );
+			$compile( template )( $scope );
+
+		};
+
+
+		self.isRequired = function() {
+			return required;
+		};
+
+		self.isValid = function() {
+
+			// May return 1; therefore use !! to convert to bool.
+			var valid = !!( !required || ( required && self.relationModel && self.relationModel.length ) );
+			console.log( 'BackofficeRelationComponentController: isValid? %o', valid );
+			return valid;
+
+		};
+
+
+
+
+
+
+
+		self.getSaveCalls = function() {
+
+			var saveCalls = multiSelect ? self.getMultiSelectSaveCalls() : self.getSingleSelectSaveCalls();
+
+			console.log( 'BackofficeRelationComponentController: saveCalls are %o', saveCalls );
+			return saveCalls;
+
+		};
+
+
+
+
+		/**
+		* Creates requests for a single relation. 
+		* No delete calls needed.
+		*/
+		self.getSingleSelectSaveCalls = function() {
+
+			// Relations missing; happens if relations were not set on server nor changed
+			// by user
+			if( !self.relationModel ) {
+				console.log( 'AutoRelationInputController: relationModel empty' );
+				return false;
+			}
+
+
+			// Element is required: It must be stored when main entity is created through POSTing to 
+			// the main entity with id_entity. It may not be deleted, therefore on updating, a PATCH
+			// call must be made to the main entity (and not DELETE/POST)
+			if( required ) {
+
+				var relationData = {};
+				relationData[ 'id_' + self.propertyName ] = self.relationModel[ 0 ].id;
+
+				// Creating main entity
+				if( !detailViewController.getEntityId() ) {
+
+					return {
+						url			: false // Use main entity URL
+						, method	: 'POST'
+						, data		: relationData
+					};
+				}
+
+				// Updating main entity
+				else {
+					return {
+						url			: false // Use main entity URL
+						, method	: 'PATCH'
+						, data		: relationData
+					};
+				}
+
+			}
+
+
+			// Element was removed
+			if( self.relationModel.length === 0 && originalData && originalData.length !== 0 ) {
+				return {
+					url			: self.propertyName + '/' + originalData[ 0 ].id
+					, method	: 'DELETE'
+				};
+			}
+
+			// Update
+			// When scope.data[ 0 ].id != originalData[ 0 ].id 
+			// Only [0] has to be checked, as it's a singleSelect
+			if( self.relationModel.length ) {
+				if( !originalData || ( originalData.length && self.relationModel[ 0 ].id !== originalData[ 0 ].id ) ) {
+				
+					var data = {};
+					data[ detailViewController.fields[ self.propertyName ].relationKey ] = self.relationModel[ 0 ].id;
+
+					// Post to /mainEntity/currentId/entityName/entityId, path needs to be entityName/entityId, 
+					// is automatically prefixed by DetailViewController 
+					return {
+						url			:  self.propertyName + '/' + self.relationModel[ 0 ].id
+						, method	: 'POST'
+					};
+			
+				}
+			}
+
+			// No changes
+			return false;
+
+		};
+
+
+
+
+		self.getMultiSelectSaveCalls = function() {
+
+			// Deletes & posts
+
+			// Select deleted and added elements
+			// Just for console.log
+			var deleted		= []
+				, added		= [];
+
+			var originalIds	= []
+				, newIds	= []
+				, calls		= [];
+
+			// Make arrays of objects to arrays of ids
+			if( self.relationModel && self.relationModel.length ) {
+				self.relationModel.forEach( function( item ) {
+					newIds.push( item.id );
+				} );
+			}
+			if( originalData && originalData.length ) {
+				originalData.forEach( function( item ) {
+					originalIds.push( item.id );
+				} );
+			}
+
+
+			// Deleted: in originalData, but not in newData
+			originalIds.forEach( function( item ) {
+				if( newIds.indexOf( item ) === -1 ) {
+					deleted.push( item );
+					calls.push( {
+						method			: 'DELETE'
+						, url			: self.propertyName + '/' + item
+					} );
+				}
+			}.bind( this ) );
+
+			// Added: in newData, but not in originalData
+			newIds.forEach( function( item ) {
+				if( originalIds.indexOf( item ) === -1 ) {
+					added.push( item );
+					calls.push( {
+						method		: 'POST'
+						, url		: self.propertyName + '/' + item
+					} );
+				}
+			}.bind( this ) );
+
+			console.log( 'BackofficeRelationComponentController: Added %o, deleted %o – calls: %o', added, deleted, calls );
+
+			if( calls.length === 0 ) {
+				return false;
+			}
+
+			return calls;
+
+		};
+
+
+
+
+
+	} ] )
+
+
+	.run( function( $templateCache ) {
+
+		$templateCache.put( 'backofficeRelationComponentTemplate.html',
+			'<div class=\'form-group\'>' +
+				'<label data-backoffice-label ' +
+					'data-label-identifier=\'{{backofficeRelationComponent.propertyName}}\' ' +
+					'data-is-required=\'backofficeRelationComponent.isRequired()\' ' + 
+					'data-is-valid=\'backofficeRelationComponent.isValid()\'>' + 
+				'</label>' +
+				'<div data-relation-input ' +
+					'class=\'relation-select col-md-9\'>' +
+				'</div>' +
+			'</div>'
+		);
+
+	} );
+
+
+
+
+} )();
+
+
+/**
+* As a tree is a simple relation on the entity it belongs to, we have to create a component
+* that is not initialized through auto-form
+*/
+angular
+.module( 'jb.backofficeFormComponents', [] )
+.directive( 'backofficeTreeComponent', [ function() {
+
+	return {
+		require				: [ '^detailView', 'backofficeTreeComponent' ]
+		, controller		: 'TreeComponentController'
+		, link				: function( scope, element, attrs, ctrl ) {
+			
+			ctrl[ 1 ].init( element, ctrl[ 0 ] );
+		
+		}
+		, templateUrl		: 'treeTemplate.html'
+		, scope				: {
+			// Filter: When making GET call, filter is applied, e.g id_menu=5. Is needed if 
+			// the nested set is grouped (e.g. menuItems might be grouped by menu). 
+			// If data is stored, filter is passed through POST call to the server; 
+			// { id: 5, children[ { id: 2 } ] } becomes { id: 5, id_menu: 3, children[ { id: 2, id_menu: 3 } ] } 
+			filter			: '=treeComponentFilter'
+			, labelName		: '@treeComponentLabel'
+			, entityName	: '@for'
+			, maxDepth		: '@'
+		}
+		, bindToController	: true
+		, controllerAs		: 'treeComponentController'
+	};
+
+} ] )
+
+
+.controller( 'TreeComponentController', [ '$scope', '$rootScope', '$attrs', '$location', '$q', 'APIWrapperService', function( $scope, $rootScope, $attrs, $location, $q, APIWrapperService ) {
+
+	var self			= this
+		, element
+		, detailViewController
+		, maxDepth		= $attrs.maxDepth || 10;
+
+	self.dataTree		= undefined;
+
+	
+	if( !self.labelName || !self.entityName ) {
+		console.warn( 'TreeComponentController: labelName or entityName (for) attribute missing' );
+	}
+
+
+	/**
+	* Called when user clicks pencil on a list item 
+	*/
+	self.editEntity = function( ev, id ) {
+		
+		ev.preventDefault();
+		$location.path( '/' + $attrs.for + '/' + id );
+
+	};
+
+
+	// Called by link function
+	self.init = function( el, detViewCtrl ) {
+
+		element					= el;
+		detailViewController	= detViewCtrl;
+
+		detailViewController.register( self );
+
+		self.getData();
+
+	};
+
+
+
+
+	/**
+	* If we get data through the detailViewController (self.select/registerGetDataHandler)
+	* we can't pass a range argument. The menu might be much l
+	*/
+	self.getData = function() {
+
+		// Create headers
+		var headers = {
+			range		: '0-0'
+		};
+
+		if( self.filter ) {
+			var filter = '';
+			for( var i in self.filter ) {
+				filter = i + '=' + self.filter[ i ];
+			}
+			headers.filter = filter;
+		}
+
+		// Make GET request
+		APIWrapperService.request( {
+			method			: 'GET'
+			, url			: '/' + self.entityName
+			, headers		: headers
+		} )
+		.then( function( data ) {
+
+			self.updateData( data );
+
+		}, function( err ) {
+			$rootScope.$broadcast( 'notification', {
+				type				: 'error'
+				, message			: 'web.backoffice.detail.loadingError'
+				, variables			: {
+					errorMessage	: err
+				}
+			} );
+		} );
+
+	};
+
+
+
+
+
+	/**
+	* Listens for data gotten in getData
+	*/
+	self.updateData = function( data ) {
+
+		self.dataTree = getTree( data );
+		console.log( 'TreeComponentController: dataTree is %o', self.dataTree );
+
+		// Wait for template to be rendered
+		setTimeout( function() {
+		
+			// Add class required for jQuery plugin			
+			element.addClass( 'dd' );
+
+			// Add jQuery plugin
+			element.nestable( {
+				dragClass				: 'dd-dragelement'
+				, placeClass			: 'dd-placeholder'
+				, maxDepth				: self.maxDepth
+			} );
+
+		}, 500 );
+		
+	};
+
+
+
+
+
+
+	/**
+	* Returns data to be stored. There's a special JSON POST call available to store a tree. 
+	*/
+	self.getSaveCalls = function() {
+		
+		var treeData = element.nestable( 'serialize' );
+		console.log( 'TreeComponentController: Store data %o', treeData );
+
+		var cleanedTreeData = self.cleanTreeData( treeData );
+		console.log( 'TreeComponentController: Cleaned data %o, got %o', treeData, cleanedTreeData );
+
+		return {
+			method				: 'POST'
+			, headers			: {
+				'Content-Type'	: 'application/json'
+			}
+			, url				: '/' + self.entityName
+			, data				: cleanedTreeData
+		};
+
+	};
+
+
+
+
+	/**
+	* nestable('serialize') returns data with a lot of junk on it – remove it and only leave
+	* the properties «id» and «children» left. Recurive function.
+	* originalTreeData, as serialized by nestable('serialize') is an object with keys 0, 1, 2, 3… 
+	* and not an array.
+	*/
+	self.cleanTreeData = function( originalTreeData, cleaned ) {
+
+		if( !cleaned ) {
+			cleaned = [];
+		}
+
+		for( var i in originalTreeData ) {
+
+			var branch = originalTreeData[ i ];
+
+			var cleanBranch = {};
+			cleanBranch.id = branch.id;
+
+			// If filter was set, add it to the data that will be sent to the server. 
+			if( self.filter ) {
+
+				for( var j in self.filter ) {
+					cleanBranch[ j ] = self.filter[ j ];
+				}
+
+			}
+
+			// Children: Recursively call cleanTreeData
+			if( branch.children ) {
+				cleanBranch.children = [];
+				self.cleanTreeData( branch.children, cleanBranch.children );
+			}
+
+			cleaned.push( cleanBranch );
+
+		}
+
+		return cleaned;
+
+	};
+
+
+
+
+
+
+
+
+
+	/* https://github.com/joinbox/eb-service-generics/blob/master/controller/MenuItem.js */
+    var getTree = function(rows) {
+
+        var rootNode = {};
+
+        // sort the nodes
+        rows.sort(function(a, b) {return a.left - b.left;});
+
+        // get the tree, recursive function
+        buildTree(rootNode, rows);
+
+        // return the children, the tree has no defined root node
+        return rootNode.children;
+
+    };
+
+
+    var buildTree = function(parentNode, children) {
+        var   left          = 'left'
+            , right         = 'right'
+            , nextRight     = 0
+            , nextChildren  = []
+            , parent;
+
+        if (!parentNode.children) {parentNode.children = [];}
+
+        children.forEach(function(node) {
+            if (node[right] > nextRight) {
+                // store next rigth boundary
+                nextRight = node[right];
+
+                // reset children array
+                nextChildren = [];
+
+                // add to parent
+                parentNode.children.push(node);
+
+                // set as parent
+                parent = node;
+            }
+            else if (node[right]+1 === nextRight) {
+                nextChildren.push(node);
+
+                // rcursiveky add chuildren
+                buildTree(parent, nextChildren);
+            }
+            else { nextChildren.push(node);}
+        });
+    };
+
+
+
+} ] )
+
+
+
+
+// Base template: create data-tree-form-element-list
+.run( function( $templateCache ) {
+
+	$templateCache.put( 'treeBranchTemplate.html',
+		'<div class=\'dd-handle\'>' +
+			'<span data-ng-if=\'branch[ treeComponentController.labelName ]\'>{{ branch[ treeComponentController.labelName ] }}</span>' +
+			'<span data-ng-if=\'!branch[ treeComponentController.labelName ]\'>N/A</span>' +
+		'</div>' +
+		'<button class=\'fa fa-pencil btn btn-link edit\' data-ng-click=\'treeComponentController.editEntity($event,branch.id)\'></button>' +
+		'<ol data-ng-if=\'branch.children\' class=\'dd-list\'>' +
+			'<li data-ng-repeat=\'branch in branch.children\' data-ng-include=\'"treeBranchTemplate.html"\' class=\'dd-item\' data-id=\'{{ branch.id }}\'>' +
+			'</li>' +
+		'</ol>'
+	);
+
+	$templateCache.put( 'treeTemplate.html',
+		'<ol>' +
+			'<li data-ng-repeat=\'branch in treeComponentController.dataTree\' data-ng-include=\'"treeBranchTemplate.html"\' class=\'dd-item\' data-id=\'{{ branch.id }}\'>' +
+			'</li>' +
+		'</ol>'
 	);
 
 } );
@@ -1245,13 +1974,20 @@ angular
 
 .directive( 'backofficeLabel', [ '$templateCache', '$compile', function( $templateCache, $compile ) {
 	return {
-		link				: function( $scope, element, attrs ) {
+		link				: function( $scope, element, attrs, ctrl ) {
 
+			
 			var scope	= $scope.$new()
 				, tpl	= $( $templateCache.get( 'backofficeLabelTemplate.html' ) );
 
-			scope.valid = scope.required = scope.name = scope.entityName = undefined;
+			// Set validity to true for old components; in template, 
+			// we test for !valid||!isValid
+			scope.valid = true;
 
+			// scope.required is used for old (auto) elements
+			scope.required = scope.name = scope.entityName = undefined;
+
+			$scope.entityName = ctrl[ 0 ].getEntityName();
 
 			$scope.$watch( 'data', function( newValue ) {
 
@@ -1262,6 +1998,7 @@ angular
 
 				scope.valid		= newValue.valid;
 				scope.name		= newValue.name;
+				console.log( 'backofficeLabel: Updated data %o', data );
 			}, true );
 
 			$scope.$watch( 'entityName', function( newValue ) {
@@ -1276,14 +2013,20 @@ angular
 			$compile( tpl )( scope );
 
 		}
+		, require: [ '^detailView' ]
+		, scope: {
+			labelIdentifier	: '@'
+			, isRequired	: '&'
+			, isValid		: '&'
+		}
 	};
 } ] )
 
 .run( function( $templateCache ) {
 	$templateCache.put( 'backofficeLabelTemplate.html',
-		'<label class=\'control-label col-md-3\' data-ng-class=\'{invalid: !valid}\'>' +
-			'<span data-ng-if=\'required\' class=\'required-indicator \'>*</span>' +
-			'<span data-translate=\'web.backoffice.{{ entityName }}.{{ name }}\'></span>' +
+		'<label class=\'control-label col-md-3\' data-ng-class=\'{invalid: !isValid()}\'>{{checkValidity()}}' +
+			'<span data-ng-if=\'isRequired()||required\' class=\'required-indicator \'>*</span>' +
+			'<span data-translate=\'web.backoffice.{{ entityName }}.{{ labelIdentifier }}\'></span>' +
 		'</label>'
 	);
 } );
@@ -1294,6 +2037,15 @@ angular
 * - Gets field data from server (through an OPTIONS call)
 * - Input components (text, images, relations) may register themselves
 * - Stores data on server
+*
+* Child components must/may implement the following methods:
+* - register: When all components were registered, GET call is made. 
+*             To be called after OPTION data was processed by component.
+* - registerOptionsDataHandler: get OPTION data (optional)
+* - registerGetDataHandler: get GET data (optional)
+* - getSaveCalls: Returns POST calls (optional)
+* - isValid: Returns true if component is valid (optional)
+* - getSelectFields: Returns select fields (replaces the select property)
 */
 angular
 .module( 'jb.backofficeDetailView', [ 'eb.apiWrapper', 'ebBackofficeConfig' ] )
@@ -1537,10 +2289,9 @@ angular
 		element = el;
 
 		// Store number of auto form elements
-		var autoFormElements = element.find( '[data-auto-form-element], [data-hidden-input]' );
+		var autoFormElements = element.find( '[data-auto-form-element], [data-hidden-input], [data-backoffice-tree-component], [data-backoffice-relation-component]' );
 		autoFormElementCount = autoFormElements.length;
 
-	
 		// getOptionData whenever entityId changes if entityId is on $attrs
 		if( $attrs.hasOwnProperty( 'entityId' ) ) {
 
@@ -1681,7 +2432,7 @@ angular
 				};
 			}
 
-			// Int
+			// Bool
 			if( singleFieldData.name && singleFieldData.type === 'boolean' ) {
 				ret[ singleFieldData.name ] = {
 					type		: 'boolean'
@@ -1700,6 +2451,7 @@ angular
 				};
 			}
 
+			// Date
 			if( singleFieldData.name && singleFieldData.type === 'date' ) {
 				ret[ singleFieldData.name ] = {
 					type		: 'datetime'
@@ -1813,7 +2565,12 @@ angular
 	// Register Components
 
 	/**
-	* For a autoFormElement to register itself
+	* For a autoFormElements to register themselves. 
+	* - Pushes them to registeredComponents
+	* - As soon as all are registered, data is gotten (GET)
+	* - Gotten data (GET) is distributed to registered components
+	* - Registered components are asked for their data when saving
+	* @param {Object} element		The child directive itself (this)
 	*/
 	self.register = function( element ) {
 
@@ -1900,13 +2657,17 @@ angular
 
 			var comp = self.registeredComponents[ i ];
 
-			if( !comp.select ) {
-				continue;
+			// New notation: getSelectFields
+			if( comp.getSelectFields && angular.isFunction( comp.getSelectFields ) ) {
+				select = select.concat( comp.getSelectFields() );
+			}
+			// Old notation: select property
+			else if( comp.select ) {
+				// Array (when multiple selects must be made)
+				// concat adds array or value
+				select = select.concat( comp.select );
 			}
 
-			// Array (when multiple selects must be made)
-			// concat adds array or value
-			select = select.concat( comp.select );
 		
 		}
 		
@@ -2025,12 +2786,12 @@ angular
 		// after it has been created (when user was on /entity/new)
 		// Can't be returned, as we're using promises. Therefore pass an object to the save
 		// call that will be filled with the id
-		var returnValue = {
+		/*var returnValue = {
 			id: undefined
-		};
+		};*/
 
 		return self
-			.makeSaveRequest( self.registeredComponents, self.getEntityName(), returnValue )
+			.makeSaveRequest( self.registeredComponents, self.getEntityName() )
 			.then( function( data ) {
 
 				// Entity didn't have an ID (was newly created): Redirect to new entity
@@ -2047,7 +2808,7 @@ angular
 
 				self.updateData();
 
-				return returnValue.id;
+				return true;
 
 			}, function( err ) {
 
@@ -2055,7 +2816,7 @@ angular
 					type				: 'error'
 					, message			: 'web.backoffice.detail.saveError'
 					, variables			: {
-						errorMessage	: err
+						errorMessage	: err.message
 					}
 				} );
 
@@ -2076,7 +2837,7 @@ angular
 		// Check if all form elements are valid
 		for( var i = 0; i < self.registeredComponents.length; i++ ) {
 			if( angular.isFunction( self.registeredComponents[ i ].isValid ) && !self.registeredComponents[ i ].isValid() ) {
-				return $q.reject( 'Not all required fields filled out.' );
+				return $q.reject( new Error( 'Not all required fields filled out.' ) );
 			}
 		}
 
@@ -2150,6 +2911,18 @@ angular
 				relationCalls.push( calls[ i ] );
 			}
 		}
+	
+		// entityId not yet set: New element – but has no fields or no required fields, 
+		// therefore no information might be provided, except for some relations. 
+		// If entity is not generated (what would happen as there's no data to store), 
+		// relations could not be created (POST to /entityName/otherEntityName/otherEntityId)
+		// would fail, as entityId doesn't exist. 
+		if( !mainCall && !self.getEntityId() ) {
+			mainCall = {
+				method			: 'POST'
+				, url			: '/' + self.getEntityName()
+			};
+		}
 
 		console.log( 'DetailView: Main save call is %o, other calls are %o', mainCall, relationCalls );
 
@@ -2158,6 +2931,8 @@ angular
 
 			// Make all secondary calls (to sub entities) simultaneously
 			.then( function( mainCallData ) {
+
+				console.log( 'DetailView: Made main save call; got back %o', mainCallData );
 
 				// Pass id of newly created object back to the Controller
 				// so that user can be redirected to new entity
@@ -2204,23 +2979,36 @@ angular
 		}
 
 		// Check if call to url does already exit
-		var call = this.getSaveCall( calls, componentCall.method, componentCall.url );
+		var call = this.getSaveCall( calls, componentCall.method, componentCall.url  );
+
+		// If componentCall has headers, treat it as a different call. To improve, we might
+		// compare headers, but let's save that for better times.
+		// Headers are e.g. used in treeFormData to store a tree (needs Content-Type: application/json)
+		if( componentCall.hasOwnProperty( 'headers' ) ) {
+			call = false;
+		}
 
 		// Call doesn't yet exist
 		if( !call ) {
 			call = {
 				method		: componentCall.method
 				, url		: componentCall.url
-				, data		: {}
+				, data		: componentCall.data
+				, headers	: componentCall.headers || {}
 			};
 			calls.push( call );
 		}
 
 		// Add data
-		if( componentCall.data ) {
-			for( var p in componentCall.data ) {
-				call.data[ p ] = componentCall.data[ p ];
+		else {
+
+			// Don't do that if we're sending a string or array (e.g. when using application/json as Content-Type
+			if( componentCall.data ) {
+				for( var p in componentCall.data ) {
+					call.data[ p ] = componentCall.data[ p ];
+				}
 			}
+
 		}
 
 	};
@@ -2239,7 +3027,12 @@ angular
 		// Default: empty array, if not found
 		var saveCall = false;
 		calls.some( function( call ) {
-			if( call.method === method && call.url === url ) {
+			// Check if URL is the same. Normally use === comparator. 
+			// But if URL is not set, it might be false or '', therefore
+			// use == comparator.
+			var sameUrl			= call.url === url || ( !call.url && !url )
+				, sameMethod	= call.method.toLowerCase() === method.toLowerCase();
+			if( sameMethod && sameUrl ) {
 				saveCall = call;
 				return true;
 			}
@@ -2274,18 +3067,39 @@ angular
 		// url
 		// - Take current url + url, if it's relative (doesn't start with a /)
 		// - Take url if it's absolute (starts with a /)
-		var url	= call.url.indexOf( '/' ) === 0 ? call.url : self.getEntityName() + '/' + self.getEntityId() + '/' + call.url;
+		var url;
+		if( call.url && call.url.indexOf( '/' ) === 0 ) {
+			url = call.url;
+		}
+		else {
+			url = '/' + self.getEntityName();
 
-		console.log( 'DetailView: Make %o call to %o with %o', call.method, url, call.data );
+			// Only use entity's ID if it exists (i.e. we're not newly creating an entity)
+			if( self.getEntityId() ) {
+				url += '/' + self.getEntityId();
+			}
+
+			// Append call.url, if available
+			if( call.url ) {
+				url += '/' + call.url;
+			}
+
+		}
+
+		console.log( 'DetailView: Make %s call to %s with %o. Call is %o, entityName is %o.', call.method, url, call.data, call, self.getEntityName() );
 
 		// Add datasourceId as long as it's needed
 		// #todo remove when eE's ready
+		if( !call.data ) {
+			call.data = {};
+		}
 		call.data.id_dataSource = BackofficeConfig.dataSourceId;
 
 		return APIWrapperService.request( {
 			url			: url
 			, data		: call.data
 			, method	: call.method
+			, headers	: call.headers
 		} );
 
 	};
@@ -2528,6 +3342,7 @@ angular
 
 
 
+
 	/**
 	* Gets the template and controller to be rendered, and does so.
 	*/
@@ -2569,6 +3384,11 @@ angular
 * Hidden input. Used to 
 * - add select statements to detailView (use for attribute)
 * - store hidden fields in detailView
+* 
+* Pass 
+* - data-read="expression" to only read data if a certain condition is met or
+* - data-write="expression" to only write data if a certain condition is met
+* Default for both (if not passed) is true. Evals against $scope.$parent.
 */
 
 'use strict';
@@ -2609,15 +3429,31 @@ angular
 
 	};
 
+	self.isValid = function() {
+		console.log( 'HiddenInputController: isValid? yes.' );
+		return true;
+	};
+
+
 	// Purpose 1: let user select any field passed through for
-	self.select = $attrs.for;
+	// If the elemen's data-read attribute evals to false, don't add the for
+	// attribute to the select statement. 
+	// This is e.g required for nested sets where we need to *set* «parentNode» or «after» or «before»,
+	// but can't select those properties because they're virtual.	
+	console.log( 'HiddenInput: for is %o, read %o evals to %o', $attrs.for, $attrs.read, $scope.$parent.$eval( $attrs.read ) );
+	if( !$attrs.hasOwnProperty( 'read' ) && $scope.$parent.$eval( $attrs.read ) ) {
+		self.select = $attrs.for;
+	}
+
 
 	// Purpose 2: Store hidden values
 	self.getSaveCalls = function() {
 
-		console.log( 'HiddenInput: Get save calls; $attrs is %o', $attrs.data );
+		var writeData = !$attrs.hasOwnProperty( 'write' ) || $scope.$parent.$eval( $attrs.write );
 
-		if( $attrs.data ) {
+		console.log( 'HiddenInput: Get save calls; $attrs.data is %o, data-write is %o and evals to %o', $attrs.data, $attrs.write, $scope.$parent.$eval( $attrs.write ) );
+
+		if( writeData && $attrs.data ) {
 
 			var saveData = {};
 			saveData[ $attrs.for ] = $attrs.data;
@@ -2630,6 +3466,7 @@ angular
 				// Method: PATCH if entity already has an ID, else POST
 				, method	: detailViewController.getEntityId() ? 'PATCH' : 'POST'
 			};
+
 		}
 
 		return false;
@@ -2893,6 +3730,9 @@ angular
 			fields			: '='
 			, model			: '='
 			, entityName	: '=' // For translation
+			, tableName		: '='
+			// Sets validity of the component on the parent scope
+			, setValidity	: '&'
 		}
 	};
 
@@ -2903,26 +3743,166 @@ angular
 	var self = this
 		, element;
 
+
 	// Array with 
 	// {
 	//	id		: 1
 	//	, code	: 'de'
 	//	}
 	$scope.languages			= [];
-	// Array with languageIds
+	
+
+	/**
+	* Array with languageIds that were selected to be edited (multiselect)
+	*/ 
 	$scope.selectedLanguages	= [];
 
 
-	$scope.$watch( 'selectedLanguages', function( newValue ) {
+	/**
+	* Contains every field and it's definition, e.g. 
+	* {
+	*	name			: fieldName (taken from $scope.fields)
+	* 	required		: true
+	* }
+	*/ 
+	$scope.fieldDefinitions		= [];
 
-		// Don't divide by 0
-		if( newValue.length === 0 ) {
-			return;
+
+
+	self.init = function( el, mCtrl ) {
+		element = el;
+
+		// Adjust height of textareas
+		setTimeout( function() {
+			self.adjustHeightOfAllAreas();
+		}, 1000 );
+
+		self.setupFieldDefinitionWatcher();
+		self.setupValidityWatcher();
+		self.setupSelectedLanguagesWatcher();
+
+	};
+
+
+
+
+
+
+
+	self.setupSelectedLanguagesWatcher = function() {
+		$scope.$watch( 'selectedLanguages', function( newValue ) {
+
+			// Don't divide by 0
+			if( newValue.length === 0 ) {
+				return;
+			}
+			var colWidth = Math.floor( 100 / newValue.length  ) + '%';
+			element.find( '.locale-col' ).css( 'width', colWidth );
+
+		}, true );
+	};
+
+
+	/**
+	* Watches model for changes and updates validity on *parent scope‹ if
+	* function was passed. Therefore tells if the whole component is valid or not (and 
+	* not just a single field).
+	* If at least one field (required or not) was set, all required fields must be set.
+	*/
+	self.setupValidityWatcher = function() {
+		$scope.$watch( 'model', function( newVal ) {
+			
+			if( !$scope.setValidity || !angular.isFunction( $scope.setValidity ) ) {
+				return;
+			}
+
+			// If model is not an object, there's no value missing.
+			if( !angular.isObject( newVal ) || !Object.keys( newVal ) ) {
+				$scope.setValidity( {validity: true } );
+				return;
+			}
+
+
+			var requiredFields		= self.getRequiredFields()
+				, valid				= true;
+
+
+			// Go through all objects. Check if required properties are set.
+			Object.keys( newVal ).forEach( function( languageKey ) {
+
+				var languageData		= newVal[ languageKey ]
+					, usedFields		= Object.keys( languageData );
+
+				console.log( 'LocaleComponentController: used fields %o, required %o in %o', usedFields, requiredFields, languageData );
+
+				requiredFields.some( function( reqField ) {
+					if( usedFields.indexOf( reqField ) === -1 ) {
+						valid = false;
+						console.log( 'LocaleComponentController: Required field %o missing in %o', reqField, languageData );
+					}
+				} );
+
+			} );
+
+			$scope.setValidity( { validity: valid } );
+
+		}, true );
+	};
+
+
+
+
+	/**
+	* Checks if a certain field is valid. 
+	*/
+	self.isFieldValid = function( languageId, fieldName ) {
+
+		var requiredFields		= self.getRequiredFields()
+			, languageData		= $scope.model[ languageId ];
+
+		// No value was set for the language: All it's fields are valid.
+		// Not an object: Invalid, don't care.
+		if( !languageData || !angular.isObject( languageData ) ) {
+			return true;
 		}
-		var colWidth = Math.floor( 100 / newValue.length  ) + '%';
-		element.find( '.locale-col' ).css( 'width', colWidth );
 
-	}, true );
+		// Not valid: Data is set for this language (i.e. some keys exist)
+		// but current fieldName was not set. 
+		// ATTENTION: '' counts as a set value (empty string).
+		if( !languageData[ fieldName ] && languageData[ fieldName ] !== '' ) {
+			return false;
+		}
+
+		return true;
+
+	};
+
+
+
+	/**
+	* Checks if a certain field in a certain language is valid. Needed to 
+	* set .invalid class on the label.
+	*/
+	$scope.isFieldValid = function( languageId, fieldName ) {
+		return self.isFieldValid( languageId, fieldName );
+	};
+
+
+
+
+
+	/**
+	* Returns an array of the required fields
+	*/
+	self.getRequiredFields = function() {
+		var requiredFields = [];
+		$scope.fieldDefinitions.forEach( function( fieldDef ) {
+			if( fieldDef.required ) {
+				requiredFields.push( fieldDef.name );
+			}
+		} );
+		return requiredFields;
+	};
 
 
 
@@ -3035,43 +4015,105 @@ angular
 	};
 
 
-	self.init = function( el, mCtrl ) {
-		element = el;
 
-		// Adjust height of textareas
-		setTimeout( function() {
-			self.adjustHeightOfAllAreas();
-		}, 1000 );
+	/**
+	* Watches $scope.tableName and $scope.fields. Calls getFieldDefinitions.
+	*/
+	self.setupFieldDefinitionWatcher = function() {
+
+		$scope.$watchGroup( [ 'tableName', 'fields' ], function() {
+			self.getFieldDefinitions();
+		} );
 
 	};
 
-	self.getLanguages = function() {
+
+	/** 
+	* Gets definitions for fields
+	*/
+	self.getFieldDefinitions = function() {
+
+		if( !$scope.fields || !$scope.tableName ) {
+			console.log( 'LocaleComponentController: fields or tableName not yet ready' );
+			return;
+		}
+
 		APIWrapperService.request( {
-			url			: '/language'
-			, method	: 'GET'
+			url				: '/' + $scope.tableName
+			, method		: 'OPTIONS'
 		} )
 		.then( function( data ) {
-
-			// Put languages to $scope.languages
-			data.forEach( function( lang ) {
-
-				// Set one selected
-				if( $scope.selectedLanguages.length === 0 ) {
-					self.toggleLanguage( lang.id );
-				}
-
-				$scope.languages.push( {
-					id		: lang.id
-					, code	: lang.code
-				} );
-			} );
-
+			self.parseOptionData( data );
 		}, function( err ) {
-			$rootScope.$broadcast( 'notification', { type: 'error', message: 'web.backoffice.detail.loadingError', variables: { errorMessage: err } } );
+			console.error( 'LocaleComponentController: Could not get OPTION data for table %o: %o', $scope.tableName, err );
 		} );
+
 	};
 
+
+	/**
+	* Parses data gotten from OPTIONS call. Goes through OPTIONS data for every field and 
+	* sets fieldDefinitions accoringly.
+	*/
+	self.parseOptionData = function( data ) {
+
+		console.log( 'LocaleComponentController: Parse OPTIONS data %o', data );
+
+		// Reset fieldDefinitions
+		$scope.fieldDefinitions = [];
+
+		$scope.fields.forEach( function( field ) {
+
+			$scope.fieldDefinitions.push( {
+				name			: field
+				, required		: !data[ field ].nullable
+				, valid			: true
+			} );
+
+		} );
+
+	};
+
+
+
+	/**
+	* Returns the languages that the current website supports. 
+	* They need to be stored (on login) in localStorage in the form of
+	* [ {
+	*		id: 2
+	*		, code: 'it'
+	*		, name: 'Italian'
+	* } ]
+	*/
+	self.getLanguages = function() {
+
+		if( !localStorage || !localStorage.getItem( 'supportedLanguages' ) ) {
+			console.error( 'LocaleComponentController: supportedLanguages cannot be retrieved from localStorage' );
+			return;
+		}
+
+		var languages = localStorage.getItem( 'supportedLanguages' );
+		languages = JSON.parse( languages );
+
+		languages.forEach( function( language ) {
+
+			$scope.languages.push( {
+				id			: language.id
+				, code		: language.code
+			} );
+
+			// Select first language
+			if( $scope.selectedLanguages.length === 0 ) {
+				self.toggleLanguage( language.id );
+			}
+
+		} );
+
+	};
+
+
 	self.getLanguages();
+
 
 } ] )
 
@@ -3090,9 +4132,9 @@ angular
 			'<div class=\'locale-content clearfix\'>' +
 				'<div class=\'locale-col\' data-ng-repeat=\'lang in languages\' data-ng-show=\'isSelected( lang.id )\'>' +
 					'<p>{{ lang.code | uppercase }}</p>' +
-					'<div data-ng-repeat=\'field in fields\'>' +
-						'<label data-translate=\'web.backoffice.{{entityName}}.{{field}}\' data-ng-attr-for=\'locale-{{lang.id}}-{{field}}\'></label>' +
-						'<textarea data-ng-model=\'model[ lang.id ][ field ]\' data-ng-attr-id=\'locale-{{lang.id}}-{{field}}\' class=\'form-control\' data-ng-keyup=\'adjustHeight( $event )\' data-ng-focus=\'adjustHeight( $event )\' /></textarea>' +
+					'<div data-ng-repeat=\'fieldDefinition in fieldDefinitions\'>' +
+						'<label data-ng-attr-for=\'locale-{{lang.id}}-{{fielDefinition.name}}\' data-ng-class=\'{ "invalid": !isFieldValid(lang.id, fieldDefinition.name)}\'><span data-translate=\'web.backoffice.{{entityName}}.{{fieldDefinition.name}}\' ></span> <span class=\'required-indicator\'data-ng-show=\'fieldDefinition.required\'>*</span></label>' +
+						'<textarea data-ng-model=\'model[ lang.id ][ fieldDefinition.name ]\' data-ng-attr-id=\'locale-{{lang.id}}-{{fieldDefinition.name}}\' class=\'form-control\' data-ng-keyup=\'adjustHeight( $event )\' data-ng-focus=\'adjustHeight( $event )\' /></textarea>' +
 					'</div>' +
 				'</div>' +
 			'</div>' +
@@ -3100,783 +4142,488 @@ angular
 	);
 
 } );
-angular
-.module( 'jb.relationInput', [ 'eb.apiWrapper' ] )
-.directive( 'relationInput', [ function() {
-
-	return {
-		require				: [ 'relationInput', 'ngModel' ]
-		, controller		: 'RelationInputController'
-		, link				: function( scope, element, attrs, ctrl ) {
-			ctrl[ 0 ].init( element, ctrl[ 1 ] );
-		}
-		, scope				: {}
-		, templateUrl		: 'relationInputTemplate.html'
-	};
-
-} ] )
-
-.controller( 'RelationInputController', [ '$scope', '$attrs', '$q', '$rootScope', 'APIWrapperService', function( $scope, $attrs, $q, $rootScope, APIWrapperService ) {
-
-	var self		= this
-		, element
-		, modelCtrl
-		, open		= false;
-
-	var eventNamespace = ( Math.random() + '' ).replace( '.', '' ).substring( 1, 15 );
-
-	// URL to get suggestions from
-	self.entityUrl				= $attrs.relationEntityEndpoint;
-
-	// Variables for suggestion: 
-	// - what fields do we search?
-	self.searchField			= $attrs.relationEntitySearchField;
-
-	// Template for search results
-	self.searchResultTemplate	= $attrs.relationSuggestionTemplate;
-
-	self.isMultiSelect			= $attrs.multiSelect === 'true' ? true : false;
-
-	// May the relations be deleted?
-	$scope.deletable			= $scope.$parent.$eval( $attrs.deletable );
-
-
-
-	// Check if all fields are provided
-	var requiredFields = [ 'entityUrl', 'searchResultTemplate', 'searchField' ];
-	requiredFields.forEach( function( requiredField ) {
-		if( !self[ requiredField ] ) {
-			console.error( 'RealtinInput: Missing %s, is mandatory', requiredField );
-		}
-	} );
-
-	// Make URLs public for «edit» and «new» buttons
-	$scope.newEntityUrl		= self.entityUrl;
-
-
-
-	// Make ngModel available to templates
-	// -> one way binding
-	$scope.entities		= undefined;
-
-	$scope.$watch( function() {
-		return modelCtrl.$modelValue;
-	}, function( newValue ) {
-		//console.log( 'RelationInput: entites for selected is %o', newValue );
-		$scope.entities			= newValue;
-	} );
-
-
-
-
-
-
-	//
-	// Init
-	//
-
-	self.init = function( el, model ) {
-		element		= el;
-		modelCtrl	= model;
-		console.log( 'RelationInput: model is %o on init', model );
-	};
-
-
-
-
-
-
-
-
-	//
-	// Change of entities (entities were added or removed)
-	// -> Update model
-	//
-
-	// Make modelValue available to UI so that 
-	// selected-entities can display the selected entities
-	// But keep in self so that child directives may access it
-	//self.entities = $scope.entities = [];
-
-
-	self.addRelation = function( entity ) {
-
-		// Update entities (will be displayed in selected-entities)
-
-		// Update model
-		if( !self.isMultiSelect ) {
-			modelCtrl.$setViewValue( [ entity ] );
-		}
-		else {
-			var currentData = ( modelCtrl.$modelValue && angular.isArray( modelCtrl.$modelValue ) ) ? modelCtrl.$modelValue.slice() : [];
-			currentData.push( entity );
-			modelCtrl.$setViewValue( currentData );
-		}
-
-		$scope.$broadcast( 'entitiesUpdated', $scope.entities );
-
-	};
-
-
-	self.removeRelation = function( entity ) {
-
-		if( self.isMultiSelect ) {
-			var originalData = modelCtrl.$modelValue;
-			originalData.splice( originalData.indexOf( entity ), 1 );
-			modelCtrl.$setViewValue( originalData );
-		}
-		else {
-			modelCtrl.$setViewValue( [] );
-		}
-
-		$scope.$broadcast( 'entitiesUpdated', $scope.entities );
-
-	};
-
-
-
-
-
-
-
-
-
-
-
-	//
-	// Select fields
-	//
-
-
-
-
-
-	//
-	// Open?
-	//
-	self.isOpen = function() {
-		// If we're open, remove the input field that catches the focus or the
-		// user may not go one input field back (shift-tab)
-		var focusInput = element.find( '.selected-entities input' );
-		if( open ) {
-			focusInput.hide();
-			setupDocumentClickHandler();
-		}
-		else {
-			focusInput.show();
-			removeDocumentClickHandler();
-		}
-		return open;
-	};
-
-
-
-
-
-
-	// 
-	// Event Listeners
-	//
-
-	// Watch for events, called from within init
-	self.setupEventListeners = function() {
-
-		// Open & close: 
-		// Watch for events here (instead of suggestion), as most events happen
-		// on this directive's element (and not the one of suggestion)
-
-		$scope.$on( 'relationInputFieldFocus', function() {
-			$scope.$apply( function() {
-				open = true;
-			} );
-		} );
-
-		$scope.$on( 'relationInputSelectedEntitiesClick', function() {
-			$scope.$apply( function() {
-				open = !open;
-			} );
-		} );
-
-		setupInputBlurHandler();
-
-	};
-
-
-
-
-
-	/**
-	* Blur on the input: Hide after some ms (that are needed for a click handler to fire first)
-	*/
-	function setupInputBlurHandler() {
-		element.find( '.entity-suggestions input' ).blur( function( ev ) {
-			setTimeout( function() {
-				$scope.$apply( function() {
-					open = false;
-				} );
-			}, 100 );
-		} );
-	}
-
-	/**
-	* Click on document: Is element.entity-suggestions above the element that was clicked?
-	* If not, close
-	*/
-	function setupDocumentClickHandler() {
-		$( document ).on( 'click.' + eventNamespace, function( ev ) {
-
-			// Clicked selectedEntities: Is handled in setupSelectedClickHandler
-			if( $( ev.target ).closest( element.find( '.selected-entities' ) ).length > 0 ) {
-				return;
-			}
-
-			if( $( ev.target ).closest( element.find( '.entity-suggestions') ).length === 0 ) {
-				$scope.$apply( function() {
-					open = false;
-				} );
-			}
-		} );
-	}
-
-	/**
-	* Remove document.click handler
-	*/
-	function removeDocumentClickHandler() {
-		$( document ).off( 'click.' + eventNamespace );
-	}
-
-} ] )
-
-
-
-.run( function( $templateCache ) {
-
-	$templateCache.put( 'relationInputTemplate.html',
-		'<div data-relation-input-selected-entities></div>' +
-		'<div data-relation-input-suggestions></div>' +
-		'<div clearfix>' +
-			'<a data-ng-attr-href=\'/#{{ newEntityUrl }}/new\'=\'#\'><span class=\'fa fa-plus\'></span> New</a>' +
-		'</div>'
-	);
-
-} )
-
-
-
-
-
-
-.directive( 'relationInputSuggestions', [ function() {
-
-	return {
-		require			: [ 'relationInputSuggestions', '^relationInput' ]
-		, link			: function( scope, element, attrs, ctrl ) {
-			ctrl[ 0 ].init( element, ctrl[ 1 ] );
-		}
-		, controller	: 'RelationInputSuggestionsController'
-		, replace		: true
-	};
-
-} ] )
-
-.controller( 'RelationInputSuggestionsController', [ '$scope', '$rootScope', '$compile', '$templateCache', 'APIWrapperService', 'RelationInputService', function( $scope, $rootScope, $compile, $templateCache, APIWrapperService, RelationInputService ) {
-
-	var self = this
-		, element
-		, relationInputController;
-
-
-	// List of results gotten for searchQuery
-	$scope.results		= [];
-
-	// Result selected by cursors (but not yet added)
-	$scope.selected		= undefined;
-
-	// Are we requesting data from the server currently?
-	// (If yes, display loading indicator)
-	$scope.loading		= false;
-
-
-
-	//
-	// Seach query
-	//
-
-	$scope.searchQuery	= undefined;
-
-	$scope.$watch( 'searchQuery', function( newValue ) {
-		self.getData( newValue );
-	} );
-
-
-
-	//
-	// Click on result or enter
-	//
-
-	$scope.selectResult = function( result ) {
-
-		// Propagate to relationInputController that updates the model
-		relationInputController.addRelation( result );
-
-		$scope.results			= [];
-		$scope.searchQuery		= '';
-
-	};
-
-
-
-
-
-
-	//
-	// Model changed
-	//
-
-	// Entites updated (propagated from relationInput)
-	// Update results displayed (remove added result from suggestions)
-	$scope.$on( 'entitiesUpdated', function() {
-		self.filterResults();
-	} );
-
-
-
-
-
-
-	//
-	// Init
-	//
-
-	self.init = function( el, relInputCtrl ) {
-		element = el;
-		relationInputController = relInputCtrl;
-		self.renderTemplate();
-		self.setupEventListeners();
-	};
-
-
-
-
-
-	//
-	// Open?
-	//
-
-	/**
-	* Returns true if suggestions should be displayed; sets focus on input
-	*/
-	$scope.isOpen = function() {
-		var open = relationInputController.isOpen();
-		if( open ) {
-			setTimeout( function() {
-				element.find( 'input' ).focus();
-			}, 100 );
-		}
-		return open;
-	};
-
-
-
-
-
-
-
-	//
-	// Render Template
-	// (don't use templateUrl as we need to insert searchResultTemplate)
-	//
-
-	self.renderTemplate = function() {
-
-		// resultTemplate: replace [ name ] with {{ result.name }}
-		// We can't use {{}} when template is passed, as it will be rendered and {{}} will be removed
-		// if we have to $compile the code first (see autoRelationInputDirecitve)
-		var resultTpl = relationInputController.searchResultTemplate;
-		resultTpl = resultTpl.replace( /\[\[(\s*)(((?!\]\]).)*)\]\]/gi, function( res, space, name ) {
-			return '{{ result.' + name + ' }}';
-		} );
-
-		var tpl = $( $templateCache.get( 'relationInputSuggestionsTemplate.html' ) );
-		tpl.find( 'li' ).append( resultTpl );
-		element.replaceWith( tpl );
-		$compile( tpl )( $scope );
-		element = tpl;
-
-	};
-
-
-
-
-
-	//
-	// Event Handlers
-	//
-
-	self.setupEventListeners = function() {
-
-		// If we use keyup, enter will only fire once (wtf?)
-
-		element.find( 'input' ).keydown( function( ev ) {
-
-			if( [ 40, 38, 13 ].indexOf( ev.which ) === -1 ) {
-				return;
-			}
-
-			$scope.$apply( function() {
-
-				switch( ev.which ) {
-					// Down
-					case 40:
-						self.updateSelected( ev, 1 );
-						break;
-					// Up
-					case 38:
-						self.updateSelected( ev, -1 );
-						break;
-					// Enter
-					case 13:
-						self.addSelected( ev );
-						break;
-				}
-
-			} );
-
-		} );
-
-	};
-
-
-	// Up or down arrow
-	self.updateSelected = function( ev, direction ) {
-
-		ev.preventDefault();
-
-		var currentIndex;
-		for( var i = 0; i < $scope.results.length; i++ ) {
-			if( $scope.results[ i ] === $scope.selected ) {
-				currentIndex = i;
-			}
-		}
-
-		if( currentIndex === undefined || ( direction === -1 && currentIndex === 0 ) || ( direction === 1 && currentIndex === $scope.results.length - 1 ) ) {
-			return;
-		}
-
-		$scope.selected = $scope.results[ currentIndex + direction ];
-
-	};
-
-	// User presses enter
-	self.addSelected = function( ev ) {
-		
-		ev.preventDefault();
-		if( !$scope.selected ) {
-			return;
-		}
-		$scope.selectResult( $scope.selected );
-
-	};
-
-
-
-
-
-
-
-
-
-	//
-	// Get Data
-	//
-
-	self.getData = function( query ) {
-
-		$scope.results = [];
-
-		if( !query ) {
-			return;
-		}
-
-		$scope.loading = true;
-
-		var filterField			= relationInputController.searchField
-			, filter			= filterField + '=like(\'%' + query + '%\')'
-			, selectFields		= self.getSelectFields();
-
-		console.log( 'RelationInput: request %s:%s, filter %o, select %o', relationInputController.entityUrl, filter, selectFields.join( ',' ) );
-
-		APIWrapperService.request( {
-			url				: relationInputController.entityUrl
-			, method		: 'GET'
-			, headers		: {
-				filter		: filter
-				, select	: selectFields.join( ',' )
-				, range		: '0-10'
-			}
-		} )
-		.then( function( data ) {
-			$scope.loading	= false;
-			$scope.results = data;
-			self.filterResults();
-			/*if( $scope.results.length > 0 ) {
-				$scope.selected = $scope.results[ 0 ];
-			}*/
-		}, function( err ) {
-			$scope.loading	= false;
-			$rootScope.$broadcast( 'notification', { type: 'error', message: 'web.backoffice.detail.loadingError', variables: { errorMessage: err } } );
-		} );
-
-	};
-
-
-
-	/**
-	* Get select fields from <li>'s content
-	*/
-	self.getSelectFields = function() {
-
-		var tpl = relationInputController.searchResultTemplate;
-
-		if( !tpl ) {
-			console.error( 'RelationInput: Missing searchResultTemplate in %o', self );
-		}
-
-		// Use service for template parsing (functionality is shared with selected entities controller)
-		return RelationInputService.extractSelectFields( tpl );
-
-	};
-
-
-
-
-
-
-
-
-
-	/**
-	* Updates $scope.results: Removes all entities that are already selected
-	* Then updates selected (as it may have been removed)
-	*/
-	self.filterResults = function() {
-
-		var selected = relationInputController.entities;
-
-		if( relationInputController.isMultiRelation ) {
-			for( var i = 0; i < selected.length; i++ ) {
-				for( var j = $scope.results.length - 1; j >= 0; j-- ) {
-
-					// id missing
-					if( !$scope.results[ j ].id || !selected[ i ].id ) {
-						continue;
-					}
-
-					if( $scope.results[ j ].id === selected[ i ].id ) {
-						$scope.results.splice( j, 1 );
-					}
-				}
-			}
-		}
-		else {
-
-		}
-
-		if( $scope.results.length > 0 ) {
-			$scope.selected = $scope.results[ 0 ];
-		}
-
-		console.log( 'RelationInput: filterResults; results is %o, selected %o', $scope.results, $scope.selected );
-
-	};
-
-} ] )
-
-
-.run( function( $templateCache ) {
-
-	$templateCache.put( 'relationInputSuggestionsTemplate.html',
-		'<div class=\'entity-suggestions\' data-ng-show=\'isOpen()\'>' +
-			'<input type=\'text\' class=\'form-control\' data-ng-model=\'searchQuery\' />' +
-			'<div class=\'progress progress-striped active\' data-ng-if=\'loading\'>' +
-				'<div class=\'progress-bar\' role=\'progressbar\' style=\'width:100%\'></div>' +
-			'</div>' +
-			'<div class=\'results-list\'>' +
-				'<ul data-ng-if=\'results.length > 0\'>' +
-					'<li data-ng-repeat=\'result in results\' data-ng-class=\'{selected:selected===result}\' data-ng-click=\'selectResult(result)\'><!-- see renderTemplate --></li>' +
-				'</ul>' +
-			'</div>' +
-		'</div>'
-	);
-
-} )
-
-
-
-
-
-
-
-.directive( 'relationInputSelectedEntities', [ function() {
-	return {
-		link			: function( scope, element, attrs, ctrl ) {
-			ctrl[ 0 ].init( element, ctrl[ 1 ] );
-		}
-		, controller	: 'RelationInputSelectedEntitiesController'
-		, require		: [ 'relationInputSelectedEntities', '^relationInput' ]
-		, templateUrl	: 'relationInputSelectedEntitiesTemplate.html'
-		, replace		: true
-	};
-} ] )
-
-
-.controller( 'RelationInputSelectedEntitiesController', [ '$scope', '$location', '$templateCache', '$compile', function( $scope, $location, $templateCache, $compile ) {
-
-	var self = this
-		, element
-		, relationInputController;
-
-
-	$scope.visitEntity = function( ev, entity ) {
-		ev.preventDefault();
-		$location.path( $scope.newEntityUrl + '/' + entity.id );
-	};
-
-
-	$scope.removeEntity = function( ev, entity ) {
-		ev.preventDefault();
-		relationInputController.removeRelation( entity );
-	};
-
-	self.init = function( el, relInputCtrl ) {
-
-		element						= el;
-		relationInputController		= relInputCtrl;
-
-		// eventListener of relationInput looks for events happening in this directive
-		// therefore wait with setting them up until this directive is ready and it's template
-		// is rendered
-		relationInputController.setupEventListeners();
-		$scope.isMultiSelect = relationInputController.isMultiSelect;
-
-		self.renderTemplate();
-		self.setupEventListeners();
-
-	};
-
-	self.renderTemplate = function() {
-
-		// See renderTemplate in relationInputSuggestionsController
-		var resultTpl = relationInputController.searchResultTemplate;
-		resultTpl = resultTpl.replace( /\[\[(\s*)(((?!\]\]).)*)\]\]/gi, function( res, space, name ) {
-			return '{{ result.' + name + ' }}';
-		} );
-
-		var tpl = $( $templateCache.get( 'relationInputSelectedEntitiesTemplate.html' ) );
-		tpl.find( 'li > span' ).append( resultTpl );
-		element.replaceWith( tpl );
-		$compile( tpl )( $scope );
-		element = tpl;
-
-	};
-
-
-	/**
-	* Listens to focus, blur and click events, propagates them (to RelationInputController). 
-	* They can't be listened to directly in the RelationInputController, as renderTemplate() is called
-	* _after_ the eventListener setup function of RelationInputController
-	*/
-	self.setupEventListeners = function() {
-
-		// Focus on (hidden) input: Show suggestions
-		element.find( 'input' ).focus( function() {
-				$scope.$emit( 'relationInputFieldFocus' );
-			} );
-
-		// Click on element
-		element.click( function() {
-			$scope.$emit( 'relationInputSelectedEntitiesClick' );
-		} );
-
-	};
-
-
-
-} ] )
-
-
-
-/**
-* Small services that need to be accessible from all directives/controllers
-*/
-.factory( 'RelationInputService', [ function() {
-
-	return {
-
-		/**
-		* Extracts select header fields from a template that is used for
-		* - the suggestions
-		* - the selected entities
-		* Template uses syntax like [[ select[0].subselect | filter ]] (basically replaces
-		* the angular {{ brackets with [[ )
-		*
-		* @return <Array>		Array of fields to be selected on GET call (as string)
-		*/
-		extractSelectFields: function( template ) {
-		
-			console.log( 'RelationInputService: Get fields from %o', template );
-
-			// Split at [ 
-			var tplSplit		= template.split( '[[' ).slice( 1 )
-			// Fields to select (e.g. 'eventData.name')
-				, selectFields	= [];
-
-			tplSplit.forEach( function( tplPart ) {
-
-				// Watch for closing ]]
-				var field = tplPart.substring( 0, tplPart.indexOf( ']]' ) );
-
-				// Remove part behind | (used for angular filters, e.g. with a date: «|date:'dd.mm.yy'»
-				if( field.indexOf( '|' ) > -1 ) {
-					field = field.substring( 0, field.indexOf( '|' ) );
-				}
-
-				// Remove white spaces
-				field = field.replace( /^\s*|\s*$/gi, '' );
-
-				// Remove [0] notation (used to output first element in array)
-				field = field.replace( /\[\d+\]/g, '' );
-
-				selectFields.push( field );
-
-			} );
-
-			return selectFields;
-
-		}
-
-
-	};
-
-
-} ] )
-
-
-.run( function( $templateCache ) {
-
-	$templateCache.put( 'relationInputSelectedEntitiesTemplate.html',
-		'<div class=\'selected-entities\' data-ng-class=\'{ "single-select": !isMultiSelect }\'>' +
-			'<input type=\'text\' />' + // catch [tab]
-			'<ul>' +
-				// use result for the loop as in the suggestion directive so that we may use the same template
-				'<li data-ng-repeat=\'result in entities\' data-ng-class=\'{empty: !result.name}\'>' +
-				'<span><!-- see renderTemplate() --></span>' +
-				'<button data-ng-click=\'visitEntity($event, result)\'><span class=\'fa fa-pencil\'></span></button>' +
-				'<button data-ng-if=\'deletable\' data-ng-click=\'removeEntity($event,result)\'>&times;</button>' +
-				'</li>' +
-			'</ul>' +
-		'</div>'
-	);
-
-} );
-
+/*https://raw.githubusercontent.com/dbushell/Nestable/master/jquery.nestable.js*/
+/*!
+ * Nestable jQuery Plugin - Copyright (c) 2012 David Bushell - http://dbushell.com/
+ * Dual-licensed under the BSD or MIT licenses
+ */
+;(function($, window, document, undefined)
+{
+    var hasTouch = 'ontouchstart' in document;
+
+    /**
+     * Detect CSS pointer-events property
+     * events are normally disabled on the dragging element to avoid conflicts
+     * https://github.com/ausi/Feature-detection-technique-for-pointer-events/blob/master/modernizr-pointerevents.js
+     */
+    var hasPointerEvents = (function()
+    {
+        var el    = document.createElement('div'),
+            docEl = document.documentElement;
+        if (!('pointerEvents' in el.style)) {
+            return false;
+        }
+        el.style.pointerEvents = 'auto';
+        el.style.pointerEvents = 'x';
+        docEl.appendChild(el);
+        var supports = window.getComputedStyle && window.getComputedStyle(el, '').pointerEvents === 'auto';
+        docEl.removeChild(el);
+        return !!supports;
+    })();
+
+    var defaults = {
+            listNodeName    : 'ol',
+            itemNodeName    : 'li',
+            rootClass       : 'dd',
+            listClass       : 'dd-list',
+            itemClass       : 'dd-item',
+            dragClass       : 'dd-dragel',
+            handleClass     : 'dd-handle',
+            collapsedClass  : 'dd-collapsed',
+            placeClass      : 'dd-placeholder',
+            noDragClass     : 'dd-nodrag',
+            emptyClass      : 'dd-empty',
+            expandBtnHTML   : '<button data-action="expand" type="button">Expand</button>',
+            collapseBtnHTML : '<button data-action="collapse" type="button">Collapse</button>',
+            group           : 0,
+            maxDepth        : 5,
+            threshold       : 20
+        };
+
+    function Plugin(element, options)
+    {
+        this.w  = $(document);
+        this.el = $(element);
+        this.options = $.extend({}, defaults, options);
+        this.init();
+    }
+
+    Plugin.prototype = {
+
+        init: function()
+        {
+            var list = this;
+
+            list.reset();
+
+            list.el.data('nestable-group', this.options.group);
+
+            list.placeEl = $('<div class="' + list.options.placeClass + '"/>');
+
+            $.each(this.el.find(list.options.itemNodeName), function(k, el) {
+                list.setParent($(el));
+            });
+
+            list.el.on('click', 'button', function(e) {
+                if (list.dragEl) {
+                    return;
+                }
+                var target = $(e.currentTarget),
+                    action = target.data('action'),
+                    item   = target.parent(list.options.itemNodeName);
+                if (action === 'collapse') {
+                    list.collapseItem(item);
+                }
+                if (action === 'expand') {
+                    list.expandItem(item);
+                }
+            });
+
+            var onStartEvent = function(e)
+            {
+                var handle = $(e.target);
+                if (!handle.hasClass(list.options.handleClass)) {
+                    if (handle.closest('.' + list.options.noDragClass).length) {
+                        return;
+                    }
+                    handle = handle.closest('.' + list.options.handleClass);
+                }
+
+                if (!handle.length || list.dragEl) {
+                    return;
+                }
+
+                list.isTouch = /^touch/.test(e.type);
+                if (list.isTouch && e.touches.length !== 1) {
+                    return;
+                }
+
+                e.preventDefault();
+                list.dragStart(e.touches ? e.touches[0] : e);
+            };
+
+            var onMoveEvent = function(e)
+            {
+                if (list.dragEl) {
+                    e.preventDefault();
+                    list.dragMove(e.touches ? e.touches[0] : e);
+                }
+            };
+
+            var onEndEvent = function(e)
+            {
+                if (list.dragEl) {
+                    e.preventDefault();
+                    list.dragStop(e.touches ? e.touches[0] : e);
+                }
+            };
+
+            if (hasTouch) {
+                list.el[0].addEventListener('touchstart', onStartEvent, false);
+                window.addEventListener('touchmove', onMoveEvent, false);
+                window.addEventListener('touchend', onEndEvent, false);
+                window.addEventListener('touchcancel', onEndEvent, false);
+            }
+
+            list.el.on('mousedown', onStartEvent);
+            list.w.on('mousemove', onMoveEvent);
+            list.w.on('mouseup', onEndEvent);
+
+        },
+
+        serialize: function()
+        {
+            var data,
+                depth = 0,
+                list  = this,
+                step  = function(level, depth)
+                {
+                    var array = [ ],
+                        items = level.children(list.options.itemNodeName);
+                    items.each(function()
+                    {
+                        var li   = $(this),
+                            item = $.extend({}, li.data()),
+                            sub  = li.children(list.options.listNodeName);
+                        if (sub.length) {
+                            item.children = step(sub, depth + 1);
+                        }
+                        array.push(item);
+                    });
+                    return array;
+                };
+            data = step(list.el.find(list.options.listNodeName).first(), depth);
+            return data;
+        },
+
+        serialise: function()
+        {
+            return this.serialize();
+        },
+
+        reset: function()
+        {
+            this.mouse = {
+                offsetX   : 0,
+                offsetY   : 0,
+                startX    : 0,
+                startY    : 0,
+                lastX     : 0,
+                lastY     : 0,
+                nowX      : 0,
+                nowY      : 0,
+                distX     : 0,
+                distY     : 0,
+                dirAx     : 0,
+                dirX      : 0,
+                dirY      : 0,
+                lastDirX  : 0,
+                lastDirY  : 0,
+                distAxX   : 0,
+                distAxY   : 0
+            };
+            this.isTouch    = false;
+            this.moving     = false;
+            this.dragEl     = null;
+            this.dragRootEl = null;
+            this.dragDepth  = 0;
+            this.hasNewRoot = false;
+            this.pointEl    = null;
+        },
+
+        expandItem: function(li)
+        {
+            li.removeClass(this.options.collapsedClass);
+            li.children('[data-action="expand"]').hide();
+            li.children('[data-action="collapse"]').show();
+            li.children(this.options.listNodeName).show();
+        },
+
+        collapseItem: function(li)
+        {
+            var lists = li.children(this.options.listNodeName);
+            if (lists.length) {
+                li.addClass(this.options.collapsedClass);
+                li.children('[data-action="collapse"]').hide();
+                li.children('[data-action="expand"]').show();
+                li.children(this.options.listNodeName).hide();
+            }
+        },
+
+        expandAll: function()
+        {
+            var list = this;
+            list.el.find(list.options.itemNodeName).each(function() {
+                list.expandItem($(this));
+            });
+        },
+
+        collapseAll: function()
+        {
+            var list = this;
+            list.el.find(list.options.itemNodeName).each(function() {
+                list.collapseItem($(this));
+            });
+        },
+
+        setParent: function(li)
+        {
+            if (li.children(this.options.listNodeName).length) {
+                li.prepend($(this.options.expandBtnHTML));
+                li.prepend($(this.options.collapseBtnHTML));
+            }
+            li.children('[data-action="expand"]').hide();
+        },
+
+        unsetParent: function(li)
+        {
+            li.removeClass(this.options.collapsedClass);
+            li.children('[data-action]').remove();
+            li.children(this.options.listNodeName).remove();
+        },
+
+        dragStart: function(e)
+        {
+            var mouse    = this.mouse,
+                target   = $(e.target),
+                dragItem = target.closest(this.options.itemNodeName);
+
+            this.placeEl.css('height', dragItem.height());
+
+            mouse.offsetX = e.offsetX !== undefined ? e.offsetX : e.pageX - target.offset().left;
+            mouse.offsetY = e.offsetY !== undefined ? e.offsetY : e.pageY - target.offset().top;
+            mouse.startX = mouse.lastX = e.pageX;
+            mouse.startY = mouse.lastY = e.pageY;
+
+            this.dragRootEl = this.el;
+
+            this.dragEl = $(document.createElement(this.options.listNodeName)).addClass(this.options.listClass + ' ' + this.options.dragClass);
+            this.dragEl.css('width', dragItem.width());
+
+            dragItem.after(this.placeEl);
+            dragItem[0].parentNode.removeChild(dragItem[0]);
+            dragItem.appendTo(this.dragEl);
+
+            $(document.body).append(this.dragEl);
+            this.dragEl.css({
+                'left' : e.pageX - mouse.offsetX,
+                'top'  : e.pageY - mouse.offsetY
+            });
+            // total depth of dragging item
+            var i, depth,
+                items = this.dragEl.find(this.options.itemNodeName);
+            for (i = 0; i < items.length; i++) {
+                depth = $(items[i]).parents(this.options.listNodeName).length;
+                if (depth > this.dragDepth) {
+                    this.dragDepth = depth;
+                }
+            }
+        },
+
+        dragStop: function(e)
+        {
+            var el = this.dragEl.children(this.options.itemNodeName).first();
+            el[0].parentNode.removeChild(el[0]);
+            this.placeEl.replaceWith(el);
+
+            this.dragEl.remove();
+            this.el.trigger('change');
+            if (this.hasNewRoot) {
+                this.dragRootEl.trigger('change');
+            }
+            this.reset();
+        },
+
+        dragMove: function(e)
+        {
+            var list, parent, prev, next, depth,
+                opt   = this.options,
+                mouse = this.mouse;
+
+            this.dragEl.css({
+                'left' : e.pageX - mouse.offsetX,
+                'top'  : e.pageY - mouse.offsetY
+            });
+
+            // mouse position last events
+            mouse.lastX = mouse.nowX;
+            mouse.lastY = mouse.nowY;
+            // mouse position this events
+            mouse.nowX  = e.pageX;
+            mouse.nowY  = e.pageY;
+            // distance mouse moved between events
+            mouse.distX = mouse.nowX - mouse.lastX;
+            mouse.distY = mouse.nowY - mouse.lastY;
+            // direction mouse was moving
+            mouse.lastDirX = mouse.dirX;
+            mouse.lastDirY = mouse.dirY;
+            // direction mouse is now moving (on both axis)
+            mouse.dirX = mouse.distX === 0 ? 0 : mouse.distX > 0 ? 1 : -1;
+            mouse.dirY = mouse.distY === 0 ? 0 : mouse.distY > 0 ? 1 : -1;
+            // axis mouse is now moving on
+            var newAx   = Math.abs(mouse.distX) > Math.abs(mouse.distY) ? 1 : 0;
+
+            // do nothing on first move
+            if (!mouse.moving) {
+                mouse.dirAx  = newAx;
+                mouse.moving = true;
+                return;
+            }
+
+            // calc distance moved on this axis (and direction)
+            if (mouse.dirAx !== newAx) {
+                mouse.distAxX = 0;
+                mouse.distAxY = 0;
+            } else {
+                mouse.distAxX += Math.abs(mouse.distX);
+                if (mouse.dirX !== 0 && mouse.dirX !== mouse.lastDirX) {
+                    mouse.distAxX = 0;
+                }
+                mouse.distAxY += Math.abs(mouse.distY);
+                if (mouse.dirY !== 0 && mouse.dirY !== mouse.lastDirY) {
+                    mouse.distAxY = 0;
+                }
+            }
+            mouse.dirAx = newAx;
+
+            /**
+             * move horizontal
+             */
+            if (mouse.dirAx && mouse.distAxX >= opt.threshold) {
+                // reset move distance on x-axis for new phase
+                mouse.distAxX = 0;
+                prev = this.placeEl.prev(opt.itemNodeName);
+                // increase horizontal level if previous sibling exists and is not collapsed
+                if (mouse.distX > 0 && prev.length && !prev.hasClass(opt.collapsedClass)) {
+                    // cannot increase level when item above is collapsed
+                    list = prev.find(opt.listNodeName).last();
+                    // check if depth limit has reached
+                    depth = this.placeEl.parents(opt.listNodeName).length;
+                    if (depth + this.dragDepth <= opt.maxDepth) {
+                        // create new sub-level if one doesn't exist
+                        if (!list.length) {
+                            list = $('<' + opt.listNodeName + '/>').addClass(opt.listClass);
+                            list.append(this.placeEl);
+                            prev.append(list);
+                            this.setParent(prev);
+                        } else {
+                            // else append to next level up
+                            list = prev.children(opt.listNodeName).last();
+                            list.append(this.placeEl);
+                        }
+                    }
+                }
+                // decrease horizontal level
+                if (mouse.distX < 0) {
+                    // we can't decrease a level if an item preceeds the current one
+                    next = this.placeEl.next(opt.itemNodeName);
+                    if (!next.length) {
+                        parent = this.placeEl.parent();
+                        this.placeEl.closest(opt.itemNodeName).after(this.placeEl);
+                        if (!parent.children().length) {
+                            this.unsetParent(parent.parent());
+                        }
+                    }
+                }
+            }
+
+            var isEmpty = false;
+
+            // find list item under cursor
+            if (!hasPointerEvents) {
+                this.dragEl[0].style.visibility = 'hidden';
+            }
+            this.pointEl = $(document.elementFromPoint(e.pageX - document.body.scrollLeft, e.pageY - (window.pageYOffset || document.documentElement.scrollTop)));
+            if (!hasPointerEvents) {
+                this.dragEl[0].style.visibility = 'visible';
+            }
+            if (this.pointEl.hasClass(opt.handleClass)) {
+                this.pointEl = this.pointEl.parent(opt.itemNodeName);
+            }
+            if (this.pointEl.hasClass(opt.emptyClass)) {
+                isEmpty = true;
+            }
+            else if (!this.pointEl.length || !this.pointEl.hasClass(opt.itemClass)) {
+                return;
+            }
+
+            // find parent list of item under cursor
+            var pointElRoot = this.pointEl.closest('.' + opt.rootClass),
+                isNewRoot   = this.dragRootEl.data('nestable-id') !== pointElRoot.data('nestable-id');
+
+            /**
+             * move vertical
+             */
+            if (!mouse.dirAx || isNewRoot || isEmpty) {
+                // check if groups match if dragging over new root
+                if (isNewRoot && opt.group !== pointElRoot.data('nestable-group')) {
+                    return;
+                }
+                // check depth limit
+                depth = this.dragDepth - 1 + this.pointEl.parents(opt.listNodeName).length;
+                if (depth > opt.maxDepth) {
+                    return;
+                }
+                var before = e.pageY < (this.pointEl.offset().top + this.pointEl.height() / 2);
+                    parent = this.placeEl.parent();
+                // if empty create new list to replace empty placeholder
+                if (isEmpty) {
+                    list = $(document.createElement(opt.listNodeName)).addClass(opt.listClass);
+                    list.append(this.placeEl);
+                    this.pointEl.replaceWith(list);
+                }
+                else if (before) {
+                    this.pointEl.before(this.placeEl);
+                }
+                else {
+                    this.pointEl.after(this.placeEl);
+                }
+                if (!parent.children().length) {
+                    this.unsetParent(parent.parent());
+                }
+                if (!this.dragRootEl.find(opt.itemNodeName).length) {
+                    this.dragRootEl.append('<div class="' + opt.emptyClass + '"/>');
+                }
+                // parent root list has changed
+                if (isNewRoot) {
+                    this.dragRootEl = pointElRoot;
+                    this.hasNewRoot = this.el[0] !== this.dragRootEl[0];
+                }
+            }
+        }
+
+    };
+
+    $.fn.nestable = function(params)
+    {
+        var lists  = this,
+            retval = this;
+
+        lists.each(function()
+        {
+            var plugin = $(this).data("nestable");
+
+            if (!plugin) {
+                $(this).data("nestable", new Plugin(this, params));
+                $(this).data("nestable-id", new Date().getTime());
+            } else {
+                if (typeof params === 'string' && typeof plugin[params] === 'function') {
+                    retval = plugin[params]();
+                }
+            }
+        });
+
+        return retval || lists;
+    };
+
+})(window.jQuery || window.Zepto, window, document);

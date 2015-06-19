@@ -12,7 +12,7 @@ var AutoImageInputController = function( $scope, $attrs, $q, APIWrapperService )
 	this.select				= 'image.*,image.bucket.url';
 	this.originalData		= undefined;
 
-	this.$q					= $q;
+	this.$q					= $q; // Pass $q to methods. 
 	this.APIWrapperService	= APIWrapperService;
 
 
@@ -33,11 +33,20 @@ AutoImageInputController.prototype.constructor = AutoImageInputController;
 
 AutoImageInputController.prototype.updateData = function( data ) {
 
+	// No image set: use empty array
+	// Don't use !angular.isArray( data.image ); it will create [ undefined ] if there's no data.image.
+	if( !data.image ) {
+		data.image = [];
+	}
+
+
 	// Image has a hasOne-relation: Is delivered as an object (instead of an array):
 	// Convert to array
 	if( !angular.isArray( data.image ) ) {
 		data.image = [ data.image ];
 	}
+
+
 
 	this.$scope.images = data.image ? data.image : [];
 
@@ -116,6 +125,11 @@ AutoImageInputController.prototype.beforeSaveTasks = function() {
 
 		var img		= this.$scope.images[ i ];
 
+		if( !img ) {
+			console.warn( 'AutoImageInputController: Can\'t get file property of undefined image %o', img );
+			continue;
+		}
+
 		// Only files added per drag and drop have a file property that's a file
 		if( img.file && img.file instanceof File ) {
 
@@ -135,11 +149,13 @@ AutoImageInputController.prototype.beforeSaveTasks = function() {
 
 AutoImageInputController.prototype._uploadFile = function( img ) {
 
+	console.log( 'AutoImageInputController: Upload file %o to /image through a POST request', img );
+
 	return this.APIWrapperService.request( {
 		method				: 'POST'
 		, data				: {
-			dataSource		: 'backoffice'
-			, image			: img.file
+			//dataSourceId	: 1
+			image			: img.file
 		}
 		, url				: '/image'
 	} )
@@ -155,8 +171,8 @@ AutoImageInputController.prototype._uploadFile = function( img ) {
 		return true;
 
 	}.bind( this ), function( err ) {
-		this.$q.reject( err );
-	} );
+		return this.$q.reject( err );
+	}.bind( this ) );
 
 };
 
@@ -194,7 +210,7 @@ angular
 
 	$templateCache.put( 'autoImageInputTemplate.html',
 		'<div class=\'row\'>' +
-			'<label data-backoffice-label></label>' +
+			'<label data-backoffice-label data-label-identifier=\'{{data.name}}\' data-is-required=\'false\' data-is-valid=\'true\'></label>' +
 			'<div class=\'col-md-9\' data-image-component data-images=\'images\'></div>' +
 		'</div>'
 	);

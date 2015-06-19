@@ -16,6 +16,14 @@ var AutoDateTimeInputController = function( $scope, $attrs ) {
 	// Display time only if type is datetime and not date
 	$scope.showTime				= this.$scope.optionData.time;
 
+	$scope.isRequired = function() {
+		return this.optionData.required;
+	};
+
+	$scope.isValid = function() {
+		return !this.optionData.required || ( this.optionData.required && this.$scope.date );
+	};
+
 };
 
 AutoDateTimeInputController.prototype = Object.create( AutoInputController.prototype );
@@ -23,7 +31,15 @@ AutoDateTimeInputController.prototype.constructor = AutoDateTimeInputController;
 
 AutoDateTimeInputController.prototype.updateData = function( data ) {
 
-	this.$scope.date = new Date( data[ this.$attrs.for] );
+	var value = data[ this.$attrs.for];
+
+	if( !value ) {
+		this.$scope.date = undefined;
+	}
+	else {
+		this.$scope.date = new Date( value );
+	}
+
 	this.originalData = this.$scope.date;
 
 };
@@ -79,7 +95,7 @@ angular
 
 	$templateCache.put( 'dateTimeInputTemplate.html',
 		'<div class=\'form-group form-group-sm\'>' +
-			'<label data-backoffice-label></label>' +
+			'<label data-backoffice-label data-label-identifier=\'{{data.name}}\' data-is-required=\'isRequired()\' data-is-valid=\'isValid()\'></label>' +
 			'<div data-ng-class=\'{ "col-md-9": !showTime, "col-md-5": showTime}\'>' +
 				'<input type=\'date\' class=\'form-control input-sm\' data-ng-model=\'date\'>' +
 			'</div>' +

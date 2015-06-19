@@ -1,7 +1,12 @@
 'use strict';
 
 /**
-* Parent controller for all autoInputs. Provides basic functionality.
+* Parent controller for all autoInputs. Provides basic functionality like
+* - calls afterInit 
+* - registers itself at the detailViewController
+* - check if child controllers implement updateData()
+* - Make element, detailViewController, entityName and entityId available
+* - … (needs refactoring!)
 */
 var AutoInputController = function( $scope, $attrs ) {
 
@@ -11,6 +16,9 @@ var AutoInputController = function( $scope, $attrs ) {
 	// $scope always holds two objects gotten from auto-form-element: 
 	// - optionData
 	// - originalAttributes
+	// Is passed in from auto-form-element through a newly created 
+	// and isolated scope.
+
 	this.$scope				= $scope;
 
 	this.$scope.entityName	= undefined;
@@ -23,9 +31,10 @@ var AutoInputController = function( $scope, $attrs ) {
 		, valid		: true
 	};
 
-	this.isValid				= function() {
+	// Needs to be defined in controller.
+	/*this.isValid				= function() {
 		return $scope.data.valid;
-	};
+	};*/
 
 	this.element				= undefined;
 	this.detailViewController	= undefined;
@@ -45,7 +54,7 @@ AutoInputController.prototype.init = function( el, detViewController ) {
 	this.$scope.entityId		= detViewController.getEntityId();
 
 	// Register myself @ detailViewController 
-	// -> I'll be notified on save
+	// -> I'll be notified on save and when data is gotten
 	this.detailViewController.register( this );
 
 	// Call afterInit
@@ -55,6 +64,7 @@ AutoInputController.prototype.init = function( el, detViewController ) {
 		this.afterInit();
 	}
 
+	// Check if updateData method was implemented.
 	if( !this.updateData ) {
 		console.error( 'AutoInputController: updateData method missing in %o %o', this, el );
 	}

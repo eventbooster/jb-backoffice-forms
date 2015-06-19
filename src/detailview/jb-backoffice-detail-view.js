@@ -5,6 +5,15 @@
 * - Gets field data from server (through an OPTIONS call)
 * - Input components (text, images, relations) may register themselves
 * - Stores data on server
+*
+* Child components must/may implement the following methods:
+* - register: When all components were registered, GET call is made. 
+*             To be called after OPTION data was processed by component.
+* - registerOptionsDataHandler: get OPTION data (optional)
+* - registerGetDataHandler: get GET data (optional)
+* - getSaveCalls: Returns POST calls (optional)
+* - isValid: Returns true if component is valid (optional)
+* - getSelectFields: Returns select fields (replaces the select property)
 */
 angular
 .module( 'jb.backofficeDetailView', [ 'eb.apiWrapper', 'ebBackofficeConfig' ] )
@@ -248,10 +257,9 @@ angular
 		element = el;
 
 		// Store number of auto form elements
-		var autoFormElements = element.find( '[data-auto-form-element], [data-hidden-input]' );
+		var autoFormElements = element.find( '[data-auto-form-element], [data-hidden-input], [data-backoffice-tree-component], [data-backoffice-relation-component]' );
 		autoFormElementCount = autoFormElements.length;
 
-	
 		// getOptionData whenever entityId changes if entityId is on $attrs
 		if( $attrs.hasOwnProperty( 'entityId' ) ) {
 
@@ -392,7 +400,7 @@ angular
 				};
 			}
 
-			// Int
+			// Bool
 			if( singleFieldData.name && singleFieldData.type === 'boolean' ) {
 				ret[ singleFieldData.name ] = {
 					type		: 'boolean'
@@ -411,6 +419,7 @@ angular
 				};
 			}
 
+			// Date
 			if( singleFieldData.name && singleFieldData.type === 'date' ) {
 				ret[ singleFieldData.name ] = {
 					type		: 'datetime'
@@ -524,7 +533,12 @@ angular
 	// Register Components
 
 	/**
-	* For a autoFormElement to register itself
+	* For a autoFormElements to register themselves. 
+	* - Pushes them to registeredComponents
+	* - As soon as all are registered, data is gotten (GET)
+	* - Gotten data (GET) is distributed to registered components
+	* - Registered components are asked for their data when saving
+	* @param {Object} element		The child directive itself (this)
 	*/
 	self.register = function( element ) {
 
@@ -611,13 +625,17 @@ angular
 
 			var comp = self.registeredComponents[ i ];
 
-			if( !comp.select ) {
-				continue;
+			// New notation: getSelectFields
+			if( comp.getSelectFields && angular.isFunction( comp.getSelectFields ) ) {
+				select = select.concat( comp.getSelectFields() );
+			}
+			// Old notation: select property
+			else if( comp.select ) {
+				// Array (when multiple selects must be made)
+				// concat adds array or value
+				select = select.concat( comp.select );
 			}
 
-			// Array (when multiple selects must be made)
-			// concat adds array or value
-			select = select.concat( comp.select );
 		
 		}
 		
@@ -736,12 +754,12 @@ angular
 		// after it has been created (when user was on /entity/new)
 		// Can't be returned, as we're using promises. Therefore pass an object to the save
 		// call that will be filled with the id
-		var returnValue = {
+		/*var returnValue = {
 			id: undefined
-		};
+		};*/
 
 		return self
-			.makeSaveRequest( self.registeredComponents, self.getEntityName(), returnValue )
+			.makeSaveRequest( self.registeredComponents, self.getEntityName() )
 			.then( function( data ) {
 
 				// Entity didn't have an ID (was newly created): Redirect to new entity
@@ -758,7 +776,7 @@ angular
 
 				self.updateData();
 
-				return returnValue.id;
+				return true;
 
 			}, function( err ) {
 
@@ -766,7 +784,7 @@ angular
 					type				: 'error'
 					, message			: 'web.backoffice.detail.saveError'
 					, variables			: {
-						errorMessage	: err
+						errorMessage	: err.message
 					}
 				} );
 
@@ -787,7 +805,7 @@ angular
 		// Check if all form elements are valid
 		for( var i = 0; i < self.registeredComponents.length; i++ ) {
 			if( angular.isFunction( self.registeredComponents[ i ].isValid ) && !self.registeredComponents[ i ].isValid() ) {
-				return $q.reject( 'Not all required fields filled out.' );
+				return $q.reject( new Error( 'Not all required fields filled out.' ) );
 			}
 		}
 
@@ -861,6 +879,18 @@ angular
 				relationCalls.push( calls[ i ] );
 			}
 		}
+	
+		// entityId not yet set: New element – but has no fields or no required fields, 
+		// therefore no information might be provided, except for some relations. 
+		// If entity is not generated (what would happen as there's no data to store), 
+		// relations could not be created (POST to /entityName/otherEntityName/otherEntityId)
+		// would fail, as entityId doesn't exist. 
+		if( !mainCall && !self.getEntityId() ) {
+			mainCall = {
+				method			: 'POST'
+				, url			: '/' + self.getEntityName()
+			};
+		}
 
 		console.log( 'DetailView: Main save call is %o, other calls are %o', mainCall, relationCalls );
 
@@ -869,6 +899,8 @@ angular
 
 			// Make all secondary calls (to sub entities) simultaneously
 			.then( function( mainCallData ) {
+
+				console.log( 'DetailView: Made main save call; got back %o', mainCallData );
 
 				// Pass id of newly created object back to the Controller
 				// so that user can be redirected to new entity
@@ -915,23 +947,36 @@ angular
 		}
 
 		// Check if call to url does already exit
-		var call = this.getSaveCall( calls, componentCall.method, componentCall.url );
+		var call = this.getSaveCall( calls, componentCall.method, componentCall.url  );
+
+		// If componentCall has headers, treat it as a different call. To improve, we might
+		// compare headers, but let's save that for better times.
+		// Headers are e.g. used in treeFormData to store a tree (needs Content-Type: application/json)
+		if( componentCall.hasOwnProperty( 'headers' ) ) {
+			call = false;
+		}
 
 		// Call doesn't yet exist
 		if( !call ) {
 			call = {
 				method		: componentCall.method
 				, url		: componentCall.url
-				, data		: {}
+				, data		: componentCall.data
+				, headers	: componentCall.headers || {}
 			};
 			calls.push( call );
 		}
 
 		// Add data
-		if( componentCall.data ) {
-			for( var p in componentCall.data ) {
-				call.data[ p ] = componentCall.data[ p ];
+		else {
+
+			// Don't do that if we're sending a string or array (e.g. when using application/json as Content-Type
+			if( componentCall.data ) {
+				for( var p in componentCall.data ) {
+					call.data[ p ] = componentCall.data[ p ];
+				}
 			}
+
 		}
 
 	};
@@ -950,7 +995,12 @@ angular
 		// Default: empty array, if not found
 		var saveCall = false;
 		calls.some( function( call ) {
-			if( call.method === method && call.url === url ) {
+			// Check if URL is the same. Normally use === comparator. 
+			// But if URL is not set, it might be false or '', therefore
+			// use == comparator.
+			var sameUrl			= call.url === url || ( !call.url && !url )
+				, sameMethod	= call.method.toLowerCase() === method.toLowerCase();
+			if( sameMethod && sameUrl ) {
 				saveCall = call;
 				return true;
 			}
@@ -985,18 +1035,39 @@ angular
 		// url
 		// - Take current url + url, if it's relative (doesn't start with a /)
 		// - Take url if it's absolute (starts with a /)
-		var url	= call.url.indexOf( '/' ) === 0 ? call.url : self.getEntityName() + '/' + self.getEntityId() + '/' + call.url;
+		var url;
+		if( call.url && call.url.indexOf( '/' ) === 0 ) {
+			url = call.url;
+		}
+		else {
+			url = '/' + self.getEntityName();
 
-		console.log( 'DetailView: Make %o call to %o with %o', call.method, url, call.data );
+			// Only use entity's ID if it exists (i.e. we're not newly creating an entity)
+			if( self.getEntityId() ) {
+				url += '/' + self.getEntityId();
+			}
+
+			// Append call.url, if available
+			if( call.url ) {
+				url += '/' + call.url;
+			}
+
+		}
+
+		console.log( 'DetailView: Make %s call to %s with %o. Call is %o, entityName is %o.', call.method, url, call.data, call, self.getEntityName() );
 
 		// Add datasourceId as long as it's needed
 		// #todo remove when eE's ready
+		if( !call.data ) {
+			call.data = {};
+		}
 		call.data.id_dataSource = BackofficeConfig.dataSourceId;
 
 		return APIWrapperService.request( {
 			url			: url
 			, data		: call.data
 			, method	: call.method
+			, headers	: call.headers
 		} );
 
 	};

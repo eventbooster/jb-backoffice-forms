@@ -27,6 +27,7 @@ var AutoRelationInputController = function( $scope, $attrs, $templateCache, $com
 		this.select.push( this.$scope.originalAttributes.for + '.' + select );
 	}.bind( this ) );
 
+	console.log( 'AutoRelationInputController: select is %o', this.select );
 
 
 
@@ -47,9 +48,15 @@ var AutoRelationInputController = function( $scope, $attrs, $templateCache, $com
 	this.isMultiSelect			= this.$scope.optionData.relationType !== 'single';
 
 
+	// User should be able to pass in a ngModel (to bind directive's selection to another controller). 
+	// If it's provided, use it's name as ngModel; else
+	//this.ngModelName 			= this.$scope.originalAttributes.ngModel || 'relations';
+
 
 	// Set valid on $scope.data (for backoffice-label)
-	this.scope.$watch( 'relations', function( newValue ) {
+	// Propagate changes to ngModel
+	/*this.scope.$watch( 'relations', function( newValue ) {
+
 		if( this.$scope.optionData.required && ( !newValue || newValue.length === 0 ) ) {
 			this.$scope.data.valid = false;
 		}
@@ -57,43 +64,23 @@ var AutoRelationInputController = function( $scope, $attrs, $templateCache, $com
 			this.$scope.data.valid = true;
 		}
 	}.bind( this ) );
+*/
 
+	$scope.isValid = function() {
+
+		if( $scope.optionData.required && ( !this.scope.relations || this.scope.relations.length === 0 ) ) {
+			return false;
+		}
+
+		return true;
+
+	}.bind( this );
 
 
 	// Holds model
 	this.scope.relations = [];
 
 
-
-
-/*	this.$scope.$on( 'dataUpdate', function( ev, data ) {
-
-		this.scope.relations = [];
-
-		// No data provided
-		if( !data[ $attrs.for ] ) {
-			return;
-		}
-		else {
-			// Fill up scope.data (model for relationInput)
-			if( this.isMultiSelect ) {
-				// Is already an array
-				this.scope.relations = data[ $attrs.for ];
-			}
-			else {
-				this.scope.relations.push( data[ $attrs.for ] );
-			}
-
-		}
-
-		// Copy data to originalData
-		// Is used to get changes on save()
-		this.originalData = this.scope.relations.slice();
-
-		console.log( 'AutoRelationInput: scope.data is %o', this.scope.relations );
-
-	}.bind( this ) );
-*/
 };
 
 
@@ -150,6 +137,7 @@ AutoRelationInputController.prototype.getSaveCalls = function() {
 
 };
 
+
 AutoRelationInputController.prototype.getSingleSelectSaveCalls = function() {
 
 	// Relations missing; happens if relations were not set on server nor changed
@@ -176,10 +164,12 @@ AutoRelationInputController.prototype.getSingleSelectSaveCalls = function() {
 			var data = {};
 			data[ this.$scope.optionData.relationKey ] = this.scope.relations[ 0 ].id;
 
+			// Post to /mainEntity/currentId/entityName/entityId, path needs to be entityName/entityId, 
+			// is automatically prefixed by DetailViewController 
 			return {
-				//url		: this.optionData + '/' +  // this.detailViewController.getEntityUrl() + '/' + this.$attrs.for + '/' + this.scope.relations[ 0 ].id
-				url			: ''
-				, data		: data
+				url			:  this.$attrs.for + '/' + this.scope.relations[ 0 ].id
+				, method	: 'POST'
+				//, data		: data
 			};
 	
 		}
@@ -285,7 +275,7 @@ angular
 .directive( 'autoRelationInput', [ function() {
 
 	return {
-		require			: [ 'autoRelationInput', '^^detailView' ]
+		require			: [ 'autoRelationInput', '^detailView' ]
 		, controller	: 'AutoRelationInputController'
 		, link			: function( scope, element, attrs, ctrl ) {
 			ctrl[ 0 ].init( element, ctrl[ 1 ] );
@@ -305,7 +295,7 @@ angular
 
 	$templateCache.put( 'autoRelationInputTemplate.html',
 		'<div class=\'form-group\'>' +
-			'<label data-backoffice-label></label>' +
+			'<label data-backoffice-label data-label-identifier=\'{{data.name}}\' data-is-valid=\'isValid()\'></label>' +
 			'<div data-relation-input ' +
 				'class=\'relation-select col-md-9\'' +
 				'data-ng-model=\'relations\'' +

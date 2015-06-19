@@ -24,7 +24,14 @@ var AutoTextInputController = function( $scope, $attrs ) {
 	// (that corresponds to data.name)
 	this.select = this.$scope.data.name;
 
-	this._validateInput();
+	$scope.isValid = function() {
+		if( this.$scope.optionData.required && !this.$scope.data.value ) {
+			return false;
+		}
+		return true;		
+	}.bind( this );
+
+	//this._validateInput();
 
 };
 
@@ -52,7 +59,7 @@ AutoTextInputController.prototype.getSaveCalls = function() {
 	
 };
 
-AutoTextInputController.prototype._validateInput = function() {
+/*AutoTextInputController.prototype._validateInput = function() {
 
 	// Update validity for label
 	this.$scope.$watch( 'data.value', function( newValue ) {
@@ -62,11 +69,10 @@ AutoTextInputController.prototype._validateInput = function() {
 		else {
 			this.$scope.data.valid = true;
 		}
+		console.log( 'AutoTextInputController: set validity to ' + this.$scope.data.valid );
 	}.bind( this ) );
 
-};
-
-
+};*/
 
 
 
@@ -99,7 +105,7 @@ angular
 
 	$templateCache.put( 'autoTextInputTemplate.html',
 		'<div class=\'form-group form-group-sm\'>' +
-			'<label data-backoffice-label></label>' +
+			'<label data-backoffice-label data-label-identifier=\'{{data.name}}\' data-is-valid=\'isValid()\'></label>' +
 			'<div class=\'col-md-9\'>' +
 				'<input type=\'text\' data-ng-attr-id=\'{{ entityName }}-{{ data.name }}-label\' class=\'form-control input-sm\' data-ng-attrs-required=\'isRequired()\' data-ng-model=\'data.value\'/>' +
 			'</div>' +
