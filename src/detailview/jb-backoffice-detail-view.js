@@ -766,7 +766,7 @@ angular
 	*												_not_ redirected to the new entity. Needed for manual saving. 
 	* @returns <Integer>							ID of the current entity
 	*/
-	$scope.save = function( dontNotifyOrRedirect, ev ) {
+	$scope.save = function( dontNotifyOrRedirect, ev, callback ) {
 
 		// Needed for nested detailViews: We don't want to propagate the save event to the parent detailView
 		// See e.g. article in CC back office
@@ -798,8 +798,15 @@ angular
 						, message			: 'web.backoffice.detail.saveSuccess'
 					} );
 				}
+				else {
+					console.log( 'DetailViewController: Don\'t show any message or redirect' );
+				}
 
 				self.updateData();
+
+				if( callback ) {
+					callback();
+				}
 
 				return true;
 
@@ -812,6 +819,10 @@ angular
 						errorMessage	: err.message
 					}
 				} );
+
+				if( callback ) {
+					callback();
+				}
 
 				return $q.reject( err );
 
@@ -937,14 +948,6 @@ angular
 				relationCalls.forEach( function( call ) {
 					callRequests.push( self.executeSaveRequest( call ) );
 				} );
-
-
-				// No calls: Resolve instantly
-				/*if( !callRequests.length ) {
-					var deferred = $q.defer();
-					deferred.resolve();
-					return deferred.promise;
-				}*/
 
 				return $q.all( callRequests );
 

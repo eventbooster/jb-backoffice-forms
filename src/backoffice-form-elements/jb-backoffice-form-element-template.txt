@@ -1,0 +1,56 @@
+/**
+* Just copy me to create a new jb-backoffice-form-element.
+*/
+( function() {
+
+	'use strict';
+
+	angular
+
+	.module( 'jb.backofficeFormElements' )
+
+	/**
+	* <input data-backoffice-relation-component 
+	*	data-suggestion-template="[[property]]"
+	* 	data-search-field="property"
+	*	data-for="enity">
+	*/
+	.directive( 'backofficeRelationInput', [ function() {
+
+		return {
+			require				: [ 'backofficeRelationInput', '^detailView', '?ngModel' ]
+			, controller		: 'BackofficeRelationInputController'
+			, controllerAs		: 'backofficeRelationInput'
+			, bindToController	: true
+			, link				: function( scope, element, attrs, ctrl ) {
+				ctrl[ 0 ].init( ctrl[ 1 ] );
+			}
+			, scope: {
+				'suggestionTemplate'	: '@'
+				, 'searchField'			: '@'
+				, 'propertyName'		: '@for'
+			}
+
+		};
+
+	} ] )
+
+	.controller( 'BackofficeRelationInputController', [ '$scope', function( $scope ) {
+
+		var self = this
+			, element
+			, detailViewController
+			, ngModelController;
+
+		self.init = function( el, detailViewCtrl, ngModelCtrl ) {
+			element = el;
+			detailViewController = detailViewCtrl;
+		};
+
+		alert('ok');
+
+	} ] );
+
+
+} )();
+

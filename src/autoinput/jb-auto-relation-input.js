@@ -251,6 +251,7 @@ AutoRelationInputController.prototype.afterInit = function() {
 	// element correctly
 	tpl.find( '[data-relation-input]' )
 		.attr( 'data-relation-entity-endpoint', this.$scope.optionData.relation )
+		.attr( 'data-relation-interactive', true )
 		.attr( 'data-relation-entity-search-field', this.$scope.originalAttributes.suggestionSearchField )
 		// Append template _after_ compiling the code – or {{ result.name }} etc. will be compiled :-)
 		.attr( 'data-relation-suggestion-template', this.$scope.originalAttributes.suggestionTemplate )

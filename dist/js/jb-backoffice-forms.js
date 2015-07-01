@@ -1140,6 +1140,7 @@ AutoRelationInputController.prototype.afterInit = function() {
 	// element correctly
 	tpl.find( '[data-relation-input]' )
 		.attr( 'data-relation-entity-endpoint', this.$scope.optionData.relation )
+		.attr( 'data-relation-interactive', true )
 		.attr( 'data-relation-entity-search-field', this.$scope.originalAttributes.suggestionSearchField )
 		// Append template _after_ compiling the code – or {{ result.name }} etc. will be compiled :-)
 		.attr( 'data-relation-suggestion-template', this.$scope.originalAttributes.suggestionTemplate )
@@ -1456,6 +1457,8 @@ angular
 			template
 				.find( '[data-relation-input]')
 				.attr( 'data-relation-entity-endpoint', self.propertyName )
+				.attr( 'data-relation-interactive', true )
+				.attr( 'data-deletable', deletable )
 				.attr( 'data-relation-entity-search-field', self.searchField )
 				.attr( 'data-relation-suggestion-template', self.suggestionTemplate )
 				.attr( 'data-ng-model', 'backofficeRelationComponent.relationModel' )
@@ -2800,7 +2803,7 @@ angular
 	*												_not_ redirected to the new entity. Needed for manual saving. 
 	* @returns <Integer>							ID of the current entity
 	*/
-	$scope.save = function( dontNotifyOrRedirect, ev ) {
+	$scope.save = function( dontNotifyOrRedirect, ev, callback ) {
 
 		// Needed for nested detailViews: We don't want to propagate the save event to the parent detailView
 		// See e.g. article in CC back office
@@ -2832,8 +2835,15 @@ angular
 						, message			: 'web.backoffice.detail.saveSuccess'
 					} );
 				}
+				else {
+					console.log( 'DetailViewController: Don\'t show any message or redirect' );
+				}
 
 				self.updateData();
+
+				if( callback ) {
+					callback();
+				}
 
 				return true;
 
@@ -2846,6 +2856,10 @@ angular
 						errorMessage	: err.message
 					}
 				} );
+
+				if( callback ) {
+					callback();
+				}
 
 				return $q.reject( err );
 
@@ -2971,14 +2985,6 @@ angular
 				relationCalls.forEach( function( call ) {
 					callRequests.push( self.executeSaveRequest( call ) );
 				} );
-
-
-				// No calls: Resolve instantly
-				/*if( !callRequests.length ) {
-					var deferred = $q.defer();
-					deferred.resolve();
-					return deferred.promise;
-				}*/
 
 				return $q.all( callRequests );
 
@@ -3497,6 +3503,8 @@ angular
 
 			// If there's a star in the for attribute, we're working with a relation. 
 			// Store it through POSTing to /entity/id/entity/id instead of sending data.
+			// If you should ever change this behaviour, make sure that you can still edit
+			// discounts on articles in the Cornèrcard back office. 
 			if( isRelation ) {
 
 				var entityName 		= $attrs.for.substring( 0, $attrs.for.lastIndexOf( '.' ) )

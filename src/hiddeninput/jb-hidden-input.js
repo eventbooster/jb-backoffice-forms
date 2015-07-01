@@ -80,6 +80,8 @@ angular
 
 			// If there's a star in the for attribute, we're working with a relation. 
 			// Store it through POSTing to /entity/id/entity/id instead of sending data.
+			// If you should ever change this behaviour, make sure that you can still edit
+			// discounts on articles in the Cornèrcard back office. 
 			if( isRelation ) {
 
 				var entityName 		= $attrs.for.substring( 0, $attrs.for.lastIndexOf( '.' ) )
