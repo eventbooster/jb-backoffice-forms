@@ -26,6 +26,8 @@ angular
 		, link			: function( scope, element, attrs, ctrl) {
 			ctrl[ 0 ].init( element, ctrl[ 1 ] );
 		}
+		// Let the user get stuff from the $parent scope to use 
+		// as value
 		, scope			: true
 	};
 
@@ -58,9 +60,10 @@ angular
 	// attribute to the select statement. 
 	// This is e.g required for nested sets where we need to *set* «parentNode» or «after» or «before»,
 	// but can't select those properties because they're virtual.	
-	console.log( 'HiddenInput: for is %o, read %o evals to %o', $attrs.for, $attrs.read, $scope.$parent.$eval( $attrs.read ) );
-	if( !$attrs.hasOwnProperty( 'read' ) && $scope.$parent.$eval( $attrs.read ) ) {
+	console.log( 'HiddenInput: for is %o, read %o (hasProperty %o) evals to %o', $attrs.for, $attrs.read, $attrs.hasOwnProperty( 'read' ), $scope.$parent.$eval( $attrs.read ) );
+	if( !$attrs.hasOwnProperty( 'read' ) || $scope.$parent.$eval( $attrs.read ) ) {
 		self.select = $attrs.for;
+		console.log( 'HiddenInput: select is %o', self.select );
 	}
 
 
@@ -69,21 +72,44 @@ angular
 
 		var writeData = !$attrs.hasOwnProperty( 'write' ) || $scope.$parent.$eval( $attrs.write );
 
-		console.log( 'HiddenInput: Get save calls; $attrs.data is %o, data-write is %o and evals to %o', $attrs.data, $attrs.write, $scope.$parent.$eval( $attrs.write ) );
+		console.log( 'HiddenInput: Get save calls; $attrs.data is %o, writeData is %o, data-write is %o and evals to %o', $attrs.data, writeData, $attrs.write, $scope.$parent.$eval( $attrs.write ) );
 
 		if( writeData && $attrs.data ) {
 
-			var saveData = {};
-			saveData[ $attrs.for ] = $attrs.data;
+			var isRelation = $attrs.for && $attrs.for.indexOf( '.' ) > -1;
 
-			console.log( 'HiddenInput: Store data %o', saveData );
+			// If there's a star in the for attribute, we're working with a relation. 
+			// Store it through POSTing to /entity/id/entity/id instead of sending data.
+			if( isRelation ) {
 
-			return {
-				url			: ''
-				, data		: saveData
-				// Method: PATCH if entity already has an ID, else POST
-				, method	: detailViewController.getEntityId() ? 'PATCH' : 'POST'
-			};
+				var entityName 		= $attrs.for.substring( 0, $attrs.for.lastIndexOf( '.' ) )
+					, url			= entityName + '/' + $attrs.data;
+
+				console.log( 'HiddenInput: Store relation %o', url );
+
+				return {
+					url			: url
+					, method	: 'POST'
+				};
+
+
+			}
+			else {
+
+				// Compose data
+				var saveData = {};
+				saveData[ $attrs.for ] = $attrs.data;
+
+				console.log( 'HiddenInput: Store data %o', saveData );
+
+				return {
+					url			: ''
+					, data		: saveData
+					// Method: PATCH if entity already has an ID, else POST
+					, method	: detailViewController.getEntityId() ? 'PATCH' : 'POST'
+				};
+
+			}
 
 		}
 
@@ -93,18 +119,3 @@ angular
 
 
 } ] );
-
-
-
-/*.run( function( $templateCache ) {
-
-	$templateCache.put( 'hiddenInputTemplate.html',
-		'<div class=\'form-group form-group-sm\'>' +
-			'<label data-backoffice-label></label>' +
-			'<div class=\'col-md-9\'>' +
-				'<input type=\'text\' data-ng-attr-id=\'{{ entityName }}-{{ data.name }}-label\' class=\'form-control input-sm\' data-ng-attrs-required=\'isRequired()\' data-ng-model=\'data.value\'/>' +
-			'</div>' +
-		'</div>'
-	);
-
-} );*/

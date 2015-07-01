@@ -142,7 +142,7 @@ angular
 	* Returns true if file type is supported 
 	*/
 	function checkFileType( file ) {
-		var acceptedFileTypes = [ 'image/jpeg', 'image/png', 'image/gif' ];
+		var acceptedFileTypes = [ 'image/jpeg' ];
 		if( acceptedFileTypes.indexOf( file.type ) === -1 ) {
 			return false;
 		}

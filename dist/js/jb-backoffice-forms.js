@@ -73,6 +73,17 @@ AutoInputController.prototype.init = function( el, detViewController ) {
 	}
 
 };
+( function() {
+
+	'use strict';
+
+	angular
+
+	// jb.backofficeFormElements: Namespace for new form elements (replacement for jb.backofficeAutoFormElement)
+	.module( 'jb.backofficeFormComponents', [] );
+
+} )();
+
 'use strict';
 
 
@@ -1241,10 +1252,12 @@ AutoTextInputController.prototype.getSaveCalls = function() {
 
 	var data = {};
 	data[ this.$scope.data.name ] = this.$scope.data.value;
+	console.error( this.detailViewController.getEntityId());
 	return {
 		url			: ''
 		, data		: data
-		, method	: this.detailViewController.getEntityId() === undefined ? 'POST' : 'PATCH'
+		// entityId may be undefined, false or ''
+		, method	: ( !this.detailViewController.getEntityId() && this.detailViewController.getEntityId() !== 0 ) ? 'POST' : 'PATCH'
 	};
 	
 };
@@ -1303,17 +1316,6 @@ angular
 	);
 
 } );
-( function() {
-
-	'use strict';
-
-	angular
-
-	// jb.backofficeFormElements: Namespace for new form elements (replacement for jb.backofficeAutoFormElement)
-	.module( 'jb.backofficeFormComponents', [] );
-
-} )();
-
 /**
 * Newer version of jb-auto-relation-input. Is not automatically replaced by auto-form-element any more, 
 * but needs to be used manually. Gives more freedom in usage. 
@@ -1669,7 +1671,7 @@ angular
 * that is not initialized through auto-form
 */
 angular
-.module( 'jb.backofficeFormComponents', [] )
+.module( 'jb.backofficeFormComponents' )
 .directive( 'backofficeTreeComponent', [ function() {
 
 	return {
@@ -1998,7 +2000,7 @@ angular
 
 				scope.valid		= newValue.valid;
 				scope.name		= newValue.name;
-				console.log( 'backofficeLabel: Updated data %o', data );
+				console.log( 'backofficeLabel: Updated data %o', newValue );
 			}, true );
 
 			$scope.$watch( 'entityName', function( newValue ) {
@@ -2064,6 +2066,9 @@ angular
 
 		// Parent inheritance is needed for events (save, remove) to be handled and 
 		// properties to be exposed to DOM (?)
+		// Problematic if we have nested detailViews (e.g. in articles on CC)
+		// But true is needed to access entityId of a parent detailView (e.g. to filter in a 
+		// nested detailView)
 		, scope				: true
 		, require			: [ 'detailView' ]
 	};
@@ -2227,6 +2232,12 @@ angular
 		$scope.entityName = newName;
 	} );
 
+	// Init (required if we have a nested detailView that has ng-if and is only displayed if a
+	// certain condition is met)
+	if( $attrs.entityName ) {
+		$scope.entityName = $attrs.entityName;
+	}
+
 
 
 	self.getEntityUrl = function() {
@@ -2289,8 +2300,17 @@ angular
 		element = el;
 
 		// Store number of auto form elements
-		var autoFormElements = element.find( '[data-auto-form-element], [data-hidden-input], [data-backoffice-tree-component], [data-backoffice-relation-component]' );
-		autoFormElementCount = autoFormElements.length;
+		// [data-backoffice-component]: Individual components that get and store data.
+		var autoFormElements		= element.find( '[data-auto-form-element], [data-hidden-input], [data-backoffice-tree-component], [data-backoffice-relation-component]', '[data-backoffice-component]' );
+
+		// If element has a parent [data-detail-view] that is different from the current detailView, don't count elements. 
+		// This may happen if we have nested detailViews.
+		autoFormElements.each( function() {
+			var closest = $( this ).closest( '[data-detail-view]' );
+			if( closest.get( 0 ) === element.get( 0 ) ) {
+				autoFormElementCount++;
+			}
+		} );
 
 		// getOptionData whenever entityId changes if entityId is on $attrs
 		if( $attrs.hasOwnProperty( 'entityId' ) ) {
@@ -2572,9 +2592,9 @@ angular
 	* - Registered components are asked for their data when saving
 	* @param {Object} element		The child directive itself (this)
 	*/
-	self.register = function( element ) {
+	self.register = function( el ) {
 
-		self.registeredComponents.push( element );
+		self.registeredComponents.push( el );
 
 		// All components registered
 		if( self.registeredComponents.length === autoFormElementCount ) {
@@ -2780,7 +2800,13 @@ angular
 	*												_not_ redirected to the new entity. Needed for manual saving. 
 	* @returns <Integer>							ID of the current entity
 	*/
-	$scope.save = function( dontNotifyOrRedirect ) {
+	$scope.save = function( dontNotifyOrRedirect, ev ) {
+
+		// Needed for nested detailViews: We don't want to propagate the save event to the parent detailView
+		// See e.g. article in CC back office
+		if( ev && angular.isFunction( ev.preventDefault ) ) {
+			ev.preventDefault();
+		}
 
 		// We need to get the saved entity's id so that we can redirect the user to it
 		// after it has been created (when user was on /entity/new)
@@ -2800,6 +2826,7 @@ angular
 				}
 
 				if( !dontNotifyOrRedirect ) {
+					console.log( 'DetailViewController: Show success message on %o', $rootScope );
 					$rootScope.$broadcast( 'notification', {
 						type				: 'success'
 						, message			: 'web.backoffice.detail.saveSuccess'
@@ -2944,6 +2971,14 @@ angular
 				relationCalls.forEach( function( call ) {
 					callRequests.push( self.executeSaveRequest( call ) );
 				} );
+
+
+				// No calls: Resolve instantly
+				/*if( !callRequests.length ) {
+					var deferred = $q.defer();
+					deferred.resolve();
+					return deferred.promise;
+				}*/
 
 				return $q.all( callRequests );
 
@@ -3144,7 +3179,7 @@ angular
 				componentCalls = [ componentCalls ];
 			}
 
-			console.log( 'DetailView: componentCalls are %o', componentCalls );
+			console.log( 'DetailView: componentCalls are %o for %o', componentCalls, comp );
 			componentCalls.forEach( function( componentCall ) {
 				self.addCall( componentCall, calls );
 			} );
@@ -3408,6 +3443,8 @@ angular
 		, link			: function( scope, element, attrs, ctrl) {
 			ctrl[ 0 ].init( element, ctrl[ 1 ] );
 		}
+		// Let the user get stuff from the $parent scope to use 
+		// as value
 		, scope			: true
 	};
 
@@ -3440,9 +3477,10 @@ angular
 	// attribute to the select statement. 
 	// This is e.g required for nested sets where we need to *set* «parentNode» or «after» or «before»,
 	// but can't select those properties because they're virtual.	
-	console.log( 'HiddenInput: for is %o, read %o evals to %o', $attrs.for, $attrs.read, $scope.$parent.$eval( $attrs.read ) );
-	if( !$attrs.hasOwnProperty( 'read' ) && $scope.$parent.$eval( $attrs.read ) ) {
+	console.log( 'HiddenInput: for is %o, read %o (hasProperty %o) evals to %o', $attrs.for, $attrs.read, $attrs.hasOwnProperty( 'read' ), $scope.$parent.$eval( $attrs.read ) );
+	if( !$attrs.hasOwnProperty( 'read' ) || $scope.$parent.$eval( $attrs.read ) ) {
 		self.select = $attrs.for;
+		console.log( 'HiddenInput: select is %o', self.select );
 	}
 
 
@@ -3451,21 +3489,44 @@ angular
 
 		var writeData = !$attrs.hasOwnProperty( 'write' ) || $scope.$parent.$eval( $attrs.write );
 
-		console.log( 'HiddenInput: Get save calls; $attrs.data is %o, data-write is %o and evals to %o', $attrs.data, $attrs.write, $scope.$parent.$eval( $attrs.write ) );
+		console.log( 'HiddenInput: Get save calls; $attrs.data is %o, writeData is %o, data-write is %o and evals to %o', $attrs.data, writeData, $attrs.write, $scope.$parent.$eval( $attrs.write ) );
 
 		if( writeData && $attrs.data ) {
 
-			var saveData = {};
-			saveData[ $attrs.for ] = $attrs.data;
+			var isRelation = $attrs.for && $attrs.for.indexOf( '.' ) > -1;
 
-			console.log( 'HiddenInput: Store data %o', saveData );
+			// If there's a star in the for attribute, we're working with a relation. 
+			// Store it through POSTing to /entity/id/entity/id instead of sending data.
+			if( isRelation ) {
 
-			return {
-				url			: ''
-				, data		: saveData
-				// Method: PATCH if entity already has an ID, else POST
-				, method	: detailViewController.getEntityId() ? 'PATCH' : 'POST'
-			};
+				var entityName 		= $attrs.for.substring( 0, $attrs.for.lastIndexOf( '.' ) )
+					, url			= entityName + '/' + $attrs.data;
+
+				console.log( 'HiddenInput: Store relation %o', url );
+
+				return {
+					url			: url
+					, method	: 'POST'
+				};
+
+
+			}
+			else {
+
+				// Compose data
+				var saveData = {};
+				saveData[ $attrs.for ] = $attrs.data;
+
+				console.log( 'HiddenInput: Store data %o', saveData );
+
+				return {
+					url			: ''
+					, data		: saveData
+					// Method: PATCH if entity already has an ID, else POST
+					, method	: detailViewController.getEntityId() ? 'PATCH' : 'POST'
+				};
+
+			}
 
 		}
 
@@ -3475,21 +3536,6 @@ angular
 
 
 } ] );
-
-
-
-/*.run( function( $templateCache ) {
-
-	$templateCache.put( 'hiddenInputTemplate.html',
-		'<div class=\'form-group form-group-sm\'>' +
-			'<label data-backoffice-label></label>' +
-			'<div class=\'col-md-9\'>' +
-				'<input type=\'text\' data-ng-attr-id=\'{{ entityName }}-{{ data.name }}-label\' class=\'form-control input-sm\' data-ng-attrs-required=\'isRequired()\' data-ng-model=\'data.value\'/>' +
-			'</div>' +
-		'</div>'
-	);
-
-} );*/
 angular
 .module( 'jb.imageComponent', [] )
 .directive( 'imageComponent', [ function() {
@@ -3634,7 +3680,7 @@ angular
 	* Returns true if file type is supported 
 	*/
 	function checkFileType( file ) {
-		var acceptedFileTypes = [ 'image/jpeg', 'image/png', 'image/gif' ];
+		var acceptedFileTypes = [ 'image/jpeg' ];
 		if( acceptedFileTypes.indexOf( file.type ) === -1 ) {
 			return false;
 		}

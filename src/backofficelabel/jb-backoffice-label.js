@@ -27,7 +27,7 @@ angular
 
 				scope.valid		= newValue.valid;
 				scope.name		= newValue.name;
-				console.log( 'backofficeLabel: Updated data %o', data );
+				console.log( 'backofficeLabel: Updated data %o', newValue );
 			}, true );
 
 			$scope.$watch( 'entityName', function( newValue ) {

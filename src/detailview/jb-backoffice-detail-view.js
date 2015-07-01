@@ -32,6 +32,9 @@ angular
 
 		// Parent inheritance is needed for events (save, remove) to be handled and 
 		// properties to be exposed to DOM (?)
+		// Problematic if we have nested detailViews (e.g. in articles on CC)
+		// But true is needed to access entityId of a parent detailView (e.g. to filter in a 
+		// nested detailView)
 		, scope				: true
 		, require			: [ 'detailView' ]
 	};
@@ -195,6 +198,12 @@ angular
 		$scope.entityName = newName;
 	} );
 
+	// Init (required if we have a nested detailView that has ng-if and is only displayed if a
+	// certain condition is met)
+	if( $attrs.entityName ) {
+		$scope.entityName = $attrs.entityName;
+	}
+
 
 
 	self.getEntityUrl = function() {
@@ -257,8 +266,17 @@ angular
 		element = el;
 
 		// Store number of auto form elements
-		var autoFormElements = element.find( '[data-auto-form-element], [data-hidden-input], [data-backoffice-tree-component], [data-backoffice-relation-component]' );
-		autoFormElementCount = autoFormElements.length;
+		// [data-backoffice-component]: Individual components that get and store data.
+		var autoFormElements		= element.find( '[data-auto-form-element], [data-hidden-input], [data-backoffice-tree-component], [data-backoffice-relation-component]', '[data-backoffice-component]' );
+
+		// If element has a parent [data-detail-view] that is different from the current detailView, don't count elements. 
+		// This may happen if we have nested detailViews.
+		autoFormElements.each( function() {
+			var closest = $( this ).closest( '[data-detail-view]' );
+			if( closest.get( 0 ) === element.get( 0 ) ) {
+				autoFormElementCount++;
+			}
+		} );
 
 		// getOptionData whenever entityId changes if entityId is on $attrs
 		if( $attrs.hasOwnProperty( 'entityId' ) ) {
@@ -540,9 +558,9 @@ angular
 	* - Registered components are asked for their data when saving
 	* @param {Object} element		The child directive itself (this)
 	*/
-	self.register = function( element ) {
+	self.register = function( el ) {
 
-		self.registeredComponents.push( element );
+		self.registeredComponents.push( el );
 
 		// All components registered
 		if( self.registeredComponents.length === autoFormElementCount ) {
@@ -748,7 +766,13 @@ angular
 	*												_not_ redirected to the new entity. Needed for manual saving. 
 	* @returns <Integer>							ID of the current entity
 	*/
-	$scope.save = function( dontNotifyOrRedirect ) {
+	$scope.save = function( dontNotifyOrRedirect, ev ) {
+
+		// Needed for nested detailViews: We don't want to propagate the save event to the parent detailView
+		// See e.g. article in CC back office
+		if( ev && angular.isFunction( ev.preventDefault ) ) {
+			ev.preventDefault();
+		}
 
 		// We need to get the saved entity's id so that we can redirect the user to it
 		// after it has been created (when user was on /entity/new)
@@ -768,6 +792,7 @@ angular
 				}
 
 				if( !dontNotifyOrRedirect ) {
+					console.log( 'DetailViewController: Show success message on %o', $rootScope );
 					$rootScope.$broadcast( 'notification', {
 						type				: 'success'
 						, message			: 'web.backoffice.detail.saveSuccess'
@@ -912,6 +937,14 @@ angular
 				relationCalls.forEach( function( call ) {
 					callRequests.push( self.executeSaveRequest( call ) );
 				} );
+
+
+				// No calls: Resolve instantly
+				/*if( !callRequests.length ) {
+					var deferred = $q.defer();
+					deferred.resolve();
+					return deferred.promise;
+				}*/
 
 				return $q.all( callRequests );
 
@@ -1112,7 +1145,7 @@ angular
 				componentCalls = [ componentCalls ];
 			}
 
-			console.log( 'DetailView: componentCalls are %o', componentCalls );
+			console.log( 'DetailView: componentCalls are %o for %o', componentCalls, comp );
 			componentCalls.forEach( function( componentCall ) {
 				self.addCall( componentCall, calls );
 			} );

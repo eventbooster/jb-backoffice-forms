@@ -51,10 +51,12 @@ AutoTextInputController.prototype.getSaveCalls = function() {
 
 	var data = {};
 	data[ this.$scope.data.name ] = this.$scope.data.value;
+	console.error( this.detailViewController.getEntityId());
 	return {
 		url			: ''
 		, data		: data
-		, method	: this.detailViewController.getEntityId() === undefined ? 'POST' : 'PATCH'
+		// entityId may be undefined, false or ''
+		, method	: ( !this.detailViewController.getEntityId() && this.detailViewController.getEntityId() !== 0 ) ? 'POST' : 'PATCH'
 	};
 	
 };
