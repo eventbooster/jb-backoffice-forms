@@ -48,13 +48,13 @@ AutoDateTimeInputController.prototype.getSaveCalls = function() {
 
 	var date			= this.$scope.date;
 
-	// Empty field
-	if( !date ) {
+	// Empty field (and original empty)
+	if( !date && !this.originalData ) {
 		return false;
 	}
 
 	// No change
-	if( date.getTime() === this.originalData.getTime() ) {
+	if( this.originalData && date.getTime() === this.originalData.getTime() ) {
 		return false;
 	}
 
@@ -64,8 +64,7 @@ AutoDateTimeInputController.prototype.getSaveCalls = function() {
 	data[ this.$scope.data.name ] = dateString;
 
 	return {
-		url			: this.detailViewController.getEntityUrl()
-		, data		: data
+		data		: data
 	};
 
 };
