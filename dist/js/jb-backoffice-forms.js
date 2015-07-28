@@ -382,7 +382,6 @@ AutoDateTimeInputController.prototype.getSaveCalls = function() {
 
 	var date			= this.$scope.date;
 
-
 	// Empty field (and original empty)
 	if( !date && !this.originalData ) {
 		return false;
@@ -1358,7 +1357,7 @@ angular
 
 	} ] )
 
-	.controller( 'BackofficeRelationComponentController', [ '$scope', '$compile', '$templateCache', function( $scope, $compile, $templateCache ) {
+	.controller( 'BackofficeRelationComponentController', [ '$scope', '$compile', '$templateCache', 'RelationInputService', function( $scope, $compile, $templateCache, RelationInputService ) {
 
 		var self = this
 			, element
@@ -1440,9 +1439,22 @@ angular
 
 		/**
 		* Returns the select statement for the GET call
+		* Use the RelationInputService from the relationInput to determine select fields depending on the 
+		* suggestionTemplate.
 		*/
 		self.getSelectFields = function() {
-			return self.propertyName + '.*';
+
+			var selectFields				= RelationInputService.extractSelectFields( self.suggestionTemplate )
+
+			// Select fields prefixed with the entity's name
+				, prefixedSelectFields		= [];
+			
+			selectFields.forEach( function( selectField ) {
+				prefixedSelectFields.push( self.propertyName + '.' + selectField );
+			} );
+
+			return prefixedSelectFields;
+
 		};
 
 
