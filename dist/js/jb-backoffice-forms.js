@@ -1360,20 +1360,20 @@ angular
 	.controller( 'BackofficeRelationComponentController', [ '$scope', '$compile', '$templateCache', 'RelationInputService', function( $scope, $compile, $templateCache, RelationInputService ) {
 
 		var self = this
-			, element
-			, detailViewController
+			, _element
+			, _detailViewController
 
 			// Data gotten from options call: 
 			// - is value required? 
 			// - is relation deletable? 
 			// - is it a multi or single select field?
-			, required
-			, deletable
-			, multiSelect
+			, _required
+			, _deletable
+			, _multiSelect
 
 			// Original data gotten from server; needed to calculate differences
 			// (when storing data)
-			, originalData;
+			, _originalData;
 
 
 		
@@ -1387,12 +1387,12 @@ angular
 		*/
 		self.init = function( el, detailViewCtrl ) {
 
-			element = el;
-			detailViewController = detailViewCtrl;
+			_element = el;
+			_detailViewController = detailViewCtrl;
 
 			// Registers itself with detailViewController
-			detailViewController.registerOptionsDataHandler( self.updateOptionsData );
-			detailViewController.registerGetDataHandler( self.updateData );
+			_detailViewController.registerOptionsDataHandler( self.updateOptionsData );
+			_detailViewController.registerGetDataHandler( self.updateData );
 
 		};
 
@@ -1404,13 +1404,15 @@ angular
 		* GET data gotten from detailView
 		*/
 		self.updateData = function( data ) {
+
 			var modelValue = angular.isArray( data[ self.propertyName ] ) ? data[ self.propertyName ] : [ data[ self.propertyName ] ];
 			self.relationModel = modelValue; 
 
-			// Store data in originalData to calculate differences when saving
-			originalData = angular.copy( modelValue );
+			// Store data in _originalData to calculate differences when saving
+			_originalData = angular.copy( modelValue );
 
 			console.log( 'BackofficeRelationComponentController: Model updated (updateData) to %o', self.relationModel );
+
 		};
 
 
@@ -1425,14 +1427,14 @@ angular
 
 			var elementData		= data[ self.propertyName ];
 
-			deletable			= elementData.originalRelation !== 'belongsTo';	
-			required			= elementData.required;
-			multiSelect			= elementData.relationType !== 'single';
+			_deletable			= elementData.originalRelation !== 'belongsTo';	
+			_required			= elementData.required;
+			_multiSelect		= elementData.relationType !== 'single';
 
-			self.replaceElement( multiSelect, deletable );
+			self.replaceElement( _multiSelect, _deletable );
 
 			// Now let detailViewController know we're ready to get GET data
-			detailViewController.register( self );
+			_detailViewController.register( self );
 
 		};
 
@@ -1474,23 +1476,22 @@ angular
 				.attr( 'data-relation-entity-search-field', self.searchField )
 				.attr( 'data-relation-suggestion-template', self.suggestionTemplate )
 				.attr( 'data-ng-model', 'backofficeRelationComponent.relationModel' )
-				.attr( 'data-multi-select', multiSelect )
-				.attr( 'data-deletable', deletable );
+				.attr( 'data-multi-select', multiSelect );
 
-			element.replaceWith( template );
+			_element.replaceWith( template );
 			$compile( template )( $scope );
 
 		};
 
 
 		self.isRequired = function() {
-			return required;
+			return _required;
 		};
 
 		self.isValid = function() {
 
 			// May return 1; therefore use !! to convert to bool.
-			var valid = !!( !required || ( required && self.relationModel && self.relationModel.length ) );
+			var valid = !!( !_required || ( _required && self.relationModel && self.relationModel.length ) );
 			console.log( 'BackofficeRelationComponentController: isValid? %o', valid );
 			return valid;
 
@@ -1504,7 +1505,7 @@ angular
 
 		self.getSaveCalls = function() {
 
-			var saveCalls = multiSelect ? self.getMultiSelectSaveCalls() : self.getSingleSelectSaveCalls();
+			var saveCalls = _multiSelect ? self.getMultiSelectSaveCalls() : self.getSingleSelectSaveCalls();
 
 			console.log( 'BackofficeRelationComponentController: saveCalls are %o', saveCalls );
 			return saveCalls;
@@ -1528,16 +1529,24 @@ angular
 			}
 
 
-			// Element is required: It must be stored when main entity is created through POSTing to 
+			// Element is required: It MUST be stored when main entity is created through POSTing to 
 			// the main entity with id_entity. It may not be deleted, therefore on updating, a PATCH
 			// call must be made to the main entity (and not DELETE/POST)
-			if( required ) {
+			if( _required ) {
 
 				var relationData = {};
 				relationData[ 'id_' + self.propertyName ] = self.relationModel[ 0 ].id;
 
+				// No changes happened: return false
+				if( self.relationModel[ 0 ].id === _originalData[ 0 ].id ) {
+					console.log( 'BackofficeRelationComponentController: No changes on required relation %o', self.propertyName );
+					return false;
+				}
+
+
+
 				// Creating main entity
-				if( !detailViewController.getEntityId() ) {
+				if( !_detailViewController.getEntityId() ) {
 
 					return {
 						url			: false // Use main entity URL
@@ -1559,21 +1568,21 @@ angular
 
 
 			// Element was removed
-			if( self.relationModel.length === 0 && originalData && originalData.length !== 0 ) {
+			if( self.relationModel.length === 0 && _originalData && _originalData.length !== 0 ) {
 				return {
-					url			: self.propertyName + '/' + originalData[ 0 ].id
+					url			: self.propertyName + '/' + _originalData[ 0 ].id
 					, method	: 'DELETE'
 				};
 			}
 
 			// Update
-			// When scope.data[ 0 ].id != originalData[ 0 ].id 
+			// When scope.data[ 0 ].id != _originalData[ 0 ].id 
 			// Only [0] has to be checked, as it's a singleSelect
 			if( self.relationModel.length ) {
-				if( !originalData || ( originalData.length && self.relationModel[ 0 ].id !== originalData[ 0 ].id ) ) {
+				if( !_originalData || ( _originalData.length && self.relationModel[ 0 ].id !== _originalData[ 0 ].id ) ) {
 				
 					var data = {};
-					data[ detailViewController.fields[ self.propertyName ].relationKey ] = self.relationModel[ 0 ].id;
+					data[ _detailViewController.fields[ self.propertyName ].relationKey ] = self.relationModel[ 0 ].id;
 
 					// Post to /mainEntity/currentId/entityName/entityId, path needs to be entityName/entityId, 
 					// is automatically prefixed by DetailViewController 
@@ -1612,14 +1621,14 @@ angular
 					newIds.push( item.id );
 				} );
 			}
-			if( originalData && originalData.length ) {
-				originalData.forEach( function( item ) {
+			if( _originalData && _originalData.length ) {
+				_originalData.forEach( function( item ) {
 					originalIds.push( item.id );
 				} );
 			}
 
 
-			// Deleted: in originalData, but not in newData
+			// Deleted: in _originalData, but not in newData
 			originalIds.forEach( function( item ) {
 				if( newIds.indexOf( item ) === -1 ) {
 					deleted.push( item );
@@ -1630,7 +1639,7 @@ angular
 				}
 			}.bind( this ) );
 
-			// Added: in newData, but not in originalData
+			// Added: in newData, but not in _originalData
 			newIds.forEach( function( item ) {
 				if( originalIds.indexOf( item ) === -1 ) {
 					added.push( item );
@@ -1658,7 +1667,7 @@ angular
 	} ] )
 
 
-	.run( function( $templateCache ) {
+	.run( [ '$templateCache', function( $templateCache ) {
 
 		$templateCache.put( 'backofficeRelationComponentTemplate.html',
 			'<div class=\'form-group\'>' +
@@ -1673,7 +1682,7 @@ angular
 			'</div>'
 		);
 
-	} );
+	} ] );
 
 
 
