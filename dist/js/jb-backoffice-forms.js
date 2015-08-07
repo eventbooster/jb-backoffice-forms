@@ -80,7 +80,7 @@ AutoInputController.prototype.init = function( el, detViewController ) {
 	angular
 
 	// jb.backofficeFormElements: Namespace for new form elements (replacement for jb.backofficeAutoFormElement)
-	.module( 'jb.backofficeFormComponents', [] );
+	.module( 'jb.backofficeFormComponents', [ 'jb.fileDropComponent' ] );
 
 } )();
 
@@ -1317,6 +1317,540 @@ angular
 
 } );
 /**
+* Adds distributed calls to image upload/list component
+*/
+( function() {
+
+	'use strict';
+
+	angular
+
+	.module( 'jb.backofficeFormComponents' )
+
+	/**
+	* <input data-backoffice-image-component 
+	*	data-for="enity">
+	*/
+	.directive( 'backofficeImageComponent', [ function() {
+
+		return {
+			require				: [ 'backofficeImageComponent', '^detailView' ]
+			, controller		: 'BackofficeImageComponentController'
+			, controllerAs		: 'backofficeImageComponent'
+			, bindToController	: true
+			, templateUrl		: 'backofficeImageComponentTemplate.html'
+			, link				: function( scope, element, attrs, ctrl ) {
+				ctrl[ 0 ].init( element, ctrl[ 1 ] );
+			}
+			, scope: {
+				'propertyName'		: '@for'
+				, 'imageModel'		: '=model'
+			}
+
+		};
+
+	} ] )
+
+	.controller( 'BackofficeImageComponentController', [ '$scope', '$rootScope', '$q', '$location', 'APIWrapperService', function( $scope, $rootScope, $q, $location, APIWrapperService ) {
+
+		var self = this
+			, _element
+			, _detailViewController
+
+			, _originalData;
+
+		self.images = [];
+
+		self.init = function( el, detailViewCtrl ) {
+			_element = el;
+			_detailViewController = detailViewCtrl;
+
+			_detailViewController.registerOptionsDataHandler( self.updateOptionsData );
+			_detailViewController.registerGetDataHandler( self.updateData );
+
+		};
+
+		/**
+		* Called with GET data
+		*/
+		self.updateData = function( data ) {
+			
+			// Re-set to empty array. Needed if we store something and data is newly loaded: Will just 
+			// append and amount of images will grow if we don't reset it to [].
+			self.images = [];
+
+			// No image set: use empty array
+			// Don't use !angular.isArray( data.image ); it will create [ undefined ] if there's no data.image.
+			if( !data.image ) {
+				data.image = [];
+			}
+
+
+			// Image has a hasOne-relation: Is delivered as an object (instead of an array):
+			// Convert to array
+			if( !angular.isArray( data.image ) ) {
+				data.image = [ data.image ];
+			}
+
+
+
+			// Store original data (to only send differences to the server when saving)
+			_originalData = data.image.slice();
+
+
+
+			// Create self.images from data.image. 
+			data.image.forEach( function( image ) {
+
+				self.images.push( _reformatImageObject( image ) );
+
+			} );
+
+		};
+
+
+		/**
+		* Takes data gotten from /image on the server and reformats it for
+		* use in the frontend.
+		*/
+		function _reformatImageObject( originalObject ) {
+
+			var focalPoint;
+			try {
+				focalPoint = JSON.parse( originalObject.focalPoint );
+			}
+			catch(e){
+				// Doesn't _really_ matter.
+				console.error( 'BackofficeImageComponentController: Could not parse focalPoint JSON', originalObject.focalPoint );
+			}
+
+
+			return {
+				url				: originalObject.bucket.url + originalObject.url
+				, focalPoint	: focalPoint
+				, width			: originalObject.width
+				, height		: originalObject.height
+				, fileSize		: originalObject.size
+				, mimeType		: originalObject.mimeType.mimeType
+				, id			: originalObject.id // Needed to save the file (see self.getSaveCalls)
+			};
+
+		}
+
+
+
+		/**
+		* Called with OPTIONS data 
+		*/
+		self.updateOptionsData = function( data ) {
+
+			_detailViewController.register( self );
+
+		};
+
+
+		/**
+		* Returns the fields that need to be selected on the GET call
+		*/
+		self.getSelectFields = function() {
+
+			return [ self.propertyName + '.*', self.propertyName + '.bucket.url', self.propertyName + '.mimeType.*' ];
+
+		};
+
+
+
+
+		/**
+		* Store/Delete files that changed.
+		*/
+		self.getSaveCalls = function() {
+
+			// Calls to be returned
+			var calls			= []
+
+				// IDs of images present on init
+				, originalIds	= []
+
+				// IDs of images present on save
+				, imageIds		= [];
+
+
+			_originalData.forEach( function( img ) {
+				originalIds.push( img.id );
+			} );
+
+			self.images.forEach( function( img ) {
+				imageIds.push( img.id );
+			} );
+
+
+			// Deleted
+			originalIds.forEach( function( id ) {
+				if( imageIds.indexOf( id ) === -1 ) {
+					// Remove relation (relative path, will be prefixed with current entity's path)
+					// Is automatically deleted when removing the relation.
+					/*calls.push( {
+						method		: 'DELETE'
+						, url		: 'image/' + id
+					} );*/ 
+					// Remove image iself (try to; not the relation)
+					calls.push( {
+						method		: 'DELETE'
+						, url		: '/image/' + id
+					} );
+				}
+			} );
+
+			// Added
+			imageIds.forEach( function( id ) {
+				if( originalIds.indexOf( id ) === -1 ) {
+					calls.push( {
+						method		: 'POST'
+						, url		: 'image/' + id
+					} );
+				}
+			} );
+
+			console.log( 'BackofficeImageComponentController: Calls to be made are %o', calls );
+			return calls;
+
+		};
+
+
+
+		/**
+		* Upload all image files
+		*/
+		self.beforeSaveTasks = function() {
+
+			var requests = [];
+
+			// Upload all added files (if there are any), then resolve promise
+			self.images.forEach( function( image ) {
+
+				// Only files added per drag and drop have a file property that's an instance of File
+				// (see file-drop-component)
+				if( image.file && image.file instanceof File ) {
+
+					console.log( 'BackofficeImageComponentController: New file %o', image );
+					requests.push( _uploadFile( image ) );
+
+				}
+
+			} );
+
+			console.log( 'BackofficeImageComponentController: Upload %o', requests );
+
+			return $q.all( requests );
+
+		};
+
+
+
+
+		/**
+		* Uploads a single file. 
+		* @param {Object} file		Object returned by drop-component. Needs to contain a file property containing a File type.
+		*/
+		function _uploadFile( image ) {
+
+			console.log( 'BackofficeImageComponentController: Upload file %o to /image through a POST request', image );
+
+			return APIWrapperService.request( {
+				method				: 'POST'
+				, data				: {
+					image			: image.file
+				}
+				, url				: '/image'
+			} )
+
+			.then( function( data ) {
+
+				// Store data gotten from server on self.images[ i ] ) 
+				// instead of the image File object
+				var index = self.images.indexOf( image );
+
+				var newFileObject = _reformatImageObject( data );
+				self.images.splice( index, 1, newFileObject );
+
+				console.log( 'BackofficeImageComponentController: Image uploaded, replace %o with %o', self.images[ index ], newFileObject );
+
+				return data;
+
+			} );
+
+		}
+
+
+
+
+		/**
+		* Click on remove icon on image.
+		*/
+		self.removeImage = function( ev, image ) {
+			
+			self.images.splice( self.images.indexOf( image ), 1 );
+
+		};
+
+
+
+		/**
+		* Click on image
+		*/
+		self.openDetailView = function( ev, image ) {
+
+			ev.preventDefault();
+
+			// Image wasn't stored yet: There's no detail view.
+			if( !image.id ) {
+				return;
+			}
+
+			$location.path( self.propertyName + '/' + image.id );
+
+		};
+
+
+
+
+		/**
+		* Called from within file-drop-component
+		*/
+		self.handleDropError = function( err ) {
+		
+			$scope.$apply( function() {
+				$rootScope.$broadcast( 'notification', {
+					'type'				: 'error'
+					, 'message'			: 'web.backoffice.detail.imageDropError'
+					, 'variables'		: {
+						'errorMessage'	: err
+					}
+				} );
+			} );
+
+		};
+
+
+
+	} ] )
+
+
+
+	.run( [ '$templateCache', function( $templateCache ) {
+
+		$templateCache.put( 'backofficeImageComponentTemplate.html',
+			'<label data-backoffice-label data-label-identifier=\'{{backofficeImageComponent.propertyName}}\' data-is-required=\'false\' data-is-valid=\'true\'></label>' +
+			'<div class=\'col-md-9 backoffice-image-component\'>' +
+				'<div data-file-drop-component data-supported-file-types=\'["image/jpeg"]\' data-model=\'backofficeImageComponent.images\' data-error-handler=\'backofficeImageComponent.handleDropError(error)\'>' +
+					'<ol data-sortable-list-component class=\'clearfix\'>' +
+						'<li data-ng-repeat=\'image in backofficeImageComponent.images\'>' +
+							'<a href=\'#\' data-ng-click=\'backofficeImageComponent.openDetailView( $event, image )\'>' +
+								'<img data-ng-attr-src=\'{{image.url || image.fileData}}\'/>' +
+								'<button class=\'remove\' data-ng-click=\'backofficeImageComponent.removeImage($event,image)\'>&times</button>' +
+							'</a>' +
+							'<span class=\'image-size-info\' data-ng-if=\'!!image.width && !!image.height\'>{{image.width}}&times;{{image.height}} Pixels</span>' +
+							'<span class=\'image-file-size-info\' data-ng-if=\'!!image.fileSize\'>{{image.fileSize/1000/1000 | number: 1 }} MB</span>' +
+							'<span class=\'focal-point-info\' data-ng-if=\'!!image.focalPoint\'>Focal Point</span>' +
+						'</li>' +
+						//'<li><button data-ng-click=\'imageDropComponent.upload()\'></button></li>' +
+					'</ol>' +
+				'</div>' +
+			'</div>'
+		);
+
+	} ] );
+
+
+} )();
+
+
+/**
+* Component for a single image to
+* - set focal points
+*/
+( function() {
+
+	'use strict';
+
+	angular
+
+	.module( 'jb.backofficeFormComponents' )
+
+	/**
+	* <input data-backoffice-image-component 
+	*	data-for="enity">
+	*/
+	.directive( 'backofficeImageDetailComponent', [ function() {
+
+		return {
+			require				: [ 'backofficeImageDetailComponent', '^detailView' ]
+			, controller		: 'BackofficeImageDetailComponentController'
+			, controllerAs		: 'backofficeImageDetailComponent'
+			, bindToController	: true
+			, templateUrl		: 'backofficeImageDetailComponentTemplate.html'
+			, link				: function( scope, element, attrs, ctrl ) {
+				ctrl[ 0 ].init( element, ctrl[ 1 ] );
+			}
+			, scope: {
+			}
+
+		};
+
+	} ] )
+
+	.controller( 'BackofficeImageDetailComponentController', [ '$scope', function( $scope ) {
+
+		var self = this
+			, _element
+			, _detailViewController
+
+			, _originalFocalPoint;
+
+
+		self.image = {};
+
+
+		self.init = function( el, detailViewCtrl ) {
+			_element = el;
+			_detailViewController = detailViewCtrl;
+
+			_detailViewController.registerOptionsDataHandler( self.updateOptionsData );
+			_detailViewController.registerGetDataHandler( self.updateData );
+
+		};
+
+		self.updateOptionsData = function( data ) {
+			_detailViewController.register( self );
+		};
+
+		self.updateData = function( data ) {
+			self.image = data;
+
+			// Convert focalPoint to object, but only if it has a x and y property
+			if( data.focalPoint ) {
+				try {
+					var focalPoint = JSON.parse( data.focalPoint );
+					if( focalPoint.x && focalPoint.y ) {
+						self.image.focalPoint = focalPoint;
+					}
+					else {
+						throw new Error( 'Property x or y missing on ' + data.focalPoint );
+					}
+				}
+				catch( e ) {
+					console.error( 'BackofficeImageDetailComponentController: Could not parse focalPoint ' + data.focalPoint + ': ' + e.message );
+				}
+			}
+
+			_originalFocalPoint = angular.copy( data.focalPoint );
+
+		};
+
+
+		self.getSelectFields = function() {
+			return '*,mimeType.*,bucket.url';
+		};
+
+		self.getSaveCalls = function() {
+			
+			// Not set before and after (but not identical due to angular.copy)
+			if( !_originalFocalPoint && !self.image.focalPoint ) {
+				return false;
+			}
+
+			// Same x and y property
+			var sameX		= _originalFocalPoint && self.image.focalPoint && _originalFocalPoint.x && self.image.focalPoint.x && self.image.focalPoint.x === _originalFocalPoint.x
+				, sameY		= _originalFocalPoint && self.image.focalPoint && _originalFocalPoint.y && self.image.focalPoint.y && self.image.focalPoint.y === _originalFocalPoint.y;
+			
+			if( sameX && sameY ) {
+				return false;
+			}
+
+			return {
+				method			: 'PATCH'
+				, url			: '/' + _detailViewController.getEntityName() + '/' + _detailViewController.getEntityId()
+				, data			: {
+					focalPoint	: JSON.stringify( self.image.focalPoint )
+				}
+			};
+
+		};
+
+		self.setFocalPoint = function( ev ) {
+			
+			var newFocalPoint = {
+				x		: ( ev.offsetX / ev.target.width ) * self.image.width
+				, y		: ( ev.offsetY / ev.target.height ) * self.image.height
+			};
+			console.log( 'BackofficeImageDetailComponentController: Set focal point to ', JSON.stringify( newFocalPoint ) );
+
+			self.image.focalPoint = newFocalPoint;
+
+		};
+
+
+		/**
+		* Returns focalPoint as object with properties x and y – or false. 
+		*/ 
+		self.getFocalPoint = function() {
+			
+			if( !self.image || !self.image.focalPoint ) {
+				return false;
+			}
+
+			return self.image.focalPoint;
+
+		};
+
+
+
+		/**
+		* Returns % values of focal point. Needed for indicator.
+		*/
+		self.getFocalPointInPercent = function() {
+			var focalPoint = self.getFocalPoint();
+
+			if( focalPoint ) {
+				return {
+					x		: Math.round( focalPoint.x / self.image.width * 100 )
+					, y		: Math.round( focalPoint.y / self.image.height * 100 )
+				};
+			}
+
+			// false
+			return focalPoint;
+
+		};
+
+	} ] )
+
+
+
+	.run( [ '$templateCache', function( $templateCache ) {
+
+		$templateCache.put( 'backofficeImageDetailComponentTemplate.html',
+
+			'<label data-backoffice-label data-label-identifier=\'image\' data-is-required=\'false\' data-is-valid=\'true\'></label>' +
+			'<div class=\'col-md-9 backoffice-image-detail-component\'>' +
+				'<div class=\'image-container\'>' +
+					'<img data-ng-attr-src=\'{{backofficeImageDetailComponent.image.bucket.url + backofficeImageDetailComponent.image.url}}\' data-ng-click=\'backofficeImageDetailComponent.setFocalPoint($event)\'/>' +
+					'<div class=\'focal-point-indicator\' data-ng-if=\'backofficeImageDetailComponent.getFocalPoint()\' data-ng-attr-style=\'top:{{backofficeImageDetailComponent.getFocalPointInPercent().y}}%;left:{{backofficeImageDetailComponent.getFocalPointInPercent().x}}%\'></div>' +
+				'</div>' +
+				'{{backofficeImageDetailComponent.getFocalPointInPercent()}}'+
+				'<div data-ng-if=\'!backofficeImageDetailComponent.getFocalPoint()\'>{{ \'web.backoffice.image.focalPointNotSet\' | translate }}</div>' +
+			'</div>'
+
+		);
+
+	} ] );
+
+
+} )();
+
+
+/**
 * Newer version of jb-auto-relation-input. Is not automatically replaced by auto-form-element any more, 
 * but needs to be used manually. Gives more freedom in usage. 
 * Don't use ngModel as it can't properly deep-watch, especially not through $render
@@ -2325,7 +2859,7 @@ angular
 
 		// Store number of auto form elements
 		// [data-backoffice-component]: Individual components that get and store data.
-		var autoFormElements		= element.find( '[data-auto-form-element], [data-hidden-input], [data-backoffice-tree-component], [data-backoffice-relation-component]', '[data-backoffice-component]' );
+		var autoFormElements		= element.find( '[data-auto-form-element], [data-hidden-input], [data-backoffice-tree-component], [data-backoffice-relation-component], [data-backoffice-component], [data-backoffice-image-component], [data-backoffice-image-detail-component]' );
 
 		// If element has a parent [data-detail-view] that is different from the current detailView, don't count elements. 
 		// This may happen if we have nested detailViews.
@@ -3155,7 +3689,7 @@ angular
 		if( !call.data ) {
 			call.data = {};
 		}
-		call.data.id_dataSource = BackofficeConfig.dataSourceId;
+		//call.data.id_dataSource = BackofficeConfig.dataSourceId;
 
 		return APIWrapperService.request( {
 			url			: url
@@ -3565,6 +4099,238 @@ angular
 
 
 } ] );
+/**
+* Angular directive that accepts file drops:
+* - Adds the file to the model
+* - Adds classes .drop-over, .dropped (2s)
+* - Holds a (hidden) file upload button
+*/
+
+angular
+.module( 'jb.fileDropComponent', [] )
+.directive( 'fileDropComponent', [ function() {
+
+	return {
+		require				: [ 'fileDropComponent' ]
+		, controller		: 'FileDropComponentController'
+		, controllerAs		: 'fileDropComponent'
+		, bindToController	: true
+		, link				: function( scope, element, attrs, ctrl ) {
+			ctrl[ 0 ].init( element );
+		}
+		, scope: {
+			'supportedFileTypes'			: '='
+			// Array the file data is pushed to
+			, 'files'						: '=model'
+			// Function that handles errors. Is called with 
+			// an Error object. The argument passed must be called
+			// «error»: 
+			// data-error-handler="errorFn(error)"
+			, 'errorHandler'				: '&'
+		}
+	};
+
+} ] )
+
+.controller( 'FileDropComponentController', [ '$scope', function( $scope ) {
+
+	var self = this
+		, _element;
+
+	self.files = [];
+
+	// undefined
+	// hover
+	// dropped
+	self.state = 'undefined';
+
+
+	self.init = function( el, detailViewCtrl ) {
+
+		_element = el;
+		_setupDragDropListeners();
+
+	};
+
+
+
+
+	/////////////////////////////////////////////////////////////////////////////////
+	//
+	// ERROR HANDLER
+	//
+
+	/**
+	* Call the error-handler function with an error.
+	*/
+	function _throwError( err ) {
+
+		if( self.errorHandler && angular.isFunction( self.errorHandler ) ) {
+			self.errorHandler( { error: err } );
+		}
+
+	}
+
+
+
+	/////////////////////////////////////////////////////////////////////////////////
+	//
+	// HTML5 d'n'd Stuff
+	//
+	
+	function _setupDragDropListeners() {
+
+		_element
+			.bind( 'drop', _dropHandler )
+			.bind( 'dragover', _dragOverHandler )
+			.bind( 'dragenter', _dragOverHandler )
+			.bind( 'dragleave', _dragLeaveHandler );
+
+	}
+
+	function _dragOverHandler( ev ) {
+		ev.preventDefault();
+		// Doesn't work yet. Probably needs a shared scope as we're 
+		// using it in nested directives.
+		$scope.$apply( function() {
+			self.state = 'hover';
+		} );
+		ev.originalEvent.dataTransfer.effectAllowed = 'copy';
+		return false;
+	}
+
+
+	function _dropHandler( ev ) {
+		ev.preventDefault();
+		var files = ev.originalEvent.dataTransfer.files;
+		_handleFiles( files );
+		return false;
+	}
+
+
+	function _dragLeaveHandler( ev ) {
+		$scope.$apply( function() {
+			self.state = undefined;
+		} );
+	}
+
+
+
+
+	/////////////////////////////////////////////////////////////////////////////////
+	//
+	// HTML5 FILE stuff
+	//
+
+	function _handleFiles( files ) {
+
+		var invalidFiles = [];
+
+		// files is not an array, cannot use forEach
+		for( var i = 0; i < files.length; i++ ) {
+
+			var file = files[ i ];
+
+			if( _checkFileType( file ) ) {
+				_readFile( file );
+			}
+			else {
+				invalidFiles.push( file.name );
+			}
+
+		}
+
+		// Inalid files detected: 
+		// - console.warn
+		// - call error callback function with new error
+		if( invalidFiles.length ) {
+			console.warn( 'FileDropComponentController: Invalid file ', JSON.stringify( invalidFiles ) );
+			_throwError( new Error( 'Tried to upload files with invalid file type: ' + invalidFiles.join( ', ' ) + '. Allowed are ' + self.supportedFileTypes.join( ', ' ) ) + '.' );
+		}
+
+	}
+
+
+
+	/**
+	* Check if file type of dropped file is in self.supportedFileTypes.
+	*/
+	function _checkFileType( file ) {
+
+		if( !self.supportedFileTypes || !angular.isArray( self.supportedFileTypes ) ) {
+			return true;
+		}
+
+		return self.supportedFileTypes.indexOf( file.type ) > -1;
+
+	}
+
+
+
+	/**
+	* Read file, add to self.files.
+	*/
+	function _readFile( file ) {
+
+		var fileReader = new FileReader();
+
+		// Add file data to self.files on load
+		fileReader.onload = function( loadEv ) {
+
+
+			var imageSize
+				, fileData = {
+					file		: file
+					, fileSize	: file.size
+					, mimeType	: file.type
+					, height	: undefined
+					, width		: undefined
+					, fileData 	: loadEv.target.result
+			};
+
+
+
+			// Try to get dimensions if it's an image
+			try {
+				var image = new Image();
+				image.src = fileReader.result;
+				image.onload = function() {
+
+					var imageScope = this;
+
+					$scope.$apply( function() {
+						fileData.width = imageScope.width;
+						fileData.height = imageScope.height;
+					} );
+
+				};
+			}
+			catch( e ) {
+			}
+
+
+			// Read file ( to display preview)
+			$scope.$apply( function() {
+
+				self.files.push( fileData );
+	
+			} );
+
+		};
+
+		fileReader.readAsDataURL( file );
+
+	}
+
+
+
+
+
+} ] );
+/**
+* DEPRECATED! Do not use any more. 
+*/
+
 angular
 .module( 'jb.imageComponent', [] )
 .directive( 'imageComponent', [ function() {

@@ -1,3 +1,7 @@
+/**
+* DEPRECATED! Do not use any more. 
+*/
+
 angular
 .module( 'jb.imageComponent', [] )
 .directive( 'imageComponent', [ function() {

@@ -4,12 +4,15 @@ var gulp		= require( 'gulp' )
 	, rename	= require( 'gulp-rename' )
 	, concat	= require( 'gulp-concat' )
 	, order		= require( 'gulp-order' )
-	, print		= require( 'gulp-print' );
+	, gulpPrint	= require( 'gulp-print' )
+	, less		= require( 'gulp-less' );
 
 
 var paths		= {
 	jsSrc		: 'src/*/*.js'
 	, jsDest	: 'dist/js'
+	, cssSrc	: 'src/**/*.less'
+	, cssDest	: 'dist/css'
 };
 
 
@@ -24,7 +27,7 @@ gulp.task( 'scripts', function() {
 			'backoffice-form-elements/jb-backoffice-form-components.js',
 			'*/*.js'
 			], { base: './src/' } ) ) // does not seem to work without base –
-		.pipe( print() )
+		.pipe( gulpPrint() )
 		.pipe( jshint() )
 		.pipe( concat( 'jb-backoffice-forms.js' ) )
 		.pipe( gulp.dest( paths.jsDest ) )
@@ -35,10 +38,26 @@ gulp.task( 'scripts', function() {
 } );
 
 
-gulp.task( 'watch', function() {
 
-	gulp.watch( paths.jsSrc, [ 'scripts' ] );
+
+gulp.task( 'less', function() {
+
+	return gulp.src( [ paths.cssSrc ] )
+		.pipe( gulpPrint() )
+		.pipe( less() )
+		.pipe( concat( 'jb-backoffice-forms.css' ) )
+		.pipe( gulp.dest( paths.cssDest ) );
 
 } );
 
-gulp.task( 'default', [ 'scripts', 'watch' ] );
+
+
+
+gulp.task( 'watch', function() {
+
+	gulp.watch( paths.jsSrc, [ 'scripts' ] );
+	gulp.watch( paths.cssSrc, [ 'less' ] );
+
+} );
+
+gulp.task( 'default', [ 'scripts', 'less', 'watch' ] );

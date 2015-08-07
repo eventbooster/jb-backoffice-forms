@@ -1,5 +1,5 @@
 /**
-* Just copy me to create a new jb-backoffice-form-element.
+* Adds distributed calls to image upload/list component
 */
 ( function() {
 
@@ -7,23 +7,21 @@
 
 	angular
 
-	.module( 'jb.backofficeFormElements' )
+	.module( 'jb.backofficeFormComponents' )
 
 	/**
-	* <input data-backoffice-relation-component 
-	*	data-suggestion-template="[[property]]"
-	* 	data-search-field="property"
+	* <input data-backoffice-image-component 
 	*	data-for="enity">
 	*/
-	.directive( 'backofficeRelationInput', [ function() {
+	.directive( 'backofficeImageComponent', [ function() {
 
 		return {
-			require				: [ 'backofficeRelationInput', '^detailView', '?ngModel' ]
-			, controller		: 'BackofficeRelationInputController'
-			, controllerAs		: 'backofficeRelationInput'
+			require				: [ 'backofficeImageInput', '^detailView' ]
+			, controller		: 'BackofficeImageInputController'
+			, controllerAs		: 'backofficeImageInput'
 			, bindToController	: true
 			, link				: function( scope, element, attrs, ctrl ) {
-				ctrl[ 0 ].init( ctrl[ 1 ] );
+				ctrl[ 0 ].init( element, ctrl[ 1 ] );
 			}
 			, scope: {
 				'suggestionTemplate'	: '@'
@@ -35,16 +33,15 @@
 
 	} ] )
 
-	.controller( 'BackofficeRelationInputController', [ '$scope', function( $scope ) {
+	.controller( 'BackofficeImageComponentController', [ '$scope', function( $scope ) {
 
 		var self = this
-			, element
-			, detailViewController
-			, ngModelController;
+			, _element
+			, _detailViewController;
 
-		self.init = function( el, detailViewCtrl, ngModelCtrl ) {
-			element = el;
-			detailViewController = detailViewCtrl;
+		self.init = function( el, detailViewCtrl ) {
+			_element = el;
+			_detailViewController = detailViewCtrl;
 		};
 
 		alert('ok');
