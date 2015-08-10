@@ -42,7 +42,7 @@ angular
 	/**
 	* Array with languageIds that were selected to be edited (multiselect)
 	*/ 
-	$scope.selectedLanguages	= [];
+	$scope.selectedLanguages	= undefined;
 
 
 	/**
@@ -79,12 +79,17 @@ angular
 	self.setupSelectedLanguagesWatcher = function() {
 		$scope.$watch( 'selectedLanguages', function( newValue ) {
 
-			// Don't divide by 0
-			if( newValue.length === 0 ) {
+			// newValue available? Return if length is 0 to not divide by 0
+			if( !newValue || !angular.isArray( newValue ) || newValue.length === 0 ) {
 				return;
 			}
+
 			var colWidth = Math.floor( 100 / newValue.length  ) + '%';
 			element.find( '.locale-col' ).css( 'width', colWidth );
+
+			setTimeout( function() {
+				self.adjustHeightOfAllAreas();
+			} );
 
 		}, true );
 	};
@@ -153,6 +158,11 @@ angular
 			return true;
 		}
 
+		// Field is not required.
+		if( requiredFields.indexOf( fieldName ) === -1 ) {
+			return true;
+		}
+
 		// Not valid: Data is set for this language (i.e. some keys exist)
 		// but current fieldName was not set. 
 		// ATTENTION: '' counts as a set value (empty string).
@@ -193,6 +203,12 @@ angular
 
 
 
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+	//
+	//   HEIGHT
+	//
+
+
 	/**
 	* Adjusts height of textareas (functionality's very basic. very.)
 	*/
@@ -206,6 +222,8 @@ angular
 			self.adjustHeight( $( this ) );
 		} );
 	};
+
+
 
 
 	self.adjustHeight = function( element ) {
@@ -228,6 +246,8 @@ angular
 		var h = Math.min( copy.height(), 200 );
 
 		copy.remove();
+
+		// #TODO: Update height of all textareas to the highest one. 
 		textarea.height( Math.max( h, parseInt( textarea.css( 'lineHeight'), 10 ) ) );
 
 	};
@@ -235,48 +255,15 @@ angular
 
 
 
-	self.toggleLanguage = function( lang ) {
 
-		// Don't untoggle last language
-		if( $scope.selectedLanguages.length === 1 && $scope.selectedLanguages[ 0 ] === lang ) {
-		//	return;
-		}
-
-		// Add/remove language to $scope.selectedLanguages
-		var idx = $scope.selectedLanguages.indexOf( lang );
-		if( idx > -1 ) {
-			$scope.selectedLanguages.splice( idx, 1 );
-		}
-		else {
-			$scope.selectedLanguages.push( lang );
-		}
-
-		// Update height of all areas. All may have changed 
-		// as the width has changed with the toggling of 
-		// a textarea
-		setTimeout( function() {
-			self.adjustHeightOfAllAreas( $( this ) );
-		}.bind( this ), 100 );
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+	//
+	//   UI Stuff
+	//
 
 
-
-	};
-
-
-
-	/**
-	* Toggles language (if user clicks language in nav-tab): 
-	* Adds/removes it from selectedLanguages
-	*/
-	$scope.toggleLanguage = function( ev, lang ) {
-
-		ev.preventDefault();
-		self.toggleLanguage( lang );
-
-	};
-
-	$scope.isSelected = function( id ) {
-		return $scope.selectedLanguages.indexOf( id ) > -1;
+	$scope.isSelected = function( language ) {
+		return $scope.selectedLanguages.indexOf( language ) > -1;
 	};
 
 
@@ -363,44 +350,6 @@ angular
 
 
 
-	/**
-	* Returns the languages that the current website supports. 
-	* They need to be stored (on login) in localStorage in the form of
-	* [ {
-	*		id: 2
-	*		, code: 'it'
-	*		, name: 'Italian'
-	* } ]
-	*/
-	self.getLanguages = function() {
-
-		if( !localStorage || !localStorage.getItem( 'supportedLanguages' ) ) {
-			console.error( 'LocaleComponentController: supportedLanguages cannot be retrieved from localStorage' );
-			return;
-		}
-
-		var languages = localStorage.getItem( 'supportedLanguages' );
-		languages = JSON.parse( languages );
-
-		languages.forEach( function( language ) {
-
-			$scope.languages.push( {
-				id			: language.id
-				, code		: language.code
-			} );
-
-			// Select first language
-			if( $scope.selectedLanguages.length === 0 ) {
-				self.toggleLanguage( language.id );
-			}
-
-		} );
-
-	};
-
-
-	self.getLanguages();
-
 
 } ] )
 
@@ -408,20 +357,18 @@ angular
 
 	$templateCache.put( 'localeComponentTemplate.html',
 		'<div class=\'locale-component\'>' +
-			'<ul class=\'nav nav-tabs\'>' +
-				'<li data-ng-repeat=\'lang in languages\' data-ng-class=\'{active:isSelected(lang.id)}\'>' +
-					'<a href=\'#\' data-ng-click=\'toggleLanguage($event,lang.id)\'>' +
-						'{{lang.code|uppercase}}' +
-						' <span data-ng-if=\'hasTranslation(lang.id)\' class=\'fa fa-check\'></span>' +
-					'</a>' +
-				'</li>' +
-			'</ul>' +
+			'<div data-language-menu-component data-selected-languages=\'selectedLanguages\' data-is-multi-select=\'true\' data-has-translation=\'hasTranslation(languageId)\'></div>' +
 			'<div class=\'locale-content clearfix\'>' +
-				'<div class=\'locale-col\' data-ng-repeat=\'lang in languages\' data-ng-show=\'isSelected( lang.id )\'>' +
+				'<div class=\'locale-col\' data-ng-repeat=\'lang in selectedLanguages\'>' +
 					'<p>{{ lang.code | uppercase }}</p>' +
 					'<div data-ng-repeat=\'fieldDefinition in fieldDefinitions\'>' +
-						'<label data-ng-attr-for=\'locale-{{lang.id}}-{{fielDefinition.name}}\' data-ng-class=\'{ "invalid": !isFieldValid(lang.id, fieldDefinition.name)}\'><span data-translate=\'web.backoffice.{{entityName}}.{{fieldDefinition.name}}\' ></span> <span class=\'required-indicator\'data-ng-show=\'fieldDefinition.required\'>*</span></label>' +
+
+						'<label data-ng-attr-for=\'locale-{{lang.id}}-{{fielDefinition.name}}\' data-ng-class=\'{ "invalid": !isFieldValid(lang.id, fieldDefinition.name)}\'>' + 
+							// Required asterisk
+							'<span data-translate=\'web.backoffice.{{entityName}}.{{fieldDefinition.name}}\' ></span> <span class=\'required-indicator\'data-ng-show=\'fieldDefinition.required\'>*</span>' +
+						'</label>' +
 						'<textarea data-ng-model=\'model[ lang.id ][ fieldDefinition.name ]\' data-ng-attr-id=\'locale-{{lang.id}}-{{fieldDefinition.name}}\' class=\'form-control\' data-ng-keyup=\'adjustHeight( $event )\' data-ng-focus=\'adjustHeight( $event )\' /></textarea>' +
+
 					'</div>' +
 				'</div>' +
 			'</div>' +

@@ -80,7 +80,7 @@ AutoInputController.prototype.init = function( el, detViewController ) {
 	angular
 
 	// jb.backofficeFormElements: Namespace for new form elements (replacement for jb.backofficeAutoFormElement)
-	.module( 'jb.backofficeFormComponents', [ 'jb.fileDropComponent' ] );
+	.module( 'jb.backofficeFormComponents', [ 'jb.fileDropComponent', 'jb.backofficeShared' ] );
 
 } )();
 
@@ -1252,7 +1252,7 @@ AutoTextInputController.prototype.getSaveCalls = function() {
 
 	var data = {};
 	data[ this.$scope.data.name ] = this.$scope.data.value;
-	console.error( this.detailViewController.getEntityId());
+
 	return {
 		url			: ''
 		, data		: data
@@ -1476,9 +1476,12 @@ angular
 				, imageIds		= [];
 
 
-			_originalData.forEach( function( img ) {
-				originalIds.push( img.id );
-			} );
+			if( _originalData && angular.isArray( _originalData ) ) {
+				_originalData.forEach( function( img ) {
+					originalIds.push( img.id );
+				} );
+			}
+
 
 			self.images.forEach( function( img ) {
 				imageIds.push( img.id );
@@ -1641,21 +1644,23 @@ angular
 	.run( [ '$templateCache', function( $templateCache ) {
 
 		$templateCache.put( 'backofficeImageComponentTemplate.html',
-			'<label data-backoffice-label data-label-identifier=\'{{backofficeImageComponent.propertyName}}\' data-is-required=\'false\' data-is-valid=\'true\'></label>' +
-			'<div class=\'col-md-9 backoffice-image-component\'>' +
-				'<div data-file-drop-component data-supported-file-types=\'["image/jpeg"]\' data-model=\'backofficeImageComponent.images\' data-error-handler=\'backofficeImageComponent.handleDropError(error)\'>' +
-					'<ol data-sortable-list-component class=\'clearfix\'>' +
-						'<li data-ng-repeat=\'image in backofficeImageComponent.images\'>' +
-							'<a href=\'#\' data-ng-click=\'backofficeImageComponent.openDetailView( $event, image )\'>' +
-								'<img data-ng-attr-src=\'{{image.url || image.fileData}}\'/>' +
-								'<button class=\'remove\' data-ng-click=\'backofficeImageComponent.removeImage($event,image)\'>&times</button>' +
-							'</a>' +
-							'<span class=\'image-size-info\' data-ng-if=\'!!image.width && !!image.height\'>{{image.width}}&times;{{image.height}} Pixels</span>' +
-							'<span class=\'image-file-size-info\' data-ng-if=\'!!image.fileSize\'>{{image.fileSize/1000/1000 | number: 1 }} MB</span>' +
-							'<span class=\'focal-point-info\' data-ng-if=\'!!image.focalPoint\'>Focal Point</span>' +
-						'</li>' +
-						//'<li><button data-ng-click=\'imageDropComponent.upload()\'></button></li>' +
-					'</ol>' +
+			'<div class=\'row\'>' +
+				'<label data-backoffice-label data-label-identifier=\'{{backofficeImageComponent.propertyName}}\' data-is-required=\'false\' data-is-valid=\'true\'></label>' +
+				'<div class=\'col-md-9 backoffice-image-component\' >' +
+					'<div data-file-drop-component data-supported-file-types=\'["image/jpeg"]\' data-model=\'backofficeImageComponent.images\' data-error-handler=\'backofficeImageComponent.handleDropError(error)\'>' +
+						'<ol data-sortable-list-component class=\'clearfix\'>' +
+							'<li data-ng-repeat=\'image in backofficeImageComponent.images\'>' +
+								'<a href=\'#\' data-ng-click=\'backofficeImageComponent.openDetailView( $event, image )\'>' +
+									'<img data-ng-attr-src=\'{{image.url || image.fileData}}\'/>' +
+									'<button class=\'remove\' data-ng-click=\'backofficeImageComponent.removeImage($event,image)\'>&times</button>' +
+								'</a>' +
+								'<span class=\'image-size-info\' data-ng-if=\'!!image.width && !!image.height\'>{{image.width}}&times;{{image.height}} Pixels</span>' +
+								'<span class=\'image-file-size-info\' data-ng-if=\'!!image.fileSize\'>{{image.fileSize/1000/1000 | number: 1 }} MB</span>' +
+								'<span class=\'focal-point-info\' data-ng-if=\'!!image.focalPoint\'>Focal Point</span>' +
+							'</li>' +
+							//'<li><button data-ng-click=\'imageDropComponent.upload()\'></button></li>' +
+						'</ol>' +
+					'</div>' +
 				'</div>' +
 			'</div>'
 		);
@@ -1838,13 +1843,80 @@ angular
 					'<img data-ng-attr-src=\'{{backofficeImageDetailComponent.image.bucket.url + backofficeImageDetailComponent.image.url}}\' data-ng-click=\'backofficeImageDetailComponent.setFocalPoint($event)\'/>' +
 					'<div class=\'focal-point-indicator\' data-ng-if=\'backofficeImageDetailComponent.getFocalPoint()\' data-ng-attr-style=\'top:{{backofficeImageDetailComponent.getFocalPointInPercent().y}}%;left:{{backofficeImageDetailComponent.getFocalPointInPercent().x}}%\'></div>' +
 				'</div>' +
-				'{{backofficeImageDetailComponent.getFocalPointInPercent()}}'+
 				'<div data-ng-if=\'!backofficeImageDetailComponent.getFocalPoint()\'>{{ \'web.backoffice.image.focalPointNotSet\' | translate }}</div>' +
 			'</div>'
 
 		);
 
 	} ] );
+
+
+} )();
+
+
+/**
+* Edit/display markdown
+*/
+( function() {
+
+	'use strict';
+
+	angular
+
+	.module( 'jb.backofficeFormComponents' )
+
+	/**
+	* <input data-backoffice-markdown-component 
+	*	data-for="enity">
+	*/
+	.directive( 'backofficeMarkdownComponent', [ function() {
+
+		return {
+			require				: [ 'backofficeMarkdownComponent', '^detailView' ]
+			, controller		: 'BackofficeMarkdownComponentController'
+			, controllerAs		: 'backofficeMarkdownComponent'
+			, bindToController	: true
+			, templateUrl		: 'backofficeMarkdownComponentTemplate.html'
+			, link				: function( scope, element, attrs, ctrl ) {
+				ctrl[ 0 ].init( element, ctrl[ 1 ] );
+			}
+			, scope: {
+				'suggestionTemplate'	: '@'
+				, 'searchField'			: '@'
+				, 'propertyName'		: '@for'
+			}
+
+		};
+
+	} ] )
+
+	.controller( 'BackofficeMarkdownComponentController', [ '$scope', function( $scope ) {
+
+		var self = this
+			, _element
+			, _detailViewController;
+
+		self.init = function( el, detailViewCtrl ) {
+			_element = el;
+			_detailViewController = detailViewCtrl;
+		};
+
+
+
+	} ] )
+
+
+	.run( [ '$templateCache', function( $templateCache ) {
+
+		$templateCache.put( 'backofficeMarkdownComponentTemplate.html', 
+
+			'<div>' +
+				'<div data-language-menu-component data-selected-languages=\'selectedLanguages\' data-is-multi-select=\'false\' data-has-translation=\'hasTranslation(languageId)\'></div>' +
+			'</div>'
+
+		);
+
+	} ]);
 
 
 } )();
@@ -2068,15 +2140,30 @@ angular
 			// call must be made to the main entity (and not DELETE/POST)
 			if( _required ) {
 
-				var relationData = {};
-				relationData[ 'id_' + self.propertyName ] = self.relationModel[ 0 ].id;
+
 
 				// No changes happened: return false
-				if( self.relationModel[ 0 ].id === _originalData[ 0 ].id ) {
-					console.log( 'BackofficeRelationComponentController: No changes on required relation %o', self.propertyName );
-					return false;
+				if( self.relationModel && _originalData ) {
+
+					// No values
+					if( self.relationModel.length === 0 && _originalData.length === 0 ) {
+						console.log( 'BackofficeRelationComponentController: No changes and no relations for required relation %o', self.propertyName );
+						return false;
+					}
+
+					// Same value
+					if( self.relationModel.length && _originalData.length && self.relationModel[ 0 ] && _originalData[ 0 ] && self.relationModel[ 0 ].id === _originalData[ 0 ].id ) {
+						console.log( 'BackofficeRelationComponentController: No changes on required relation %o', self.propertyName );
+						return false;
+					}
+
 				}
 
+
+
+
+				var relationData = {};
+				relationData[ 'id_' + self.propertyName ] = self.relationModel[ 0 ].id;
 
 
 				// Creating main entity
@@ -4596,7 +4683,7 @@ angular
 	/**
 	* Array with languageIds that were selected to be edited (multiselect)
 	*/ 
-	$scope.selectedLanguages	= [];
+	$scope.selectedLanguages	= undefined;
 
 
 	/**
@@ -4633,12 +4720,17 @@ angular
 	self.setupSelectedLanguagesWatcher = function() {
 		$scope.$watch( 'selectedLanguages', function( newValue ) {
 
-			// Don't divide by 0
-			if( newValue.length === 0 ) {
+			// newValue available? Return if length is 0 to not divide by 0
+			if( !newValue || !angular.isArray( newValue ) || newValue.length === 0 ) {
 				return;
 			}
+
 			var colWidth = Math.floor( 100 / newValue.length  ) + '%';
 			element.find( '.locale-col' ).css( 'width', colWidth );
+
+			setTimeout( function() {
+				self.adjustHeightOfAllAreas();
+			} );
 
 		}, true );
 	};
@@ -4707,6 +4799,11 @@ angular
 			return true;
 		}
 
+		// Field is not required.
+		if( requiredFields.indexOf( fieldName ) === -1 ) {
+			return true;
+		}
+
 		// Not valid: Data is set for this language (i.e. some keys exist)
 		// but current fieldName was not set. 
 		// ATTENTION: '' counts as a set value (empty string).
@@ -4747,6 +4844,12 @@ angular
 
 
 
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+	//
+	//   HEIGHT
+	//
+
+
 	/**
 	* Adjusts height of textareas (functionality's very basic. very.)
 	*/
@@ -4760,6 +4863,8 @@ angular
 			self.adjustHeight( $( this ) );
 		} );
 	};
+
+
 
 
 	self.adjustHeight = function( element ) {
@@ -4782,6 +4887,8 @@ angular
 		var h = Math.min( copy.height(), 200 );
 
 		copy.remove();
+
+		// #TODO: Update height of all textareas to the highest one. 
 		textarea.height( Math.max( h, parseInt( textarea.css( 'lineHeight'), 10 ) ) );
 
 	};
@@ -4789,48 +4896,15 @@ angular
 
 
 
-	self.toggleLanguage = function( lang ) {
 
-		// Don't untoggle last language
-		if( $scope.selectedLanguages.length === 1 && $scope.selectedLanguages[ 0 ] === lang ) {
-		//	return;
-		}
-
-		// Add/remove language to $scope.selectedLanguages
-		var idx = $scope.selectedLanguages.indexOf( lang );
-		if( idx > -1 ) {
-			$scope.selectedLanguages.splice( idx, 1 );
-		}
-		else {
-			$scope.selectedLanguages.push( lang );
-		}
-
-		// Update height of all areas. All may have changed 
-		// as the width has changed with the toggling of 
-		// a textarea
-		setTimeout( function() {
-			self.adjustHeightOfAllAreas( $( this ) );
-		}.bind( this ), 100 );
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
+	//
+	//   UI Stuff
+	//
 
 
-
-	};
-
-
-
-	/**
-	* Toggles language (if user clicks language in nav-tab): 
-	* Adds/removes it from selectedLanguages
-	*/
-	$scope.toggleLanguage = function( ev, lang ) {
-
-		ev.preventDefault();
-		self.toggleLanguage( lang );
-
-	};
-
-	$scope.isSelected = function( id ) {
-		return $scope.selectedLanguages.indexOf( id ) > -1;
+	$scope.isSelected = function( language ) {
+		return $scope.selectedLanguages.indexOf( language ) > -1;
 	};
 
 
@@ -4917,6 +4991,148 @@ angular
 
 
 
+
+} ] )
+
+.run( function( $templateCache ) {
+
+	$templateCache.put( 'localeComponentTemplate.html',
+		'<div class=\'locale-component\'>' +
+			'<div data-language-menu-component data-selected-languages=\'selectedLanguages\' data-is-multi-select=\'true\' data-has-translation=\'hasTranslation(languageId)\'></div>' +
+			'<div class=\'locale-content clearfix\'>' +
+				'<div class=\'locale-col\' data-ng-repeat=\'lang in selectedLanguages\'>' +
+					'<p>{{ lang.code | uppercase }}</p>' +
+					'<div data-ng-repeat=\'fieldDefinition in fieldDefinitions\'>' +
+
+						'<label data-ng-attr-for=\'locale-{{lang.id}}-{{fielDefinition.name}}\' data-ng-class=\'{ "invalid": !isFieldValid(lang.id, fieldDefinition.name)}\'>' + 
+							// Required asterisk
+							'<span data-translate=\'web.backoffice.{{entityName}}.{{fieldDefinition.name}}\' ></span> <span class=\'required-indicator\'data-ng-show=\'fieldDefinition.required\'>*</span>' +
+						'</label>' +
+						'<textarea data-ng-model=\'model[ lang.id ][ fieldDefinition.name ]\' data-ng-attr-id=\'locale-{{lang.id}}-{{fieldDefinition.name}}\' class=\'form-control\' data-ng-keyup=\'adjustHeight( $event )\' data-ng-focus=\'adjustHeight( $event )\' /></textarea>' +
+
+					'</div>' +
+				'</div>' +
+			'</div>' +
+		'</div>'
+	);
+
+} );
+/**
+* Displays a menu with the supported languages.
+*
+* Use like
+* <div data-language-menu-component
+* 	data-selected="property" <!-- is always an array consisting of objects returned by self.getLanguage() -->
+*	data-is-multi-select="false|true"
+*	data-has-translation="functionName"> <!-- must take a paramter languageId, e.g. DE -->
+* </div>
+*
+*/
+
+angular
+
+.module( 'jb.backofficeShared', [] )
+
+.directive( 'languageMenuComponent', [ function() {
+
+	return {
+		require					: [ 'languageMenuComponent' ]
+		, controller			: 'LanguageMenuComponentController'
+		, controllerAs			: 'languageMenuComponent'
+		, bindToController		: true
+		, templateUrl			: 'languageMenuComponentTemplate.html'
+		, link					: function( scope, element, attrs, ctrl ) {
+			ctrl[ 0 ].init( element );
+		}
+		, scope: {
+			'selectedLanguages'	: '='
+			, 'isMultiSelect'	: '='
+			, 'hasTranslation'	: '&'
+		}
+	};
+
+} ] )
+
+.controller( 'LanguageMenuComponentController', [ '$scope', function( $scope ) {
+
+	var self = this
+		, _element;
+
+
+	self.languages = [];
+	self.selectedLanguages = [];
+
+
+	self.init = function( el ) {
+		_element = el;
+		self.getLanguages();
+	};
+
+
+
+	/**
+	* Click handler
+	*/
+	self.toggleLanguage = function( ev, lang ) {
+
+		if( ev && ev.originalEvent && ev.originalEvent instanceof Event ) {
+			ev.preventDefault();
+		}
+
+		// Only one language may be selected
+		if( !self.isMultiSelect ) {
+			self.selectedLanguages = [ lang ];
+			return;
+		}
+
+
+		// Don't untoggle last language
+		if( self.selectedLanguages.length === 1 && self.selectedLanguages[ 0 ].id === lang.id ) {
+			return;
+		}
+
+		// Add/remove language to self.selectedLanguages
+
+		// Is language already selected? Strangely we cannot use indexOf – language objects change somehow.
+		var isSelected = false;
+		self.selectedLanguages.some( function( item, index ) {
+			if( item.id === lang.id ) {
+				isSelected = index;
+				return true;
+			}
+		} );
+
+		if( isSelected !== false ) {
+			self.selectedLanguages.splice( isSelected, 1 );
+		}
+		else {
+			self.selectedLanguages.push( lang );
+		}
+
+	};
+
+
+
+
+	/**
+	* Returns true if language is selected. 
+	*/
+	self.isSelected = function( language ) {
+
+		var selected = false;
+		self.selectedLanguages.some( function( item ) {
+			if( language.id === item.id ) {
+				selected = true;
+				return true;
+			}
+		} );
+
+		return selected;
+
+	};
+
+
+
 	/**
 	* Returns the languages that the current website supports. 
 	* They need to be stored (on login) in localStorage in the form of
@@ -4938,14 +5154,14 @@ angular
 
 		languages.forEach( function( language ) {
 
-			$scope.languages.push( {
+			self.languages.push( {
 				id			: language.id
 				, code		: language.code
 			} );
 
 			// Select first language
-			if( $scope.selectedLanguages.length === 0 ) {
-				self.toggleLanguage( language.id );
+			if( self.selectedLanguages.length === 0 ) {
+				self.toggleLanguage( null, language );
 			}
 
 		} );
@@ -4953,36 +5169,38 @@ angular
 	};
 
 
-	self.getLanguages();
+
+
+	self.checkForTranslation = function( languageId ) {
+
+		if( !self.hasTranslation || !angular.isFunction( self.hasTranslation ) ) {
+			console.warn( 'LanguageMenuComponentController: No hasTranslation function was passed' );
+		}
+
+		return self.hasTranslation( { 'languageId': languageId } );
+	
+	};
+
+
 
 
 } ] )
 
-.run( function( $templateCache ) {
+.run( [ '$templateCache', function( $templateCache ) {
 
-	$templateCache.put( 'localeComponentTemplate.html',
-		'<div class=\'locale-component\'>' +
-			'<ul class=\'nav nav-tabs\'>' +
-				'<li data-ng-repeat=\'lang in languages\' data-ng-class=\'{active:isSelected(lang.id)}\'>' +
-					'<a href=\'#\' data-ng-click=\'toggleLanguage($event,lang.id)\'>' +
-						'{{lang.code|uppercase}}' +
-						' <span data-ng-if=\'hasTranslation(lang.id)\' class=\'fa fa-check\'></span>' +
-					'</a>' +
-				'</li>' +
-			'</ul>' +
-			'<div class=\'locale-content clearfix\'>' +
-				'<div class=\'locale-col\' data-ng-repeat=\'lang in languages\' data-ng-show=\'isSelected( lang.id )\'>' +
-					'<p>{{ lang.code | uppercase }}</p>' +
-					'<div data-ng-repeat=\'fieldDefinition in fieldDefinitions\'>' +
-						'<label data-ng-attr-for=\'locale-{{lang.id}}-{{fielDefinition.name}}\' data-ng-class=\'{ "invalid": !isFieldValid(lang.id, fieldDefinition.name)}\'><span data-translate=\'web.backoffice.{{entityName}}.{{fieldDefinition.name}}\' ></span> <span class=\'required-indicator\'data-ng-show=\'fieldDefinition.required\'>*</span></label>' +
-						'<textarea data-ng-model=\'model[ lang.id ][ fieldDefinition.name ]\' data-ng-attr-id=\'locale-{{lang.id}}-{{fieldDefinition.name}}\' class=\'form-control\' data-ng-keyup=\'adjustHeight( $event )\' data-ng-focus=\'adjustHeight( $event )\' /></textarea>' +
-					'</div>' +
-				'</div>' +
-			'</div>' +
-		'</div>'
+	$templateCache.put( 'languageMenuComponentTemplate.html',
+		'<ul class=\'nav nav-tabs\'>' +
+			'<li data-ng-repeat=\'lang in languageMenuComponent.languages\' data-ng-class=\'{active:languageMenuComponent.isSelected(lang)}\'>' +
+				'<a href=\'#\' data-ng-click=\'languageMenuComponent.toggleLanguage( $event, lang )\'>' +
+					'{{lang.code|uppercase}}' +
+					'<span data-ng-if=\'languageMenuComponent.checkForTranslation(lang.id)\' class=\'fa fa-check\'></span>' +
+				'</a>' +
+			'</li>' +
+		'</ul>'
 	);
 
-} );
+
+} ] );
 /*https://raw.githubusercontent.com/dbushell/Nestable/master/jquery.nestable.js*/
 /*!
  * Nestable jQuery Plugin - Copyright (c) 2012 David Bushell - http://dbushell.com/

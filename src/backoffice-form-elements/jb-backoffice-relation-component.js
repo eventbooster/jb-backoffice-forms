@@ -216,15 +216,30 @@
 			// call must be made to the main entity (and not DELETE/POST)
 			if( _required ) {
 
-				var relationData = {};
-				relationData[ 'id_' + self.propertyName ] = self.relationModel[ 0 ].id;
+
 
 				// No changes happened: return false
-				if( self.relationModel[ 0 ].id === _originalData[ 0 ].id ) {
-					console.log( 'BackofficeRelationComponentController: No changes on required relation %o', self.propertyName );
-					return false;
+				if( self.relationModel && _originalData ) {
+
+					// No values
+					if( self.relationModel.length === 0 && _originalData.length === 0 ) {
+						console.log( 'BackofficeRelationComponentController: No changes and no relations for required relation %o', self.propertyName );
+						return false;
+					}
+
+					// Same value
+					if( self.relationModel.length && _originalData.length && self.relationModel[ 0 ] && _originalData[ 0 ] && self.relationModel[ 0 ].id === _originalData[ 0 ].id ) {
+						console.log( 'BackofficeRelationComponentController: No changes on required relation %o', self.propertyName );
+						return false;
+					}
+
 				}
 
+
+
+
+				var relationData = {};
+				relationData[ 'id_' + self.propertyName ] = self.relationModel[ 0 ].id;
 
 
 				// Creating main entity

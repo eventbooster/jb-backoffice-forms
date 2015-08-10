@@ -51,7 +51,7 @@ AutoTextInputController.prototype.getSaveCalls = function() {
 
 	var data = {};
 	data[ this.$scope.data.name ] = this.$scope.data.value;
-	console.error( this.detailViewController.getEntityId());
+
 	return {
 		url			: ''
 		, data		: data

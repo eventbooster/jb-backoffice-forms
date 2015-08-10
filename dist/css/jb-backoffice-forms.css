@@ -1,0 +1,112 @@
+.backoffice-image-component {
+  background-color: white;
+  border-radius: 4px;
+  padding: 6px 12px;
+  margin-top: 15px;
+  margin-bottom: 15px;
+}
+.backoffice-image-component [data-file-drop-component],
+.backoffice-image-component [file-drop-component] {
+  border: 4px solid white;
+}
+.backoffice-image-component [data-file-drop-component].drag-over,
+.backoffice-image-component [file-drop-component].drag-over {
+  border-color: green;
+}
+.backoffice-image-component ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  min-height: 50px;
+  /* needed to drop on an empty ol */
+}
+.backoffice-image-component ol li {
+  float: left;
+  margin: 5px;
+  position: relative;
+  /* Hide file input – will be triggered when user clicks the button */
+}
+.backoffice-image-component ol li:first-child {
+  margin-left: 0;
+}
+.backoffice-image-component ol li img {
+  /*height: 100%;
+				max-width: 100%;*/
+  border: 1px solid #ccc;
+  height: 70px;
+}
+.backoffice-image-component ol li button.add {
+  height: 100%;
+  border: none;
+  padding: 0 50px;
+  background-color: #fff;
+  color: #337ab7;
+}
+.backoffice-image-component ol li button.add:hover {
+  background-color: #5cb85c;
+  color: white;
+}
+.backoffice-image-component ol li button.add:focus {
+  outline: 0;
+}
+.backoffice-image-component ol li input[type=file] {
+  position: absolute;
+  height: 0;
+  width: 0;
+  opacity: 0;
+  display: block;
+}
+.backoffice-image-component ol li.active {
+  width: 100%;
+  height: auto;
+}
+.backoffice-image-component ol li.active img {
+  width: 100%;
+  height: auto;
+}
+.backoffice-image-component ol li button.remove {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: white;
+  border: none;
+  display: none;
+}
+.backoffice-image-component ol li button.remove:focus {
+  outline: 0;
+}
+.backoffice-image-component ol li button.remove:hover {
+  background-color: #d9534f;
+  color: #fff;
+}
+.backoffice-image-component ol li:hover button.remove {
+  display: block;
+}
+.backoffice-image-component ol li .image-size-info,
+.backoffice-image-component ol li .focal-point-info,
+.backoffice-image-component ol li .image-file-size-info {
+  font-size: 0.7rem;
+  display: block;
+}
+
+.backoffice-image-detail-component {
+  /** Needed for absolute positioning of .focal-point-indicator */
+}
+.backoffice-image-detail-component .image-container {
+  position: relative;
+}
+.backoffice-image-detail-component img {
+  max-width: 100%;
+  height: auto;
+}
+.backoffice-image-detail-component .focal-point-indicator {
+  position: absolute;
+  width: 25px;
+  height: 25px;
+  border-radius: 100%;
+  border: 3px solid red;
+  background-color: white;
+  opacity: 0.4;
+  margin-top: -13px;
+  margin-left: -13px;
+}
