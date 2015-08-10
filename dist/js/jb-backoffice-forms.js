@@ -2845,8 +2845,11 @@ angular
 	$scope.entityId = self.parseUrl().id;
 
 	// Update entity whenever data-entity-id changes on element
-	$attrs.$observe( 'entityId', function( newId ) {
-		$scope.entityId = newId;
+	// Get data when attribute changes.
+	$scope.$watch( $attrs.entityId, function( val ) {
+		if( val ) {
+			$scope.entityId = val;
+		}
 	} );
 
 	self.getEntityId = function() {
