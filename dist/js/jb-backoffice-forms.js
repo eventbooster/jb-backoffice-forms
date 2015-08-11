@@ -345,7 +345,9 @@ var AutoDateTimeInputController = function( $scope, $attrs ) {
 	// Needed to calculate differences on save
 	this.originalData			= undefined;
 	
-	this.$scope.date			= undefined;
+	this.$scope.values 			= {
+		date					: undefined
+	};
 
 	// Display time only if type is datetime and not date
 	$scope.showTime				= this.$scope.optionData.time;
@@ -355,7 +357,7 @@ var AutoDateTimeInputController = function( $scope, $attrs ) {
 	};
 
 	$scope.isValid = function() {
-		return !this.optionData.required || ( this.optionData.required && this.$scope.date );
+		return !this.optionData.required || ( this.optionData.required && this.$scope.values.date );
 	};
 
 };
@@ -368,19 +370,23 @@ AutoDateTimeInputController.prototype.updateData = function( data ) {
 	var value = data[ this.$attrs.for];
 
 	if( !value ) {
-		this.$scope.date = undefined;
+		this.$scope.values.date = undefined;
 	}
 	else {
-		this.$scope.date = new Date( value );
+		this.$scope.values.date = new Date( value );
 	}
 
-	this.originalData = this.$scope.date;
+	this.originalData = this.$scope.values.date;
 
 };
 
+function pad( nr ) {
+	return nr < 10 ? '0' + nr : nr;
+}
+
 AutoDateTimeInputController.prototype.getSaveCalls = function() {
 
-	var date			= this.$scope.date;
+	var date			= this.$scope.values.date;
 
 	// Empty field (and original empty)
 	if( !date && !this.originalData ) {
@@ -392,7 +398,7 @@ AutoDateTimeInputController.prototype.getSaveCalls = function() {
 		return false;
 	}
 
-	var dateString		= date.getFullYear() + '-' + ( date.getMonth() + 1 ) + '-' + date.getDate()  + ' ' + date.getHours() + ':' + date.getMinutes() + ':' + date.getSeconds()
+	var dateString		= date.getFullYear() + '-' + pad( date.getMonth() + 1 ) + '-' + pad( date.getDate() ) + ' ' + pad( date.getHours() ) + ':' + pad( date.getMinutes() ) + ':' + pad( date.getSeconds() )
 		, data			= {};
 
 	data[ this.$scope.data.name ] = dateString;
@@ -429,11 +435,12 @@ angular
 	$templateCache.put( 'dateTimeInputTemplate.html',
 		'<div class=\'form-group form-group-sm\'>' +
 			'<label data-backoffice-label data-label-identifier=\'{{data.name}}\' data-is-required=\'isRequired()\' data-is-valid=\'isValid()\'></label>' +
+			// input[time] and input[date] are bound to the same model. Should work nicely.
 			'<div data-ng-class=\'{ "col-md-9": !showTime, "col-md-5": showTime}\'>' +
-				'<input type=\'date\' class=\'form-control input-sm\' data-ng-model=\'date\'>' +
+				'<input type=\'date\' class=\'form-control input-sm\' data-ng-model=\'values.date\'>' +
 			'</div>' +
 			'<div class=\'col-md-4\' data-ng-if=\'showTime\'>' +
-				'<input type=\'time\' class=\'form-control input-sm\' data-ng-model=\'date\' />' +
+				'<input type=\'time\' class=\'form-control input-sm\' data-ng-model=\'values.date\' />' +
 			'</div>' +
 		'</div>'
 	);
@@ -2743,7 +2750,10 @@ angular
 		// Element directive belongs to, set on init
 		, element
 
-		// Handlers that will be called on OPTIONs data received
+		// Handlers that will be called on OPTIONs and GET data received, 
+		// registered from sub-components through 
+		// - self.registerOptionsDataHandler( callback )
+		// - self.registerGetDataHandler( callback )
 		, optionHandlers		= []
 		, getHandlers			= [];
 
@@ -2796,6 +2806,8 @@ angular
 
 
 
+
+
 	//////////////////////////////////////////////////////////////////////////
 	//
 	// Entity ID 
@@ -2812,6 +2824,8 @@ angular
 	self.parseUrl = function() {
 
 		// Take id from path
+		// Path is equal to window.location.search.substring(1),
+		// therefore «/entity/id» or «/entity»
 		var path				= $location.path()
 			, split				= path.split( '/' )
 			, returnValue		= {
@@ -2819,17 +2833,24 @@ angular
 				, id			: undefined
 			};
 
+		// If data-entity-name is set, don't take name OR id 
+		// from URL (URL is overwritten by attributes)
+		// Not needed any more.
+		/*if( $attrs.entityName ) {
+			return returnValue;
+		}*/
+
 		if( split.length < 2 ) {
 			return returnValue;
 		}
 
-		// Only name
-		if( split.length >= 2 ) {
+		// Name
+		if( split.length > 1 ) {
 			returnValue.name = split[ 1 ];
 		}
 
-		// Name and ID	
-		if( split.length >= 3 ) {
+		// ID	
+		if( split.length > 2 ) {
 
 			var id = parseInt( split[ 2 ], 10 );
 			if( !isNaN( id ) ) {
@@ -2842,21 +2863,66 @@ angular
 
 	};
 
-	$scope.entityId = self.parseUrl().id;
 
 	// Update entity whenever data-entity-id changes on element
 	// Get data when attribute changes.
 	$scope.$watch( $attrs.entityId, function( val ) {
+
+		console.log( 'DetailViewController: $attrs.entityId changed to %o; if val exists, update $scope.entityId', val );
+
 		if( val ) {
 			$scope.entityId = val;
+			self.getData();
 		}
 	} );
+
+	if( $scope.$parent.$eval( $attrs.entityId ) ) {
+		$scope.entityId = $scope.$parent.$eval( $attrs.entityId );
+	}
+	else {
+		$scope.entityId = self.parseUrl().id;
+	}
+
+
+
+	// Name
+	$scope.$watch( $attrs.entityName, function( val ) {
+
+		console.log( 'DetailViewController: $attrs.entityName changed to %o; if val exists, update $scope.entityName', val );
+
+		if( val ) {
+			$scope.entityName = val;
+			self.getData();
+		}
+	} );
+
+	if( $scope.$parent.$eval( $attrs.entityName ) ) {
+		$scope.entityName = $scope.$parent.$eval( $attrs.entityName );
+	}
+	else {
+		$scope.entityName = self.parseUrl().name;
+	}
+
+
+
+
+
 
 	self.getEntityId = function() {
 		return $scope.entityId;
 	};
 
+	self.getEntityName = function() {
+		return $scope.entityName;
+	};
 
+	self.getEntityUrl = function() {
+		var url = '/' + self.getEntityName();
+		if( self.getEntityId() ) {
+			url += '/' + self.getEntityId();
+		}
+		return url;
+	};
 
 
 
@@ -2869,32 +2935,24 @@ angular
 	// Entity Name and URL
 	//
 
-	$scope.entityName = self.parseUrl().name;
-
-	self.getEntityName = function() {
-		return $scope.entityName;
-	};
 
 	// Watch attributes
-	$attrs.$observe( 'entityName', function( newName ) {
+	/*$attrs.$observe( 'entityName', function( newName ) {
 		$scope.entityName = newName;
-	} );
+	} );*/
 
 	// Init (required if we have a nested detailView that has ng-if and is only displayed if a
 	// certain condition is met)
-	if( $attrs.entityName ) {
+	/*if( $attrs.entityName ) {
 		$scope.entityName = $attrs.entityName;
-	}
+	}*/
 
 
 
-	self.getEntityUrl = function() {
-		var url = '/' + self.getEntityName();
-		if( self.getEntityId() ) {
-			url += '/' + self.getEntityId();
-		}
-		return url;
-	};
+
+
+
+
 
 
 
@@ -3588,7 +3646,7 @@ angular
 
 		// Split calls up in mainCall (call to /), needs to be done first
 		// (main entity needs to be created before relations can be set)
-		// Main calls start with /entityName or have no URL (relative)
+		// Main calls start with /entityName
 		for( var i = 0; i < calls.length; i++ ) {
 			if( calls[ i ].url === '/' + self.getEntityName() || !calls[ i ].url ) {
 				mainCall = calls[ i ];
@@ -3650,6 +3708,15 @@ angular
 	* by an array item on calls and composes the data.
 	*/
 	self.addCall = function( componentCall, calls ) {
+
+
+		// Components may pass back just a data field – means that it's stored on the entity itself.
+		// Get url from self.getEntityUrl, as it is needed to determine the method of the call 
+		// (PATCH or POST). 
+		if( !componentCall.url ) {
+			componentCall.url = self.getEntityUrl();
+		}
+
 
 		// Method's missing
 		if( !componentCall.method ) {
