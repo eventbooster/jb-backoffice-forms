@@ -148,11 +148,10 @@ angular
 			};
 
 		// If data-entity-name is set, don't take name OR id 
-		// from URL (URL is overwritten by attributes)
-		// Not needed any more.
-		/*if( $attrs.entityName ) {
+		// from URL (URL needs to be overwritten by attributes)
+		if( $attrs.entityName ) {
 			return returnValue;
-		}*/
+		}
 
 		if( split.length < 2 ) {
 			return returnValue;
