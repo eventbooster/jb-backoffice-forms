@@ -89,6 +89,9 @@
 		};
 
 
+		/**
+		* Implies that path is /image/imageId
+		*/
 		self.getSelectFields = function() {
 			return '*,mimeType.*,bucket.url';
 		};

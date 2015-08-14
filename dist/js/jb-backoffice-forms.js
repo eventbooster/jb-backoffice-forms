@@ -1769,6 +1769,9 @@ angular
 		};
 
 
+		/**
+		* Implies that path is /image/imageId
+		*/
 		self.getSelectFields = function() {
 			return '*,mimeType.*,bucket.url';
 		};
@@ -3083,12 +3086,7 @@ angular
 					handler( fields );
 				} );
 
-				// getOptions may be called multiple times. If it's the second time, all components will already be
-				// registered. Make sure that getData is called again
-				//console.log( '%o vs %o (%o)', autoFormElementCount, self.registeredComponents.length, self.registeredComponents );
-				if( autoFormElementCount === self.registeredComponents.length ) {
-					self.getData();
-				}
+				self.getData();
 
 			}, function( err ) {
 
@@ -3317,20 +3315,8 @@ angular
 
 		self.registeredComponents.push( el );
 
-		// All components registered
-		if( self.registeredComponents.length === autoFormElementCount ) {
+		self.getData();
 
-			console.log( 'DetailView: all elements registered (%o). Get data.', self.registeredComponents );
-
-			// We're in new mode: No data available
-			if( !self.getEntityId() ) {
-				console.log( 'New mode (no id provided); don\'t get data' );
-				return;
-			}
-
-			self.getData();
-
-		}
 	};
 
 
@@ -3354,6 +3340,32 @@ angular
 	// GET data
 
 	self.getData = function() {
+
+		// autoFormElementCount is only set on init, as element is not available before. 
+		// Register may happen before (as child elements are linked before parent elements). 
+		// Return.
+		if( autoFormElementCount === 0 ) {
+			return;
+		}
+
+		// Only get data when all components have registered themselves.
+		if( self.registeredComponents.length < autoFormElementCount ) {
+			console.log( 'DetailViewController: Can\'t get data, not all autoFormElements registered yet: %o vs %o', self.registeredComponents.length, autoFormElementCount );
+			return;
+		}
+
+		// Too many components registered
+		if( self.registeredComponents.length > autoFormElementCount ) {
+			console.error( 'DetailViewController: More components registered than detected in the DOM: %o vs %o. Registered: %o.', self.registeredComponents.length, autoFormElementCount, self.registeredComponents );
+			// Data has already been gotten, therefore return.
+			return;
+		}
+
+		if( !self.getEntityId() ) {
+			console.log( 'DetailViewController: Can\'t get data, entity ID is not set.' );
+			return;
+		}
+
 
 		self
 			.makeGetRequest()
@@ -4200,7 +4212,6 @@ angular
 	};
 
 	self.isValid = function() {
-		console.log( 'HiddenInputController: isValid? yes.' );
 		return true;
 	};
 
@@ -4213,7 +4224,6 @@ angular
 	console.log( 'HiddenInput: for is %o, read %o (hasProperty %o) evals to %o', $attrs.for, $attrs.read, $attrs.hasOwnProperty( 'read' ), $scope.$parent.$eval( $attrs.read ) );
 	if( !$attrs.hasOwnProperty( 'read' ) || $scope.$parent.$eval( $attrs.read ) ) {
 		self.select = $attrs.for;
-		console.log( 'HiddenInput: select is %o', self.select );
 	}
 
 

@@ -50,7 +50,6 @@ angular
 	};
 
 	self.isValid = function() {
-		console.log( 'HiddenInputController: isValid? yes.' );
 		return true;
 	};
 
@@ -63,7 +62,6 @@ angular
 	console.log( 'HiddenInput: for is %o, read %o (hasProperty %o) evals to %o', $attrs.for, $attrs.read, $attrs.hasOwnProperty( 'read' ), $scope.$parent.$eval( $attrs.read ) );
 	if( !$attrs.hasOwnProperty( 'read' ) || $scope.$parent.$eval( $attrs.read ) ) {
 		self.select = $attrs.for;
-		console.log( 'HiddenInput: select is %o', self.select );
 	}
 
 
