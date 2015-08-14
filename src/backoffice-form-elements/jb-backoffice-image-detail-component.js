@@ -38,6 +38,8 @@
 			, _element
 			, _detailViewController
 
+			//, _imageRenderingIds = []
+
 			, _originalFocalPoint;
 
 
@@ -58,6 +60,7 @@
 		};
 
 		self.updateData = function( data ) {
+
 			self.image = data;
 
 			// Convert focalPoint to object, but only if it has a x and y property
@@ -84,6 +87,14 @@
 				}
 			}
 
+
+			// Store IDs of imageRenderings
+			/*if( data.imageRendering && data.imageRendering.length ) {
+				_imageRenderingIds = data.imageRendering.map( function( item ) {
+					return item.id;
+				} );
+			}*/
+
 			_originalFocalPoint = angular.copy( data.focalPoint );
 
 		};
@@ -93,7 +104,11 @@
 		* Implies that path is /image/imageId
 		*/
 		self.getSelectFields = function() {
+
+			// imageRendering: Renderings must be deleted when changing the focal point. 
+			// See https://github.com/joinbox/eb-backoffice/issues/112
 			return '*,mimeType.*,bucket.url';
+
 		};
 
 		self.getSaveCalls = function() {
@@ -111,14 +126,28 @@
 				return false;
 			}
 
-			return {
+			var calls = [];
+
+			// PATCH on image automatically deletes imageRenderings. No need to do it manually.
+			calls.push( {
 				// It's always PATCH, as the image does exist
 				method			: 'PATCH'
 				, url			: '/' + _detailViewController.getEntityName() + '/' + _detailViewController.getEntityId()
 				, data			: {
 					focalPoint	: JSON.stringify( self.image.focalPoint )
 				}
-			};
+			} );
+
+
+			// Remove existing image renderings
+			/*_imageRenderingIds.forEach( function( imageRenderingId ) {
+				calls.push( {
+					method			: 'DELETE'
+					, url			: '/imageRendering/' + imageRenderingId
+				} );
+			} );*/
+
+			return calls;
 
 		};
 

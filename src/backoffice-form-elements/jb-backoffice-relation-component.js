@@ -87,7 +87,15 @@
 		*/
 		self.updateData = function( data ) {
 
-			var modelValue = angular.isArray( data[ self.propertyName ] ) ? data[ self.propertyName ] : [ data[ self.propertyName ] ];
+			var modelValue;
+
+			if( !data || !data[ self.propertyName ] ) {
+				modelValue = [];
+			}
+			else {
+				modelValue = angular.isArray( data[ self.propertyName ] ) ? data[ self.propertyName ] : [ data[ self.propertyName ] ];
+			}
+
 			self.relationModel = modelValue; 
 
 			// Store data in _originalData to calculate differences when saving
