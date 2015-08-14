@@ -65,6 +65,14 @@
 				try {
 					var focalPoint = JSON.parse( data.focalPoint );
 					if( focalPoint.x && focalPoint.y ) {
+
+						focalPoint.x = parseInt( focalPoint.x, 10 );
+						focalPoint.y = parseInt( focalPoint.y, 10 );
+
+						if( isNaN( focalPoint.x ) || isNaN( focalPoint.y ) ) {
+							throw new Error( 'x or y property on focalPoint not an integer (or castable).' );
+						}
+
 						self.image.focalPoint = focalPoint;
 					}
 					else {
@@ -101,6 +109,7 @@
 			}
 
 			return {
+				// It's always PATCH, as the image does exist
 				method			: 'PATCH'
 				, url			: '/' + _detailViewController.getEntityName() + '/' + _detailViewController.getEntityId()
 				, data			: {
@@ -110,8 +119,14 @@
 
 		};
 
-		self.setFocalPoint = function( ev ) {
-			
+
+
+
+		/**
+		* Click handler
+		*/
+		self.setFocalPointClickHandler = function( ev ) {
+				
 			var newFocalPoint = {
 				x		: ( ev.offsetX / ev.target.width ) * self.image.width
 				, y		: ( ev.offsetY / ev.target.height ) * self.image.height
@@ -121,6 +136,8 @@
 			self.image.focalPoint = newFocalPoint;
 
 		};
+
+
 
 
 		/**
@@ -144,15 +161,14 @@
 		self.getFocalPointInPercent = function() {
 			var focalPoint = self.getFocalPoint();
 
-			if( focalPoint ) {
-				return {
-					x		: Math.round( focalPoint.x / self.image.width * 100 )
-					, y		: Math.round( focalPoint.y / self.image.height * 100 )
-				};
+			if( !focalPoint ) {
+				return false;
 			}
 
-			// false
-			return focalPoint;
+			return {
+				x		: Math.round( focalPoint.x / self.image.width * 100 )
+				, y		: Math.round( focalPoint.y / self.image.height * 100 )
+			};
 
 		};
 
@@ -167,7 +183,7 @@
 			'<label data-backoffice-label data-label-identifier=\'image\' data-is-required=\'false\' data-is-valid=\'true\'></label>' +
 			'<div class=\'col-md-9 backoffice-image-detail-component\'>' +
 				'<div class=\'image-container\'>' +
-					'<img data-ng-attr-src=\'{{backofficeImageDetailComponent.image.bucket.url + backofficeImageDetailComponent.image.url}}\' data-ng-click=\'backofficeImageDetailComponent.setFocalPoint($event)\'/>' +
+					'<img data-ng-attr-src=\'{{backofficeImageDetailComponent.image.bucket.url + backofficeImageDetailComponent.image.url}}\' data-ng-click=\'backofficeImageDetailComponent.setFocalPointClickHandler($event)\'/>' +
 					'<div class=\'focal-point-indicator\' data-ng-if=\'backofficeImageDetailComponent.getFocalPoint()\' data-ng-attr-style=\'top:{{backofficeImageDetailComponent.getFocalPointInPercent().y}}%;left:{{backofficeImageDetailComponent.getFocalPointInPercent().x}}%\'></div>' +
 				'</div>' +
 				'<div data-ng-if=\'!backofficeImageDetailComponent.getFocalPoint()\'>{{ \'web.backoffice.image.focalPointNotSet\' | translate }}</div>' +

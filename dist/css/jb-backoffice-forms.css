@@ -94,6 +94,9 @@
 }
 .backoffice-image-detail-component .image-container {
   position: relative;
+  display: inline-block;
+  /* Give it the same size as the image; needed for portrait sized images. 
+								If it's wider than the image, the focal point is not set correctly. */
 }
 .backoffice-image-detail-component img {
   max-width: 100%;
