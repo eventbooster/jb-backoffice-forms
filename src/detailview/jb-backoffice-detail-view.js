@@ -846,13 +846,14 @@ angular
 
 		return self
 			.makeSaveRequest( self.registeredComponents, self.getEntityName() )
-			.then( function( data ) {
+			.then( function( entityId ) {
 
 				// Entity didn't have an ID (was newly created): Redirect to new entity
 				if( $location.path().indexOf( '/new') === $location.path().length - 4 && !dontNotifyOrRedirect ) {
 					$location.path( '/' + self.getEntityName() + '/' + self.getEntityId() );
 				}
 
+				// Do notify and redirect
 				if( !dontNotifyOrRedirect ) {
 					console.log( 'DetailViewController: Show success message on %o', $rootScope );
 					$rootScope.$broadcast( 'notification', {
@@ -866,11 +867,8 @@ angular
 
 				self.updateData();
 
-				if( callback ) {
-					callback();
-				}
+				return entityId || null;
 
-				return true;
 
 			}, function( err ) {
 
@@ -881,10 +879,6 @@ angular
 						errorMessage	: err.message
 					}
 				} );
-
-				if( callback ) {
-					callback();
-				}
 
 				return $q.reject( err );
 
@@ -956,6 +950,7 @@ angular
 	*   by doing all calls going to /
 	* - second, all other things (e.g. relations that need the entity to be 
 	*   existent)
+	* @return Promise		Parameter passed is null or mainEntity's id
 	*/
 	self.makeMainSaveCall = function() {
 
@@ -964,13 +959,14 @@ angular
 		console.log( 'DetailView: Save calls are %o', calls );
 
 		var mainCall
-			, relationCalls = [];
+			, relationCalls = []
+			, mainCallData;
 
-		// Split calls up in mainCall (call to /), needs to be done first
+		// Split calls up in mainCall, needs to be done first
 		// (main entity needs to be created before relations can be set)
-		// Main calls start with /entityName
+		// Main calls start with /entityName or /entityName/entityId (for updates)
 		for( var i = 0; i < calls.length; i++ ) {
-			if( calls[ i ].url === '/' + self.getEntityName() || !calls[ i ].url ) {
+			if( !calls[ i ].url || calls[ i ].url.indexOf( '/' + self.getEntityName() ) === 0 ) {
 				mainCall = calls[ i ];
 			}
 			else {
@@ -996,7 +992,10 @@ angular
 		return self.executeSaveRequest( mainCall )
 
 			// Make all secondary calls (to sub entities) simultaneously
-			.then( function( mainCallData ) {
+			.then( function( mainCallResult ) {
+
+				// Make mainCallData available to next promise
+				mainCallData = mainCallResult;
 
 				console.log( 'DetailView: Made main save call; got back %o', mainCallData );
 
@@ -1013,9 +1012,17 @@ angular
 
 				return $q.all( callRequests );
 
-			}, function( err ) {
-				return $q.reject( err );
+			} )
+
+			// Make sure we pass back the id.
+			.then( function() {
+				if( mainCallData && mainCallData.id ) {
+					console.log( 'DetailView: Made call to the main entity; return it\'s id %o', mainCallData.id );
+					return mainCallData.id;
+				}
+				return null;
 			} );
+
 
 	};
 
