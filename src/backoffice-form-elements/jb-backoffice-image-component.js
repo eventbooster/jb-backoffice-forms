@@ -274,7 +274,8 @@
 		* Click on remove icon on image.
 		*/
 		self.removeImage = function( ev, image ) {
-			
+
+			ev.preventDefault();
 			self.images.splice( self.images.indexOf( image ), 1 );
 
 		};
