@@ -2759,7 +2759,7 @@ angular
 * - getSelectFields: Returns select fields (replaces the select property)
 */
 angular
-.module( 'jb.backofficeDetailView', [ 'eb.apiWrapper', 'ebBackofficeConfig' ] )
+.module( 'jb.backofficeDetailView', [ 'eb.apiWrapper' ] )
 .directive( 'detailView', [ function() {
 
 	return {
@@ -3708,6 +3708,8 @@ angular
 		// Split calls up in mainCall, needs to be done first
 		// (main entity needs to be created before relations can be set)
 		// Main calls start with /entityName or /entityName/entityId (for updates)
+		// /entityName/entityId must be covered in case of redirects. Subsequent calls
+		// to releations must be made to the new entityId. 
 		for( var i = 0; i < calls.length; i++ ) {
 			if( !calls[ i ].url || calls[ i ].url.indexOf( '/' + self.getEntityName() ) === 0 ) {
 				mainCall = calls[ i ];
