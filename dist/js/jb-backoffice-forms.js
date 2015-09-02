@@ -1369,6 +1369,7 @@ angular
 		self.images = [];
 
 		self.init = function( el, detailViewCtrl ) {
+
 			_element = el;
 			_detailViewController = detailViewCtrl;
 
@@ -1645,6 +1646,20 @@ angular
 
 
 
+
+		////////////////
+
+		self.uploadFile = function() {
+
+			_element
+				.find( 'input[type=\'file\']' )
+				.click();
+
+		};
+
+
+
+
 	} ] )
 
 
@@ -1666,8 +1681,9 @@ angular
 								'<span class=\'image-file-size-info\' data-ng-if=\'!!image.fileSize\'>{{image.fileSize/1000/1000 | number: 1 }} MB</span>' +
 								'<span class=\'focal-point-info\' data-ng-if=\'!!image.focalPoint\'>Focal Point</span>' +
 							'</li>' +
-							//'<li><button data-ng-click=\'imageDropComponent.upload()\'></button></li>' +
+							'<li><button class=\'add-file-button\' data-ng-click=\'backofficeImageComponent.uploadFile()\'>+</button></li>' +
 						'</ol>' +
+						'<input type=\'file\' multiple/>' +
 					'</div>' +
 				'</div>' +
 			'</div>'
@@ -2759,7 +2775,7 @@ angular
 * - getSelectFields: Returns select fields (replaces the select property)
 */
 angular
-.module( 'jb.backofficeDetailView', [ 'eb.apiWrapper' ] )
+.module( 'jb.backofficeDetailView', [ 'eb.apiWrapper', 'pascalprecht.translate' ] )
 .directive( 'detailView', [ function() {
 
 	return {
@@ -3999,18 +4015,25 @@ angular
 
 	/**
 	* Deletes the entity. 
-	* @param <Boolean> nonInteracitve		True if user should not be redirected to main view
+	* @param <Boolean> nonInteractive		True if user should not be redirected to main view
 	*/
-	$scope.delete = function( nonInteracitve ) {
+	$scope.delete = function( nonInteractive ) {
 		
 		console.log( 'DetailView: Delete' );
+
+		// Display confirmation dialog – must be done in interactive and non-interactive mode
+		var confirmed = confirm( $filter( 'translate')('web.backoffice.detail.confirmDeletion' ) );
+
+		if( !confirmed ) {
+			return;
+		}
 
 		return self
 			.makeDeleteRequest()
 			.then( function( data ) {
 
 				// Go to entity's list view
-				if( !nonInteracitve ) {
+				if( !nonInteractive ) {
 					$location.path( '/' + self.getEntityName() );
 	
 					$rootScope.$broadcast( 'notification', {
@@ -4025,7 +4048,7 @@ angular
 
 			}, function( err ) {
 
-				if( !nonInteracitve ) {
+				if( !nonInteractive ) {
 					$rootScope.$broadcast( 'notification', {
 						type				: 'error'
 						, message			: 'web.backoffice.detail.deleteError'
@@ -4106,7 +4129,7 @@ angular
 
 		// List
 		if( !entityId ) {
-			controllerName	= 'ebBackoffice' + entityName.substring( 0, 1 ).toUpperCase() + entityName.substring( 1 ) + 'ListCtrl';
+			controllerName	= 'backoffice' + entityName.substring( 0, 1 ).toUpperCase() + entityName.substring( 1 ) + 'ListController';
 			templatePath	= templateBasePath + entityDashed + '-list.tpl.html';
 		}
 
@@ -4379,6 +4402,8 @@ angular
 		_element = el;
 		_setupDragDropListeners();
 
+		_addFileInputChangeListener();
+
 	};
 
 
@@ -4446,11 +4471,47 @@ angular
 
 
 
+
+	/////////////////////////////////////////////////////////////////////////////////
+	//
+	// INPUT[type=file] STUFF
+	//
+
+
+	/**
+	* If there's an input[type=file], handle it's change event.
+	*/
+	function _addFileInputChangeListener() {
+
+		_element
+			.find( 'input[type=\'file\']' )
+			.change( function( ev ) {
+
+				console.error( ev );
+				
+				if( !ev.target.files || !ev.target.files.length ) {
+					console.log( 'BackofficeImageComponentController: files field on ev.target missing: %o', ev.target );
+					return;
+				}
+
+				_handleFiles( ev.target.files );
+
+			} );
+
+	}
+
+
+
+
+
 	/////////////////////////////////////////////////////////////////////////////////
 	//
 	// HTML5 FILE stuff
 	//
 
+	/**
+	* Handles files in a JS fileList
+	*/
 	function _handleFiles( files ) {
 
 		var invalidFiles = [];

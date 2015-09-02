@@ -16,7 +16,7 @@
 * - getSelectFields: Returns select fields (replaces the select property)
 */
 angular
-.module( 'jb.backofficeDetailView', [ 'eb.apiWrapper' ] )
+.module( 'jb.backofficeDetailView', [ 'eb.apiWrapper', 'pascalprecht.translate' ] )
 .directive( 'detailView', [ function() {
 
 	return {
@@ -1256,18 +1256,25 @@ angular
 
 	/**
 	* Deletes the entity. 
-	* @param <Boolean> nonInteracitve		True if user should not be redirected to main view
+	* @param <Boolean> nonInteractive		True if user should not be redirected to main view
 	*/
-	$scope.delete = function( nonInteracitve ) {
+	$scope.delete = function( nonInteractive ) {
 		
 		console.log( 'DetailView: Delete' );
+
+		// Display confirmation dialog – must be done in interactive and non-interactive mode
+		var confirmed = confirm( $filter( 'translate')('web.backoffice.detail.confirmDeletion' ) );
+
+		if( !confirmed ) {
+			return;
+		}
 
 		return self
 			.makeDeleteRequest()
 			.then( function( data ) {
 
 				// Go to entity's list view
-				if( !nonInteracitve ) {
+				if( !nonInteractive ) {
 					$location.path( '/' + self.getEntityName() );
 	
 					$rootScope.$broadcast( 'notification', {
@@ -1282,7 +1289,7 @@ angular
 
 			}, function( err ) {
 
-				if( !nonInteracitve ) {
+				if( !nonInteractive ) {
 					$rootScope.$broadcast( 'notification', {
 						type				: 'error'
 						, message			: 'web.backoffice.detail.deleteError'

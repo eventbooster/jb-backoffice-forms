@@ -21,6 +21,15 @@
 	}
 
 
+	/* hide file input */
+	input[type=file] {
+		display: block;
+		position: absolute;
+		height: 0;
+		width: 0;
+		opacity: 0;		
+	}
+
 
 	ol {
 
@@ -41,18 +50,16 @@
 			}
 
 			img {
-				/*height: 100%;
-				max-width: 100%;*/
 				border: 1px solid #ccc;
 				height: 70px;
 			}
 
-			button.add {
-				height: 100%;
+			button.add-file-button {
+				height: 70px;
 				border: none;
 				padding: 0 50px;
-				background-color: #fff;
-				color: @link-color;
+				background-color: @link-color;
+				color: #fff;
 
 				&:hover {
 					background-color: @brand-success;
