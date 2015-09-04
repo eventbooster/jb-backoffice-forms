@@ -134,8 +134,6 @@ angular
 			.find( 'input[type=\'file\']' )
 			.change( function( ev ) {
 
-				console.error( ev );
-				
 				if( !ev.target.files || !ev.target.files.length ) {
 					console.log( 'BackofficeImageComponentController: files field on ev.target missing: %o', ev.target );
 					return;

@@ -1434,7 +1434,10 @@ angular
 
 
 			return {
+				// URL of the image itself
 				url				: originalObject.bucket.url + originalObject.url
+				// URL of the entity; needed to crop image
+				, entityUrl		: '/image/' + originalObject.id
 				, focalPoint	: focalPoint
 				, width			: originalObject.width
 				, height		: originalObject.height
@@ -1545,6 +1548,7 @@ angular
 				if( image.file && image.file instanceof File ) {
 
 					console.log( 'BackofficeImageComponentController: New file %o', image );
+					// Errors will be handled in detail-view
 					requests.push( _uploadFile( image ) );
 
 				}
@@ -1674,7 +1678,8 @@ angular
 						'<ol data-sortable-list-component class=\'clearfix\'>' +
 							'<li data-ng-repeat=\'image in backofficeImageComponent.images\'>' +
 								'<a href=\'#\' data-ng-click=\'backofficeImageComponent.openDetailView( $event, image )\'>' +
-									'<img data-ng-attr-src=\'{{image.url || image.fileData}}\'/>' +
+									// #Todo: Use smaller file
+									'<img data-ng-attr-src=\'{{image.url || image.fileData}}\'/>' +
 									'<button class=\'remove\' data-ng-click=\'backofficeImageComponent.removeImage($event,image)\'>&times</button>' +
 								'</a>' +
 								'<span class=\'image-size-info\' data-ng-if=\'!!image.width && !!image.height\'>{{image.width}}&times;{{image.height}} Pixels</span>' +
@@ -4487,8 +4492,6 @@ angular
 			.find( 'input[type=\'file\']' )
 			.change( function( ev ) {
 
-				console.error( ev );
-				
 				if( !ev.target.files || !ev.target.files.length ) {
 					console.log( 'BackofficeImageComponentController: files field on ev.target missing: %o', ev.target );
 					return;
