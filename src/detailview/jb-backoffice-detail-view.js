@@ -44,7 +44,7 @@ angular
 
 
 
-.controller( 'DetailViewController', [ '$scope', '$rootScope', '$location', '$q', '$attrs', '$filter', 'APIWrapperService', 'BackofficeConfig', function( $scope, $rootScope, $location, $q, $attrs, $filter, APIWrapperService, BackofficeConfig ) {
+.controller( 'DetailViewController', [ '$scope', '$rootScope', '$location', '$q', '$attrs', '$filter', 'APIWrapperService', function( $scope, $rootScope, $location, $q, $attrs, $filter, APIWrapperService ) {
 
 
 
@@ -1177,7 +1177,6 @@ angular
 		if( !call.data ) {
 			call.data = {};
 		}
-		//call.data.id_dataSource = BackofficeConfig.dataSourceId;
 
 		return APIWrapperService.request( {
 			url			: url
