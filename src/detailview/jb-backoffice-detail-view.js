@@ -44,7 +44,7 @@ angular
 
 
 
-.controller( 'DetailViewController', [ '$scope', '$rootScope', '$location', '$q', '$attrs', '$filter', 'APIWrapperService', function( $scope, $rootScope, $location, $q, $attrs, $filter, APIWrapperService ) {
+.controller( 'DetailViewController', [ '$scope', '$rootScope', '$q', '$attrs', '$filter',  '$state', 'APIWrapperService', function( $scope, $rootScope, $q, $attrs, $filter, $state, APIWrapperService ) {
 
 
 
@@ -140,7 +140,7 @@ angular
 		// Take id from path
 		// Path is equal to window.location.search.substring(1),
 		// therefore «/entity/id» or «/entity»
-		var path				= $location.path()
+		/*var path				= $location.path()
 			, split				= path.split( '/' )
 			, returnValue		= {
 				name			: undefined
@@ -172,7 +172,13 @@ angular
 
 		}
 
-		return returnValue;
+		return returnValue;*/
+
+		return {
+			name			: $state.params.entityName
+			, id			: $state.params.entityId
+			, isNew			: $state.params.entityId === 'new' ? true : false
+		};
 
 	};
 
@@ -283,7 +289,7 @@ angular
 
 	self.setTitle = function() {
 
-		if( $location.path().indexOf( '/new' ) === $location.path().length - 4 ) {
+		if( self.parseUrl().isNew ) {
 			$scope.title = $filter( 'translate' )( 'web.backoffice.create' ) + ': ';
 		}
 		else {
@@ -849,8 +855,8 @@ angular
 			.then( function( entityId ) {
 
 				// Entity didn't have an ID (was newly created): Redirect to new entity
-				if( $location.path().indexOf( '/new') === $location.path().length - 4 && !dontNotifyOrRedirect ) {
-					$location.path( '/' + self.getEntityName() + '/' + self.getEntityId() );
+				if( self.parseUrl().isNew && !dontNotifyOrRedirect ) {
+					$state.go( 'app.detail', { entityName: self.getEntityName(), entityId: self.getEntityId() } );
 				}
 
 				// Do notify and redirect
@@ -1274,7 +1280,8 @@ angular
 
 				// Go to entity's list view
 				if( !nonInteractive ) {
-					$location.path( '/' + self.getEntityName() );
+					
+					$state.go( 'app.list', { entityName: self.getEntityName() } );
 	
 					$rootScope.$broadcast( 'notification', {
 						type				: 'success'

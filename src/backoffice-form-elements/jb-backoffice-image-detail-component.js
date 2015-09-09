@@ -160,8 +160,8 @@
 		self.setFocalPointClickHandler = function( ev ) {
 				
 			var newFocalPoint = {
-				x		: ( ev.offsetX / ev.target.width ) * self.image.width
-				, y		: ( ev.offsetY / ev.target.height ) * self.image.height
+				x		: Math.round( ev.offsetX / ev.target.width * self.image.width )
+				, y		: Math.round( ev.offsetY / ev.target.height * self.image.height )
 			};
 			console.log( 'BackofficeImageDetailComponentController: Set focal point to ', JSON.stringify( newFocalPoint ) );
 

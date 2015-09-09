@@ -1862,8 +1862,8 @@ angular
 		self.setFocalPointClickHandler = function( ev ) {
 				
 			var newFocalPoint = {
-				x		: ( ev.offsetX / ev.target.width ) * self.image.width
-				, y		: ( ev.offsetY / ev.target.height ) * self.image.height
+				x		: Math.round( ev.offsetX / ev.target.width * self.image.width )
+				, y		: Math.round( ev.offsetY / ev.target.height * self.image.height )
 			};
 			console.log( 'BackofficeImageDetailComponentController: Set focal point to ', JSON.stringify( newFocalPoint ) );
 
@@ -2808,7 +2808,7 @@ angular
 
 
 
-.controller( 'DetailViewController', [ '$scope', '$rootScope', '$location', '$q', '$attrs', '$filter', 'APIWrapperService', function( $scope, $rootScope, $location, $q, $attrs, $filter, APIWrapperService ) {
+.controller( 'DetailViewController', [ '$scope', '$rootScope', '$q', '$attrs', '$filter',  '$state', 'APIWrapperService', function( $scope, $rootScope, $q, $attrs, $filter, $state, APIWrapperService ) {
 
 
 
@@ -2904,7 +2904,7 @@ angular
 		// Take id from path
 		// Path is equal to window.location.search.substring(1),
 		// therefore «/entity/id» or «/entity»
-		var path				= $location.path()
+		/*var path				= $location.path()
 			, split				= path.split( '/' )
 			, returnValue		= {
 				name			: undefined
@@ -2936,7 +2936,13 @@ angular
 
 		}
 
-		return returnValue;
+		return returnValue;*/
+
+		return {
+			name			: $state.params.entityName
+			, id			: $state.params.entityId
+			, isNew			: $state.params.entityId === 'new' ? true : false
+		};
 
 	};
 
@@ -3047,7 +3053,7 @@ angular
 
 	self.setTitle = function() {
 
-		if( $location.path().indexOf( '/new' ) === $location.path().length - 4 ) {
+		if( self.parseUrl().isNew ) {
 			$scope.title = $filter( 'translate' )( 'web.backoffice.create' ) + ': ';
 		}
 		else {
@@ -3613,8 +3619,8 @@ angular
 			.then( function( entityId ) {
 
 				// Entity didn't have an ID (was newly created): Redirect to new entity
-				if( $location.path().indexOf( '/new') === $location.path().length - 4 && !dontNotifyOrRedirect ) {
-					$location.path( '/' + self.getEntityName() + '/' + self.getEntityId() );
+				if( self.parseUrl().isNew && !dontNotifyOrRedirect ) {
+					$state.go( 'app.detail', { entityName: self.getEntityName(), entityId: self.getEntityId() } );
 				}
 
 				// Do notify and redirect
@@ -4038,7 +4044,8 @@ angular
 
 				// Go to entity's list view
 				if( !nonInteractive ) {
-					$location.path( '/' + self.getEntityName() );
+					
+					$state.go( 'app.list', { entityName: self.getEntityName() } );
 	
 					$rootScope.$broadcast( 'notification', {
 						type				: 'success'
@@ -5258,7 +5265,7 @@ angular
 
 } ] )
 
-.controller( 'LanguageMenuComponentController', [ '$scope', function( $scope ) {
+.controller( 'LanguageMenuComponentController', [ 'SessionService', function( SessionService ) {
 
 	var self = this
 		, _element;
@@ -5349,24 +5356,23 @@ angular
 	*/
 	self.getLanguages = function() {
 
-		if( !localStorage || !localStorage.getItem( 'supportedLanguages' ) ) {
-			console.error( 'LocaleComponentController: supportedLanguages cannot be retrieved from localStorage' );
+		var languages = SessionService.get( 'supported-languages', 'local' );
+
+		if( !languages ) {
+			console.error( 'LocaleComponentController: supported-languages cannot be retrieved from Session' );
 			return;
 		}
-
-		var languages = localStorage.getItem( 'supportedLanguages' );
-		languages = JSON.parse( languages );
 
 		languages.forEach( function( language ) {
 
 			self.languages.push( {
-				id			: language.id
-				, code		: language.code
+				id			: language.language.id
+				, code		: language.language.code
 			} );
 
 			// Select first language
 			if( self.selectedLanguages.length === 0 ) {
-				self.toggleLanguage( null, language );
+				self.toggleLanguage( null, self.languages[ 0 ] );
 			}
 
 		} );

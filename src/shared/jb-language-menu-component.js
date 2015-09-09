@@ -34,7 +34,7 @@ angular
 
 } ] )
 
-.controller( 'LanguageMenuComponentController', [ '$scope', function( $scope ) {
+.controller( 'LanguageMenuComponentController', [ 'SessionService', function( SessionService ) {
 
 	var self = this
 		, _element;
@@ -125,24 +125,23 @@ angular
 	*/
 	self.getLanguages = function() {
 
-		if( !localStorage || !localStorage.getItem( 'supportedLanguages' ) ) {
-			console.error( 'LocaleComponentController: supportedLanguages cannot be retrieved from localStorage' );
+		var languages = SessionService.get( 'supported-languages', 'local' );
+
+		if( !languages ) {
+			console.error( 'LocaleComponentController: supported-languages cannot be retrieved from Session' );
 			return;
 		}
-
-		var languages = localStorage.getItem( 'supportedLanguages' );
-		languages = JSON.parse( languages );
 
 		languages.forEach( function( language ) {
 
 			self.languages.push( {
-				id			: language.id
-				, code		: language.code
+				id			: language.language.id
+				, code		: language.language.code
 			} );
 
 			// Select first language
 			if( self.selectedLanguages.length === 0 ) {
-				self.toggleLanguage( null, language );
+				self.toggleLanguage( null, self.languages[ 0 ] );
 			}
 
 		} );

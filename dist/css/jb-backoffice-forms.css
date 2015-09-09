@@ -120,3 +120,38 @@
   margin-top: -13px;
   margin-left: -13px;
 }
+
+.locale-component .nav li {
+  margin-right: 10px;
+}
+.locale-component .nav li a {
+  padding: 4px 8px;
+}
+.locale-component .nav li a .fa {
+  font-size: 0.7em;
+  bottom: 2px;
+  position: relative;
+}
+.locale-component .locale-content {
+  padding-top: 10px;
+  background-color: #ffffff;
+}
+.locale-component .locale-content .locale-col {
+  float: left;
+  padding: 0 5px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.locale-component .locale-content .locale-col p {
+  font-size: 0.8em;
+  margin: 0;
+}
+.locale-component .locale-content .locale-col label {
+  margin: 2px 0;
+  font-size: 0.8em;
+}
+.locale-component .locale-content .locale-col textarea {
+  height: 34px;
+  /* default; is overwritten by js */
+  width: 100%;
+}
