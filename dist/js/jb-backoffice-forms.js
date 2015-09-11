@@ -2650,7 +2650,7 @@ angular
 * - getSelectFields: Returns select fields (replaces the select property)
 */
 angular
-.module( 'jb.backofficeDetailView', [ 'eb.apiWrapper', 'pascalprecht.translate' ] )
+.module( 'jb.backofficeDetailView', [ 'jb.apiWrapper', 'pascalprecht.translate' ] )
 .directive( 'detailView', [ function() {
 
 	return {
@@ -4508,7 +4508,7 @@ angular
 */
 
 angular
-.module( 'jb.localeComponent', [ 'eb.apiWrapper', 'jb.backofficeShared' ] )
+.module( 'jb.localeComponent', [ 'jb.apiWrapper', 'jb.backofficeShared' ] )
 .directive( 'localeComponent', [ function() {
 
 	return {

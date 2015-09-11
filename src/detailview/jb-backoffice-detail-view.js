@@ -16,7 +16,7 @@
 * - getSelectFields: Returns select fields (replaces the select property)
 */
 angular
-.module( 'jb.backofficeDetailView', [ 'eb.apiWrapper', 'pascalprecht.translate' ] )
+.module( 'jb.backofficeDetailView', [ 'jb.apiWrapper', 'pascalprecht.translate' ] )
 .directive( 'detailView', [ function() {
 
 	return {
