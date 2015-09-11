@@ -26,14 +26,16 @@
 			}
 			, scope: {
 				'propertyName'		: '@for'
+				, 'pathField'		: '@' // Field that has to be selected to get the image's path, e.g. path or bucket.url
 				, 'imageModel'		: '=model'
+				//, 'imageDetailState': '@' // State to display the image's detail
 			}
 
 		};
 
 	} ] )
 
-	.controller( 'BackofficeImageComponentController', [ '$scope', '$rootScope', '$q', '$location', 'APIWrapperService', function( $scope, $rootScope, $q, $location, APIWrapperService ) {
+	.controller( 'BackofficeImageComponentController', [ '$scope', '$rootScope', '$q', '$state', 'APIWrapperService', function( $scope, $rootScope, $q, $state, APIWrapperService ) {
 
 		var self = this
 			, _element
@@ -110,7 +112,7 @@
 
 			return {
 				// URL of the image itself
-				url				: originalObject.bucket.url + originalObject.url
+				url				: originalObject[ self.pathField ]
 				// URL of the entity; needed to crop image
 				, entityUrl		: '/image/' + originalObject.id
 				, focalPoint	: focalPoint
@@ -140,7 +142,7 @@
 		*/
 		self.getSelectFields = function() {
 
-			return [ self.propertyName + '.*', self.propertyName + '.bucket.url', self.propertyName + '.mimeType.*' ];
+			return [ self.propertyName + '.*', self.propertyName + '.' + self.pathField, self.propertyName + '.mimeType.*' ];
 
 		};
 
@@ -299,7 +301,7 @@
 				return;
 			}
 
-			$location.path( self.propertyName + '/' + image.id );
+			$state.go( 'app.detail', { entityName: 'image', entityId: image.id } );
 
 		};
 

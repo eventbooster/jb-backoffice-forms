@@ -204,8 +204,8 @@ angular
 	$templateCache.put( 'autoLanguageInputTemplate.html',
 		'<div class=\'row\'>'+
 			// Component itself is never required and always valid. Only single fields may be required or invalid.
-			'<label data-backoffice-label data-label-identifier=\'{{data.name}}\' data-is-required=\'false\' data-is-valid=\'isValid()\'></label>' +
-				'<div data-locale-component class=\'col-md-9\' data-fields=\'fields\' data-table-name=\'tableName\' data-model=\'locales\' data-set-validity=\'setValidity(validity)\' data-entity-name=\'entityName\'>' +
+			//'<label data-backoffice-label data-label-identifier=\'{{data.name}}\' data-is-required=\'false\' data-is-valid=\'isValid()\'></label>' +
+				'<div data-locale-component class=\'col-md-12\' data-fields=\'fields\' data-table-name=\'tableName\' data-model=\'locales\' data-set-validity=\'setValidity(validity)\' data-entity-name=\'entityName\'>' +
 			'</div>' +
 		'</div>'
 	);

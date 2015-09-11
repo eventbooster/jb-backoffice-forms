@@ -26,6 +26,7 @@
 				ctrl[ 0 ].init( element, ctrl[ 1 ] );
 			}
 			, scope: {
+				pathField		: '@'
 			}
 
 		};
@@ -107,7 +108,7 @@
 
 			// imageRendering: Renderings must be deleted when changing the focal point. 
 			// See https://github.com/joinbox/eb-backoffice/issues/112
-			return '*,mimeType.*,bucket.url';
+			return '*,mimeType.*,' + self.pathField;
 
 		};
 
@@ -215,10 +216,11 @@
 			'<label data-backoffice-label data-label-identifier=\'image\' data-is-required=\'false\' data-is-valid=\'true\'></label>' +
 			'<div class=\'col-md-9 backoffice-image-detail-component\'>' +
 				'<div class=\'image-container\'>' +
-					'<img data-ng-attr-src=\'{{backofficeImageDetailComponent.image.bucket.url + backofficeImageDetailComponent.image.url}}\' data-ng-click=\'backofficeImageDetailComponent.setFocalPointClickHandler($event)\'/>' +
+					'<img data-ng-attr-src=\'{{backofficeImageDetailComponent.image[ backofficeImageDetailComponent.pathField ]}}\' data-ng-click=\'backofficeImageDetailComponent.setFocalPointClickHandler($event)\'/>' +
 					'<div class=\'focal-point-indicator\' data-ng-if=\'backofficeImageDetailComponent.getFocalPoint()\' data-ng-attr-style=\'top:{{backofficeImageDetailComponent.getFocalPointInPercent().y}}%;left:{{backofficeImageDetailComponent.getFocalPointInPercent().x}}%\'></div>' +
 				'</div>' +
 				'<div data-ng-if=\'!backofficeImageDetailComponent.getFocalPoint()\'>{{ \'web.backoffice.image.focalPointNotSet\' | translate }}</div>' +
+				'<div data-ng-if=\'backofficeImageDetailComponent.getFocalPoint()\'>{{ \'web.backoffice.image.focalPoint\' | translate }}: {{ backofficeImageDetailComponent.getFocalPoint().x }} / {{backofficeImageDetailComponent.getFocalPoint().y}} </div>' +
 			'</div>'
 
 		);

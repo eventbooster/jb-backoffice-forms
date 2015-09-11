@@ -128,7 +128,7 @@ angular
 		var languages = SessionService.get( 'supported-languages', 'local' );
 
 		if( !languages ) {
-			console.error( 'LocaleComponentController: supported-languages cannot be retrieved from Session' );
+			console.error( 'LanguageMenuComponentController: supported-languages cannot be retrieved from Session' );
 			return;
 		}
 
@@ -143,6 +143,8 @@ angular
 			if( self.selectedLanguages.length === 0 ) {
 				self.toggleLanguage( null, self.languages[ 0 ] );
 			}
+
+			console.log( 'LanguageMenuComponentController: supported languages are %o, selected is %o', self.languages, self.selectedLanguages );
 
 		} );
 

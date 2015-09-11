@@ -3,7 +3,7 @@
 */
 
 angular
-.module( 'jb.localeComponent', [ 'eb.apiWrapper'] )
+.module( 'jb.localeComponent', [ 'eb.apiWrapper', 'jb.backofficeShared' ] )
 .directive( 'localeComponent', [ function() {
 
 	return {

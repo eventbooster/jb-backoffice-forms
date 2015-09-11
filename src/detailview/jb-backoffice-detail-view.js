@@ -176,7 +176,8 @@ angular
 
 		return {
 			name			: $state.params.entityName
-			, id			: $state.params.entityId
+			// Only return id if it's an ID (and not 'new'). If we return «new», a GET request will be made to /entityName/new
+			, id			: ( $state.params.entityId && $state.params.entityId !== 'new' ) ? $state.params.entityId : false
 			, isNew			: $state.params.entityId === 'new' ? true : false
 		};
 
@@ -326,7 +327,7 @@ angular
 
 		// Store number of auto form elements
 		// [data-backoffice-component]: Individual components that get and store data.
-		var autoFormElements		= element.find( '[data-auto-form-element], [data-hidden-input], [data-backoffice-tree-component], [data-backoffice-relation-component], [data-backoffice-component], [data-backoffice-image-component], [data-backoffice-image-detail-component]' );
+		var autoFormElements		= element.find( '[data-auto-form-element], [data-hidden-input], [data-backoffice-tree-component], [data-backoffice-relation-component], [data-backoffice-component], [data-backoffice-image-component], [data-backoffice-image-detail-component], [data-backoffice-video-component]' );
 
 		// If element has a parent [data-detail-view] that is different from the current detailView, don't count elements. 
 		// This may happen if we have nested detailViews.
@@ -512,6 +513,10 @@ angular
 					if( singleFieldData[ j ].name === 'image' ) {
 						ret[ j ] = {
 							type				: 'image'
+							, required			: !singleFieldData[ j ].nullable
+							, originalRelation	: 'hasOne' // Store image on id_image instead of POST to /entity/id/image/id
+							, relationType		: 'single' // same
+							, relationKey		: singleFieldData[ j ].key
 						};
 					}
 
@@ -550,6 +555,8 @@ angular
 						ret[ n ] = {
 							type				: 'image'
 							, tableName			: singleFieldData[ n ].table.name
+							, relationType		: 'multiple'
+							, originalRelation	: 'hasMany'
 						};
 					}
 
@@ -1045,7 +1052,6 @@ angular
 	* by an array item on calls and composes the data.
 	*/
 	self.addCall = function( componentCall, calls ) {
-
 
 		// Components may pass back just a data field – means that it's stored on the entity itself.
 		// Get url from self.getEntityUrl, as it is needed to determine the method of the call 
