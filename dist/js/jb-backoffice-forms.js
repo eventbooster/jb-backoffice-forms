@@ -827,6 +827,8 @@ angular
 			, _element
 			, _detailViewController
 
+			, _relationKey
+
 			, _originalData;
 
 		self.images = [];
@@ -841,8 +843,10 @@ angular
 
 		};
 
+
+
 		/**
-		* Called with GET data
+		* Called with GET data from detailView
 		*/
 		self.updateData = function( data ) {
 			
@@ -918,6 +922,18 @@ angular
 		*/
 		self.updateOptionsData = function( data ) {
 
+			if( !data[ self.propertyName ] || !angular.isObject( data[ self.propertyName ] ) ) {
+				console.error( 'BackofficeImageComponentController: Missing data for %o', self.propertyName );
+				return;
+			}
+
+			// Relation is 1:n and stored on the entity's id_image field (or similar): 
+			// Store relation key (e.g. id_image).
+			if( data[ self.propertyName ].relationKey ) {
+				_relationKey = data[ self.propertyName ].relationKey;
+			}
+
+
 			_detailViewController.register( self );
 
 		};
@@ -939,6 +955,80 @@ angular
 		* Store/Delete files that changed.
 		*/
 		self.getSaveCalls = function() {
+
+			// Store a signle relation (pretty easy)
+			if( _relationKey ) {
+
+				return _saveSingleRelation();
+
+			}
+
+			else {
+
+				return _saveMultiRelation();
+
+			}
+
+
+		};
+
+
+
+		function _saveSingleRelation() {
+
+			// Removed
+			if( _originalData && _originalData.length && ( !self.images || !self.images.length ) ) {
+
+				var data = {};
+				data[ _relationKey ] = null;
+
+				return {
+					// We can savely use PATCH as _originalData existed and
+					// therefore entity is present.
+					method				: 'PATCH'
+					, data				: data
+				};
+
+			}
+
+			// Added
+			else if ( !_originalData && self.images && self.images.length ) {
+
+				var addData = {};
+				addData[ _relationKey ] = self.images[ 0 ].id;
+
+				return {
+					method				: _detailViewController.getEntityId() ? 'PATCH' : 'POST'
+					, data				: addData
+				};
+
+			}
+
+			// Change: Take the last image. This functionality might (SHOULD!) be improved. 
+			else if( _originalData && _originalData.length && self.images && self.images.length && _originalData[ 0 ].id !== self.images[ self.images.length - 1 ].id ) {
+
+				var changeData = {};
+				changeData[ _relationKey ] = self.images[ self.images.length - 1 ].id;
+
+				return {
+					// Patch can be savely used as _originalData exists
+					method				: 'PATCH'
+					, data				: changeData
+				};
+
+			}
+
+			else {
+				console.log( 'BackofficeImageComponentController: No changes made to a single relation image' );
+				return false;
+			}
+
+		}
+
+
+
+
+		function _saveMultiRelation() {
 
 			// Calls to be returned
 			var calls			= []
@@ -965,17 +1055,14 @@ angular
 			// Deleted
 			originalIds.forEach( function( id ) {
 				if( imageIds.indexOf( id ) === -1 ) {
-					// Remove relation (relative path, will be prefixed with current entity's path)
-					// Is automatically deleted when removing the relation.
-					/*calls.push( {
-						method		: 'DELETE'
-						, url		: 'image/' + id
-					} );*/ 
+
+					// Original image seems to be automatically deleted when the relation is removed.
 					// Remove image iself (try to; not the relation)
 					calls.push( {
 						method		: 'DELETE'
 						, url		: '/image/' + id
 					} );
+
 				}
 			} );
 
@@ -992,7 +1079,9 @@ angular
 			console.log( 'BackofficeImageComponentController: Calls to be made are %o', calls );
 			return calls;
 
-		};
+
+		}
+
 
 
 
@@ -3996,6 +4085,7 @@ angular
 			// «error»: 
 			// data-error-handler="errorFn(error)"
 			, 'errorHandler'				: '&'
+			, 'maxFileCount'				: '@' // To be implemented.
 		}
 	};
 

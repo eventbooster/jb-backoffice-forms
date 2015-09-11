@@ -26,6 +26,7 @@ angular
 			// «error»: 
 			// data-error-handler="errorFn(error)"
 			, 'errorHandler'				: '&'
+			, 'maxFileCount'				: '@' // To be implemented.
 		}
 	};
 
