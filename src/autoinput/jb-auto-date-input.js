@@ -23,7 +23,13 @@ var AutoDateTimeInputController = function( $scope, $attrs ) {
 	};
 
 	$scope.isValid = function() {
-		return !this.optionData.required || ( this.optionData.required && this.$scope.values.date );
+
+		if( ( !this.$scope || !this.$scope.values || !this.$scope.values.date ) && this.optionData.required ) {
+			return false;
+		}
+
+		return true;
+
 	};
 
 };
