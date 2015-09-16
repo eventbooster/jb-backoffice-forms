@@ -44,6 +44,7 @@
 		self.images = [];
 
 		self.init = function( el, detailViewCtrl ) {
+
 			_element = el;
 			_detailViewController = detailViewCtrl;
 
@@ -320,6 +321,20 @@
 
 
 
+
+		////////////////
+
+		self.uploadFile = function() {
+
+			_element
+				.find( 'input[type=\'file\']' )
+				.click();
+
+		};
+
+
+
+
 	} ] )
 
 
@@ -341,8 +356,9 @@
 								'<span class=\'image-file-size-info\' data-ng-if=\'!!image.fileSize\'>{{image.fileSize/1000/1000 | number: 1 }} MB</span>' +
 								'<span class=\'focal-point-info\' data-ng-if=\'!!image.focalPoint\'>Focal Point</span>' +
 							'</li>' +
-							//'<li><button data-ng-click=\'imageDropComponent.upload()\'></button></li>' +
+							'<li><button class=\'add-file-button\' data-ng-click=\'backofficeImageComponent.uploadFile()\'>+</button></li>' +
 						'</ol>' +
+						'<input type=\'file\' multiple/>' +
 					'</div>' +
 				'</div>' +
 			'</div>'

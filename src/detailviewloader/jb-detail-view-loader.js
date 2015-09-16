@@ -46,7 +46,7 @@ angular
 
 		// List
 		if( !entityId ) {
-			controllerName	= 'ebBackoffice' + entityName.substring( 0, 1 ).toUpperCase() + entityName.substring( 1 ) + 'ListCtrl';
+			controllerName	= 'backoffice' + entityName.substring( 0, 1 ).toUpperCase() + entityName.substring( 1 ) + 'ListController';
 			templatePath	= templateBasePath + entityDashed + '-list.tpl.html';
 		}
 

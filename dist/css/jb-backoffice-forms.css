@@ -4,6 +4,7 @@
   padding: 6px 12px;
   margin-top: 15px;
   margin-bottom: 15px;
+  /* hide file input */
 }
 .backoffice-image-component [data-file-drop-component],
 .backoffice-image-component [file-drop-component] {
@@ -12,6 +13,13 @@
 .backoffice-image-component [data-file-drop-component].drag-over,
 .backoffice-image-component [file-drop-component].drag-over {
   border-color: green;
+}
+.backoffice-image-component input[type=file] {
+  display: block;
+  position: absolute;
+  height: 0;
+  width: 0;
+  opacity: 0;
 }
 .backoffice-image-component ol {
   list-style: none;
@@ -30,23 +38,21 @@
   margin-left: 0;
 }
 .backoffice-image-component ol li img {
-  /*height: 100%;
-				max-width: 100%;*/
   border: 1px solid #ccc;
   height: 70px;
 }
-.backoffice-image-component ol li button.add {
-  height: 100%;
+.backoffice-image-component ol li button.add-file-button {
+  height: 70px;
   border: none;
   padding: 0 50px;
-  background-color: #fff;
-  color: #337ab7;
+  background-color: #337ab7;
+  color: #fff;
 }
-.backoffice-image-component ol li button.add:hover {
+.backoffice-image-component ol li button.add-file-button:hover {
   background-color: #5cb85c;
   color: white;
 }
-.backoffice-image-component ol li button.add:focus {
+.backoffice-image-component ol li button.add-file-button:focus {
   outline: 0;
 }
 .backoffice-image-component ol li input[type=file] {
@@ -94,6 +100,7 @@
 }
 .backoffice-image-detail-component .image-container {
   position: relative;
+  max-width: 100%;
   display: inline-block;
   /* Give it the same size as the image; needed for portrait sized images. 
 								If it's wider than the image, the focal point is not set correctly. */

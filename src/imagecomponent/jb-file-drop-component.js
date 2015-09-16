@@ -49,6 +49,8 @@ angular
 		_element = el;
 		_setupDragDropListeners();
 
+		_addFileInputChangeListener();
+
 	};
 
 
@@ -116,11 +118,47 @@ angular
 
 
 
+
+	/////////////////////////////////////////////////////////////////////////////////
+	//
+	// INPUT[type=file] STUFF
+	//
+
+
+	/**
+	* If there's an input[type=file], handle it's change event.
+	*/
+	function _addFileInputChangeListener() {
+
+		_element
+			.find( 'input[type=\'file\']' )
+			.change( function( ev ) {
+
+				console.error( ev );
+				
+				if( !ev.target.files || !ev.target.files.length ) {
+					console.log( 'BackofficeImageComponentController: files field on ev.target missing: %o', ev.target );
+					return;
+				}
+
+				_handleFiles( ev.target.files );
+
+			} );
+
+	}
+
+
+
+
+
 	/////////////////////////////////////////////////////////////////////////////////
 	//
 	// HTML5 FILE stuff
 	//
 
+	/**
+	* Handles files in a JS fileList
+	*/
 	function _handleFiles( files ) {
 
 		var invalidFiles = [];

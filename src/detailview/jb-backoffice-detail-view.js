@@ -16,7 +16,7 @@
 * - getSelectFields: Returns select fields (replaces the select property)
 */
 angular
-.module( 'jb.backofficeDetailView', [ 'eb.apiWrapper', 'ebBackofficeConfig' ] )
+.module( 'jb.backofficeDetailView', [ 'eb.apiWrapper', 'pascalprecht.translate' ] )
 .directive( 'detailView', [ function() {
 
 	return {
@@ -965,6 +965,8 @@ angular
 		// Split calls up in mainCall, needs to be done first
 		// (main entity needs to be created before relations can be set)
 		// Main calls start with /entityName or /entityName/entityId (for updates)
+		// /entityName/entityId must be covered in case of redirects. Subsequent calls
+		// to releations must be made to the new entityId. 
 		for( var i = 0; i < calls.length; i++ ) {
 			if( !calls[ i ].url || calls[ i ].url.indexOf( '/' + self.getEntityName() ) === 0 ) {
 				mainCall = calls[ i ];
@@ -1254,18 +1256,25 @@ angular
 
 	/**
 	* Deletes the entity. 
-	* @param <Boolean> nonInteracitve		True if user should not be redirected to main view
+	* @param <Boolean> nonInteractive		True if user should not be redirected to main view
 	*/
-	$scope.delete = function( nonInteracitve ) {
+	$scope.delete = function( nonInteractive ) {
 		
 		console.log( 'DetailView: Delete' );
+
+		// Display confirmation dialog – must be done in interactive and non-interactive mode
+		var confirmed = confirm( $filter( 'translate')('web.backoffice.detail.confirmDeletion' ) );
+
+		if( !confirmed ) {
+			return;
+		}
 
 		return self
 			.makeDeleteRequest()
 			.then( function( data ) {
 
 				// Go to entity's list view
-				if( !nonInteracitve ) {
+				if( !nonInteractive ) {
 					$location.path( '/' + self.getEntityName() );
 	
 					$rootScope.$broadcast( 'notification', {
@@ -1280,7 +1289,7 @@ angular
 
 			}, function( err ) {
 
-				if( !nonInteracitve ) {
+				if( !nonInteractive ) {
 					$rootScope.$broadcast( 'notification', {
 						type				: 'error'
 						, message			: 'web.backoffice.detail.deleteError'
