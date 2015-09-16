@@ -513,10 +513,6 @@ angular
 					if( singleFieldData[ j ].name === 'image' ) {
 						ret[ j ] = {
 							type				: 'image'
-							, required			: !singleFieldData[ j ].nullable
-							, originalRelation	: 'hasOne' // Store image on id_image instead of POST to /entity/id/image/id
-							, relationType		: 'single' // same
-							, relationKey		: singleFieldData[ j ].key
 						};
 					}
 
@@ -525,8 +521,16 @@ angular
 						// j contains the field's name
 						ret[ j ] = {
 							type				: 'relation'
-							// Link to entity's collection (e.g. /city)
-							, relation			: singleFieldData[ j ]._rel.collection
+
+							// Link to entity's collection (e.g. city)
+							, relation			: singleFieldData[ j ].hasAlias ? singleFieldData[ j ].referencedModelName : singleFieldData[ j ].name
+
+							// If property is an alias, set alias here. Alias for event is e.g. parentEvent (EventBooster).
+							// Alias must be used to save relation, but is not available to GET data. 
+							// GET /name
+							// POST /alias/id/otherEntity/id
+							, alias				: singleFieldData[ j ].hasAlias ? singleFieldData[ j ].name : false
+
 							, relationType		: 'single'
 							, required			: !singleFieldData[ j ].nullable
 							, originalRelation	: 'hasOne'
@@ -554,9 +558,7 @@ angular
 					else if( singleFieldData[ n ].name === 'image' ) {
 						ret[ n ] = {
 							type				: 'image'
-							, tableName			: singleFieldData[ n ].table.name
-							, relationType		: 'multiple'
-							, originalRelation	: 'hasMany'
+							, tableName			: singleFieldData[ n ].table.name
 						};
 					}
 
@@ -564,7 +566,11 @@ angular
 
 						ret[ n ] = {
 							type				: 'relation'
-							, relation			: singleFieldData[ n ]._rel.collection
+							
+							// relation and alias: See hasOne
+							, relation			: singleFieldData[ n ].hasAlias ? singleFieldData[ n ].referencedModelName : singleFieldData[ n ].name
+							, alias				: singleFieldData[ n ].hasAlias ? singleFieldData[ n ].name : false
+
 							, relationType		: 'multiple'
 							, originalRelation	: 'hasMany'
 						};
@@ -580,9 +586,13 @@ angular
 
 					var relation = singleFieldData[ p ]._rel ? singleFieldData[ p ]._rel.collection : false;
 
-					ret[ p ] = {
+					ret[ p ] = {
 						type					: 'relation'
-						, relation				: relation
+
+						// relation and alias: See hasOne
+						, relation			: singleFieldData[ p ].hasAlias ? singleFieldData[ p ].referencedModelName : singleFieldData[ p ].name
+						, alias				: singleFieldData[ p ].hasAlias ? singleFieldData[ p ].name : false
+
 						, relationType			: 'multiple' // #todo: always multiple?
 						, required				: false //!singleFieldData[ p ].nullable won't work, as nullable ain't set
 						, originalRelation		: 'belongsTo'
