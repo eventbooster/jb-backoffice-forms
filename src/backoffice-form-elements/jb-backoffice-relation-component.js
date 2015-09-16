@@ -55,7 +55,8 @@
 
 			// Original data gotten from server; needed to calculate differences
 			// (when storing data)
-			, _originalData;
+			, _originalData
+			, _optionData;
 
 
 		
@@ -121,6 +122,8 @@
 			_required			= elementData.required;
 			_multiSelect		= elementData.relationType !== 'single';
 
+			_optionData			= data[ self.propertyName ];
+
 			self.replaceElement( _multiSelect, _deletable );
 
 			// Now let detailViewController know we're ready to get GET data
@@ -160,7 +163,8 @@
 
 			template
 				.find( '[data-relation-input]')
-				.attr( 'data-relation-entity-endpoint', self.propertyName )
+				// Use OPTION data's .referencedModelName if available, else .name
+				.attr( 'data-relation-entity-endpoint', _optionData.relation )
 				.attr( 'data-relation-interactive', true )
 				.attr( 'data-deletable', deletable )
 				.attr( 'data-relation-entity-search-field', self.searchField )
@@ -211,6 +215,7 @@
 		*/
 		self.getSingleSelectSaveCalls = function() {
 
+
 			// Relations missing; happens if relations were not set on server nor changed
 			// by user
 			if( !self.relationModel ) {
@@ -223,8 +228,6 @@
 			// the main entity with id_entity. It may not be deleted, therefore on updating, a PATCH
 			// call must be made to the main entity (and not DELETE/POST)
 			if( _required ) {
-
-
 
 				// No changes happened: return false
 				if( self.relationModel && _originalData ) {
@@ -275,7 +278,9 @@
 			// Element was removed
 			if( self.relationModel.length === 0 && _originalData && _originalData.length !== 0 ) {
 				return {
-					url			: self.propertyName + '/' + _originalData[ 0 ].id
+					// self.propertyName must be first (before _detailViewController.getEntityName()) as the server handles stuff the same way – 
+					// and ESPECIALLY for entities with an alias.
+					url			: '/' + self.propertyName + '/' + _originalData[ 0 ].id + '/' + _detailViewController.getEntityName() + '/' + _detailViewController.getEntityId()
 					, method	: 'DELETE'
 				};
 			}
@@ -284,7 +289,8 @@
 			// When scope.data[ 0 ].id != _originalData[ 0 ].id 
 			// Only [0] has to be checked, as it's a singleSelect
 			if( self.relationModel.length ) {
-				if( !_originalData || ( _originalData.length && self.relationModel[ 0 ].id !== _originalData[ 0 ].id ) ) {
+				
+				if( !_originalData || !_originalData.length || ( _originalData.length && self.relationModel[ 0 ].id !== _originalData[ 0 ].id ) ) {
 				
 					var data = {};
 					data[ _detailViewController.fields[ self.propertyName ].relationKey ] = self.relationModel[ 0 ].id;
@@ -292,11 +298,12 @@
 					// Post to /mainEntity/currentId/entityName/entityId, path needs to be entityName/entityId, 
 					// is automatically prefixed by DetailViewController 
 					return {
-						url			:  self.propertyName + '/' + self.relationModel[ 0 ].id
+						url			:  '/' + self.propertyName + '/' + self.relationModel[ 0 ].id + '/' + _detailViewController.getEntityName() + '/' + _detailViewController.getEntityId()
 						, method	: 'POST'
 					};
 			
 				}
+
 			}
 
 			// No changes
@@ -339,7 +346,7 @@
 					deleted.push( item );
 					calls.push( {
 						method			: 'DELETE'
-						, url			: self.propertyName + '/' + item
+						, url			: '/' + self.propertyName + '/' + item + '/' + _detailViewController.getEntityName() + '/' + _detailViewController.getEntityId()
 					} );
 				}
 			}.bind( this ) );
@@ -350,7 +357,7 @@
 					added.push( item );
 					calls.push( {
 						method		: 'POST'
-						, url		: self.propertyName + '/' + item
+						, url		: '/' + self.propertyName + '/' + item + '/' + _detailViewController.getEntityName() + '/' + _detailViewController.getEntityId()
 					} );
 				}
 			}.bind( this ) );

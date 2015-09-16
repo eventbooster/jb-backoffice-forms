@@ -514,8 +514,16 @@ angular
 						// j contains the field's name
 						ret[ j ] = {
 							type				: 'relation'
-							// Link to entity's collection (e.g. /city)
-							, relation			: singleFieldData[ j ]._rel.collection
+
+							// Link to entity's collection (e.g. city)
+							, relation			: singleFieldData[ j ].hasAlias ? singleFieldData[ j ].referencedModelName : singleFieldData[ j ].name
+
+							// If property is an alias, set alias here. Alias for event is e.g. parentEvent (EventBooster).
+							// Alias must be used to save relation, but is not available to GET data. 
+							// GET /name
+							// POST /alias/id/otherEntity/id
+							, alias				: singleFieldData[ j ].hasAlias ? singleFieldData[ j ].name : false
+
 							, relationType		: 'single'
 							, required			: !singleFieldData[ j ].nullable
 							, originalRelation	: 'hasOne'
@@ -551,7 +559,11 @@ angular
 
 						ret[ n ] = {
 							type				: 'relation'
-							, relation			: singleFieldData[ n ]._rel.collection
+							
+							// relation and alias: See hasOne
+							, relation			: singleFieldData[ n ].hasAlias ? singleFieldData[ n ].referencedModelName : singleFieldData[ n ].name
+							, alias				: singleFieldData[ n ].hasAlias ? singleFieldData[ n ].name : false
+
 							, relationType		: 'multiple'
 							, originalRelation	: 'hasMany'
 						};
@@ -569,7 +581,11 @@ angular
 
 					ret[ p ] = {
 						type					: 'relation'
-						, relation				: relation
+
+						// relation and alias: See hasOne
+						, relation			: singleFieldData[ p ].hasAlias ? singleFieldData[ p ].referencedModelName : singleFieldData[ p ].name
+						, alias				: singleFieldData[ p ].hasAlias ? singleFieldData[ p ].name : false
+
 						, relationType			: 'multiple' // #todo: always multiple?
 						, required				: false //!singleFieldData[ p ].nullable won't work, as nullable ain't set
 						, originalRelation		: 'belongsTo'
