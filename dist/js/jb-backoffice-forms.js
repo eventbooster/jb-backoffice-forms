@@ -921,6 +921,8 @@ angular
 
 			}
 
+			return false;
+
 		};
 
 
@@ -1734,6 +1736,325 @@ angular
 } )();
 
 
+/***
+* Media group component: Displays videos and images in a list that may be sorted 
+* by drag-and-drop.
+*/
+( function() {
+
+	'use strict';
+
+	angular
+
+	.module( 'jb.backofficeFormComponents' )
+
+	.directive( 'backofficeMediaGroupComponent', [ function() {
+
+		return {
+			require				: [ 'backofficeMediaGroupComponent', '^detailView' ]
+			, controller		: 'BackofficeMediaGroupComponentController'
+			, controllerAs		: 'backofficeMediaGroupComponent'
+			, bindToController	: true
+			, templateUrl		: 'backofficeMediaGroupComponentTemplate.html'
+			, link				: function( scope, element, attrs, ctrl ) {
+				ctrl[ 0 ].init( element, ctrl[ 1 ] );
+			}
+			, scope: {
+				'propertyName'		: '@for'
+			}
+
+		};
+
+	} ] )
+
+	.controller( 'BackofficeMediaGroupComponentController', [ '$scope', '$rootScope', '$q', 'APIWrapperService', function( $scope, $rootScope, $q, APIWrapperService ) {
+
+		var self = this
+			, _element
+			, _detailViewController
+
+			, _originalData
+
+			, _selectFields = [ '*', 'video.*', 'video.videoType.*', 'image.*', 'mediumGroup_medium.*' ];
+
+
+		self.media = [];
+
+
+		/**
+		* Model that the relation-input («add medium») is bound to. 
+		* Watch it to see what new medium is added; after change, remove it's items – should
+		* therefore always have a length of 0 or 1. 
+		*/
+		self.addMediumModel = [];
+
+
+		self.init = function( el, detailViewCtrl ) {
+
+			_element = el;
+			_detailViewController = detailViewCtrl;
+
+			_detailViewController.registerOptionsDataHandler( self.updateOptionsData );
+			_detailViewController.registerGetDataHandler( self.updateData );
+
+			self.setupAddMediumModelWatcher();
+
+		};
+
+
+
+
+		/**
+		* Called with GET data
+		*/
+		self.updateData = function( data ) {
+			
+			if( data[ self.propertyName ] ) {
+
+				self.media 		= data[ self.propertyName ];
+				_originalData 	= angular.copy( self.media );
+
+			}
+
+		};
+
+
+
+
+		/**
+		* Watch for changes on addMediumModel. When data is added,
+		* add it to self.media.
+		*/
+		self.setupAddMediumModelWatcher = function() {
+
+			$scope.$watch( function() {
+				return self.addMediumModel;
+			}, function( newVal ) {
+
+				if( self.addMediumModel.length === 1 ) {
+
+					self.addMedium( newVal[ 0 ].id );
+
+					// Re-set model
+					self.addMediumModel = [];					
+				}
+
+			}, true );
+
+		};
+
+
+		/**
+		* Adds a medium to self.media (is the de-facto click handler for
+		* the add medium dropdown).
+		*/
+		self.addMedium = function( mediumId ) {
+
+			// Check for duplicates
+			if( 
+				self.media.filter( function( item ) {
+					return item.id === mediumId;
+				} ).length > 0 
+			) {
+				console.error( 'BackofficeMediaGroupComponentController: Trying to add duplicate with id', mediumId );
+				return;
+			}
+
+			APIWrapperService.request( {
+				url				: '/' + self.propertyName + '/' + mediumId
+				, method		: 'GET'
+				, headers		: {
+					select		: self.getSelectFields()
+				}
+			} )
+			.then( function( data ) {
+				
+				console.error( 'add %o to media', data );
+				self.media.push( data );
+				console.error( self.media );
+
+			}, function( err ) {
+
+				console.error( 'BackofficeMediaGroupComponentController: Could not get data for medium with id %o: %o', mediumId, err );
+
+				$rootScope.$broadcast( 'notification', {
+					'type'		: 'error'
+					, 'message'	: 'web.backoffice.detail.loadingError'
+					, variables	: {
+						errorMessage: err
+					}
+				} );
+
+			} );
+
+
+		};
+
+
+
+		/**
+		* Called with OPTIONS data 
+		*/
+		self.updateOptionsData = function( data ) {
+
+			_detailViewController.register( self );
+
+		};
+
+
+
+		/**
+		* Returns the fields that need to be selected on the GET call
+		*/
+		self.getSelectFields = function() {
+
+			return _selectFields.map( function( item ) {
+				return self.propertyName + '.' + item;
+			} );
+
+		};
+
+
+
+
+		/**
+		* Store/Delete files that changed.
+		*/
+		self.getSaveCalls = function() {
+
+			// Get IDs of entities _before_ anything was edited and curent state.
+			var oldIds = _originalData.map( function( item ) {
+					return item.id;
+				} )
+			, newIds = self.media.map( function( item ) {
+					return item.id;
+				} );
+
+			// Get deleted and created medium relations
+			var created = []
+				, deleted = [];
+			
+			newIds.forEach( function( item ) {
+				if( oldIds.indexOf( item ) === -1 ) {
+					created.push( item );
+				}
+			} );
+
+			oldIds.forEach( function( item ) {
+				if( newIds.indexOf( item ) === -1 ) {
+					deleted.push( item );
+				}
+			} );
+
+
+
+			var calls = [];
+
+			// 1. Delete relations
+			deleted.forEach( function( item ) {
+				calls.push( {
+					method		: 'DELETE'
+					, url		: self.propertyName + '/' + item
+				} );
+			} );
+
+
+			// 2. Create relations
+			created.forEach( function( item ) {
+				calls.push( {
+					method		: 'POST'
+					, url		: self.propertyName + '/' + item
+				} );
+			} );
+
+
+			// 3. Save order
+
+
+
+			return calls;
+
+		};
+
+
+
+		self.isValid = function() {
+			return true;
+		};
+
+
+		self.isRequired = function() {
+			return false;
+		};
+
+
+		self.removeMedium = function( medium ) {
+
+			self.media.splice( self.media.indexOf( medium ), 1 );
+
+		};
+
+
+	} ] )
+
+
+
+	.run( [ '$templateCache', function( $templateCache ) {
+
+		$templateCache.put( 'backofficeMediaGroupComponentTemplate.html',
+
+			'<div class=\'backoffice-media-group-component\'>' +
+
+				'<div class=\'row\'>' +
+					'<div class=\'col-md-12\'>' +
+
+						'<ol class=\'clearfix\' data-drag-drop-list>' +
+							'<li data-ng-repeat=\'medium in backofficeMediaGroupComponent.media\' draggable=\'true\'>' +
+								'<div data-ng-if=\'medium.image\'>' +
+									'<button data-ng-click=\'backofficeMediaGroupComponent.removeMedium(medium)\'>&times;</button>' +
+									'<img data-ng-attr-src=\'{{medium.image.url}}\'>' +
+								'</div>' +
+								'<div data-ng-if=\'medium.video && medium.video.videoType.identifier === "youtube"\'>' +
+									'<button data-ng-click=\'backofficeMediaGroupComponent.removeMedium(medium)\'>&times;</button>' +
+									'<img data-ng-attr-src=\'http://img.youtube.com/vi/{{medium.video.uri}}/0.jpg\'>' +
+								'</div>' +
+							'</li>' +
+						'</ol>' +
+
+					'</div>' +
+				'</div>' +
+
+				'<div class=\'row\'>' +
+					'<div class=\'col-md-9\'>' +
+
+						'<div class="relation-select" ' +
+							'data-relation-input ' +
+							'data-ng-attr-data-relation-entity-endpoint="{{backofficeMediaGroupComponent.propertyName}}" ' +
+							'data-relation-interactive="false" ' +
+							'data-deletable="false" ' +
+							'data-relation-entity-search-field="title" ' +
+							'data-relation-suggestion-template="[[title]] <img src=\'[[image.url]]\'/>" ' +
+							'data-ng-model="backofficeMediaGroupComponent.addMediumModel" ' +
+							'data-multi-select="true">' +
+						'</div>' +
+
+					'</div>' +
+					'<div class=\'col-md-3\'>' +
+
+						'<button class="btn btn btn-success" data-ng-attr-ui-sref="app.detail({entityName:\'{{backofficeMediaGroupComponent.propertyName}}\',entityId:\'new\'})">{{ \'web.backoffice.mediumGroup.createMedium\' | translate }}</button>' +
+
+					'</div>' +
+				'</div>' +
+			'</div>'
+
+		);
+
+	} ] );
+
+
+} )();
+
+
 /**
 * Newer version of jb-auto-relation-input. Is not automatically replaced by auto-form-element any more, 
 * but needs to be used manually. Gives more freedom in usage. 
@@ -1941,11 +2262,14 @@ angular
 
 
 
+
+
 		/**
 		* Creates requests for a single relation. 
 		* No delete calls needed.
 		*/
 		self.getSingleSelectSaveCalls = function() {
+
 
 			// Relations missing; happens if relations were not set on server nor changed
 			// by user
@@ -1959,8 +2283,6 @@ angular
 			// the main entity with id_entity. It may not be deleted, therefore on updating, a PATCH
 			// call must be made to the main entity (and not DELETE/POST)
 			if( _required ) {
-
-
 
 				// No changes happened: return false
 				if( self.relationModel && _originalData ) {
@@ -2011,7 +2333,9 @@ angular
 			// Element was removed
 			if( self.relationModel.length === 0 && _originalData && _originalData.length !== 0 ) {
 				return {
-					url			: self.propertyName + '/' + _originalData[ 0 ].id
+					// self.propertyName must be first (before _detailViewController.getEntityName()) as the server handles stuff the same way – 
+					// and ESPECIALLY for entities with an alias.
+					url			: '/' + self.propertyName + '/' + _originalData[ 0 ].id + '/' + _detailViewController.getEntityName() + '/' + _detailViewController.getEntityId()
 					, method	: 'DELETE'
 				};
 			}
@@ -2020,7 +2344,8 @@ angular
 			// When scope.data[ 0 ].id != _originalData[ 0 ].id 
 			// Only [0] has to be checked, as it's a singleSelect
 			if( self.relationModel.length ) {
-				if( !_originalData || ( _originalData.length && self.relationModel[ 0 ].id !== _originalData[ 0 ].id ) ) {
+				
+				if( !_originalData || !_originalData.length || ( _originalData.length && self.relationModel[ 0 ].id !== _originalData[ 0 ].id ) ) {
 				
 					var data = {};
 					data[ _detailViewController.fields[ self.propertyName ].relationKey ] = self.relationModel[ 0 ].id;
@@ -2028,11 +2353,12 @@ angular
 					// Post to /mainEntity/currentId/entityName/entityId, path needs to be entityName/entityId, 
 					// is automatically prefixed by DetailViewController 
 					return {
-						url			:  self.propertyName + '/' + self.relationModel[ 0 ].id
+						url			:  '/' + self.propertyName + '/' + self.relationModel[ 0 ].id + '/' + _detailViewController.getEntityName() + '/' + _detailViewController.getEntityId()
 						, method	: 'POST'
 					};
 			
 				}
+
 			}
 
 			// No changes
@@ -2075,7 +2401,7 @@ angular
 					deleted.push( item );
 					calls.push( {
 						method			: 'DELETE'
-						, url			: self.propertyName + '/' + item
+						, url			: '/' + self.propertyName + '/' + item + '/' + _detailViewController.getEntityName() + '/' + _detailViewController.getEntityId()
 					} );
 				}
 			}.bind( this ) );
@@ -2086,7 +2412,7 @@ angular
 					added.push( item );
 					calls.push( {
 						method		: 'POST'
-						, url		: self.propertyName + '/' + item
+						, url		: '/' + self.propertyName + '/' + item + '/' + _detailViewController.getEntityName() + '/' + _detailViewController.getEntityId()
 					} );
 				}
 			}.bind( this ) );
@@ -2961,7 +3287,7 @@ angular
 
 		// Store number of auto form elements
 		// [data-backoffice-component]: Individual components that get and store data.
-		var autoFormElements		= element.find( '[data-auto-form-element], [data-hidden-input], [data-backoffice-tree-component], [data-backoffice-relation-component], [data-backoffice-component], [data-backoffice-image-component], [data-backoffice-image-detail-component], [data-backoffice-video-component], [data-backoffice-date-component]' );
+		var autoFormElements		= element.find( '[data-auto-form-element], [data-hidden-input], [data-backoffice-tree-component], [data-backoffice-relation-component], [data-backoffice-component], [data-backoffice-image-component], [data-backoffice-image-detail-component], [data-backoffice-video-component], [data-backoffice-date-component], [data-backoffice-media-group-component]' );
 
 		// If element has a parent [data-detail-view] that is different from the current detailView, don't count elements. 
 		// This may happen if we have nested detailViews.
@@ -3147,10 +3473,6 @@ angular
 					if( singleFieldData[ j ].name === 'image' ) {
 						ret[ j ] = {
 							type				: 'image'
-							, required			: !singleFieldData[ j ].nullable
-							, originalRelation	: 'hasOne' // Store image on id_image instead of POST to /entity/id/image/id
-							, relationType		: 'single' // same
-							, relationKey		: singleFieldData[ j ].key
 						};
 					}
 
@@ -3159,8 +3481,16 @@ angular
 						// j contains the field's name
 						ret[ j ] = {
 							type				: 'relation'
-							// Link to entity's collection (e.g. /city)
-							, relation			: singleFieldData[ j ]._rel.collection
+
+							// Link to entity's collection (e.g. city)
+							, relation			: singleFieldData[ j ].hasAlias ? singleFieldData[ j ].referencedModelName : singleFieldData[ j ].name
+
+							// If property is an alias, set alias here. Alias for event is e.g. parentEvent (EventBooster).
+							// Alias must be used to save relation, but is not available to GET data. 
+							// GET /name
+							// POST /alias/id/otherEntity/id
+							, alias				: singleFieldData[ j ].hasAlias ? singleFieldData[ j ].name : false
+
 							, relationType		: 'single'
 							, required			: !singleFieldData[ j ].nullable
 							, originalRelation	: 'hasOne'
@@ -3188,9 +3518,7 @@ angular
 					else if( singleFieldData[ n ].name === 'image' ) {
 						ret[ n ] = {
 							type				: 'image'
-							, tableName			: singleFieldData[ n ].table.name
-							, relationType		: 'multiple'
-							, originalRelation	: 'hasMany'
+							, tableName			: singleFieldData[ n ].table.name
 						};
 					}
 
@@ -3198,7 +3526,11 @@ angular
 
 						ret[ n ] = {
 							type				: 'relation'
-							, relation			: singleFieldData[ n ]._rel.collection
+							
+							// relation and alias: See hasOne
+							, relation			: singleFieldData[ n ].hasAlias ? singleFieldData[ n ].referencedModelName : singleFieldData[ n ].name
+							, alias				: singleFieldData[ n ].hasAlias ? singleFieldData[ n ].name : false
+
 							, relationType		: 'multiple'
 							, originalRelation	: 'hasMany'
 						};
@@ -3214,9 +3546,13 @@ angular
 
 					var relation = singleFieldData[ p ]._rel ? singleFieldData[ p ]._rel.collection : false;
 
-					ret[ p ] = {
+					ret[ p ] = {
 						type					: 'relation'
-						, relation				: relation
+
+						// relation and alias: See hasOne
+						, relation			: singleFieldData[ p ].hasAlias ? singleFieldData[ p ].referencedModelName : singleFieldData[ p ].name
+						, alias				: singleFieldData[ p ].hasAlias ? singleFieldData[ p ].name : false
+
 						, relationType			: 'multiple' // #todo: always multiple?
 						, required				: false //!singleFieldData[ p ].nullable won't work, as nullable ain't set
 						, originalRelation		: 'belongsTo'
@@ -3838,6 +4174,22 @@ angular
 
 	/**
 	* Goes through all inputs, collects their save calls (by calling getSaveCalls)
+	*
+	* getSaveCalls() may return: 
+	* - false (no call to be made)
+	* - an array of objects or single object, where each object has the following properties
+	*     - url (mandatory): URL to be called as 
+	*           - a <String>: If prefixed with a /, will be an absolute path, else relative to the 
+	*             current entity
+	*           - an <Object> with the properties
+	*                   - path <String>: path
+	*                   - baseEntity <String> 'append|prepend' Whether and where to append
+	*                     the current entity plus its ID. If not set or another value, 
+	*                     current entity is not used at all.
+	*     - method (mandatory, <String>): method to be used (GET,PATCH,POST)
+	*     - headers (optional, <Object>): an object of headers, e.g. { range: '0-10' }
+	*     - data (optional <Object>): data to be sent with a POST or PATCH request
+	* - a Promise
 	*/
 	self.generateSaveCalls = function() {
 
@@ -4507,380 +4859,571 @@ angular
 * Directive for locales
 */
 
-angular
-.module( 'jb.localeComponent', [ 'jb.apiWrapper', 'jb.backofficeShared' ] )
-.directive( 'localeComponent', [ function() {
+( function() {
 
-	return {
-		link				: function( scope, element, attrs, ctrl ) {
-			ctrl[ 0 ].init( element, ctrl[ 1 ] );
-		}
-		, controller		: 'LocaleComponentController'
-		, require			: [ 'localeComponent' ]
-		, templateUrl		: 'localeComponentTemplate.html'
-		, scope				: {
-			fields			: '='
-			, model			: '='
-			, entityName	: '=' // For translation
-			, tableName		: '='
-			// Sets validity of the component on the parent scope
-			, setValidity	: '&'
-		}
-	};
-
-} ] )
-
-.controller( 'LocaleComponentController', [ '$scope', 'APIWrapperService', function( $scope, APIWrapperService ) {
-
-	var self = this
-		, element;
+	'use strict';
 
 
-	// Array with 
-	// {
-	//	id		: 1
-	//	, code	: 'de'
-	//	}
-	$scope.languages			= [];
-	
+	angular
+	.module( 'jb.localeComponent', [ 'jb.apiWrapper', 'jb.backofficeShared' ] )
+	.directive( 'localeComponent', [ function() {
 
-	/**
-	* Array with languageIds that were selected to be edited (multiselect)
-	*/ 
-	$scope.selectedLanguages	= undefined;
-
-
-	/**
-	* Contains every field and it's definition, e.g. 
-	* {
-	*	name			: fieldName (taken from $scope.fields)
-	* 	required		: true
-	* }
-	*/ 
-	$scope.fieldDefinitions		= [];
-
-
-
-	self.init = function( el, mCtrl ) {
-		element = el;
-
-		// Adjust height of textareas
-		setTimeout( function() {
-			self.adjustHeightOfAllAreas();
-		}, 1000 );
-
-		self.setupFieldDefinitionWatcher();
-		self.setupValidityWatcher();
-		self.setupSelectedLanguagesWatcher();
-
-	};
-
-
-
-
-
-
-
-	self.setupSelectedLanguagesWatcher = function() {
-		$scope.$watch( 'selectedLanguages', function( newValue ) {
-
-			// newValue available? Return if length is 0 to not divide by 0
-			if( !newValue || !angular.isArray( newValue ) || newValue.length === 0 ) {
-				return;
+		return {
+			link				: function( scope, element, attrs, ctrl ) {
+				ctrl[ 0 ].init( element, ctrl[ 1 ] );
 			}
+			, controller		: 'LocaleComponentController'
+			, require			: [ 'localeComponent' ]
+			, templateUrl		: 'localeComponentTemplate.html'
+			, scope				: {
+				fields			: '='
+				, model			: '='
+				, entityName	: '=' // For translation
+				, tableName		: '='
+				// Sets validity of the component on the parent scope
+				, setValidity	: '&'
+			}
+		};
 
-			var colWidth = Math.floor( 100 / newValue.length  ) + '%';
-			element.find( '.locale-col' ).css( 'width', colWidth );
+	} ] )
 
+	.controller( 'LocaleComponentController', [ '$scope', 'APIWrapperService', function( $scope, APIWrapperService ) {
+
+		var self = this
+			, element;
+
+
+		// Array with 
+		// {
+		//	id		: 1
+		//	, code	: 'de'
+		//	}
+		$scope.languages			= [];
+		
+
+		/**
+		* Array with languageIds that were selected to be edited (multiselect)
+		*/ 
+		$scope.selectedLanguages	= undefined;
+
+
+		/**
+		* Contains every field and it's definition, e.g. 
+		* {
+		*	name			: fieldName (taken from $scope.fields)
+		* 	required		: true
+		* }
+		*/ 
+		$scope.fieldDefinitions		= [];
+
+
+
+		self.init = function( el, mCtrl ) {
+			element = el;
+
+			// Adjust height of textareas
 			setTimeout( function() {
 				self.adjustHeightOfAllAreas();
-			} );
+			}, 1000 );
 
-		}, true );
-	};
+			self.setupFieldDefinitionWatcher();
+			self.setupValidityWatcher();
+			self.setupSelectedLanguagesWatcher();
+
+		};
 
 
-	/**
-	* Watches model for changes and updates validity on *parent scope‹ if
-	* function was passed. Therefore tells if the whole component is valid or not (and 
-	* not just a single field).
-	* If at least one field (required or not) was set, all required fields must be set.
-	*/
-	self.setupValidityWatcher = function() {
-		$scope.$watch( 'model', function( newVal ) {
-			
-			if( !$scope.setValidity || !angular.isFunction( $scope.setValidity ) ) {
-				return;
-			}
 
-			// If model is not an object, there's no value missing.
-			if( !angular.isObject( newVal ) || !Object.keys( newVal ) ) {
-				$scope.setValidity( {validity: true } );
-				return;
-			}
 
+
+
+
+		self.setupSelectedLanguagesWatcher = function() {
+			$scope.$watch( 'selectedLanguages', function( newValue ) {
+
+				// newValue available? Return if length is 0 to not divide by 0
+				if( !newValue || !angular.isArray( newValue ) || newValue.length === 0 ) {
+					return;
+				}
+
+				var colWidth = Math.floor( 100 / newValue.length  ) + '%';
+				element.find( '.locale-col' ).css( 'width', colWidth );
+
+				setTimeout( function() {
+					self.adjustHeightOfAllAreas();
+				} );
+
+			}, true );
+		};
+
+
+		/**
+		* Watches model for changes and updates validity on *parent scope‹ if
+		* function was passed. Therefore tells if the whole component is valid or not (and 
+		* not just a single field).
+		* If at least one field (required or not) was set, all required fields must be set.
+		*/
+		self.setupValidityWatcher = function() {
+			$scope.$watch( 'model', function( newVal ) {
+				
+				if( !$scope.setValidity || !angular.isFunction( $scope.setValidity ) ) {
+					return;
+				}
+
+				// If model is not an object, there's no value missing.
+				if( !angular.isObject( newVal ) || !Object.keys( newVal ) ) {
+					$scope.setValidity( {validity: true } );
+					return;
+				}
+
+
+				var requiredFields		= self.getRequiredFields()
+					, valid				= true;
+
+
+				// Go through all objects. Check if required properties are set.
+				Object.keys( newVal ).forEach( function( languageKey ) {
+
+					var languageData		= newVal[ languageKey ]
+						, usedFields		= Object.keys( languageData );
+
+					console.log( 'LocaleComponentController: used fields %o, required %o in %o', usedFields, requiredFields, languageData );
+
+					requiredFields.some( function( reqField ) {
+						if( usedFields.indexOf( reqField ) === -1 ) {
+							valid = false;
+							console.log( 'LocaleComponentController: Required field %o missing in %o', reqField, languageData );
+						}
+					} );
+
+				} );
+
+				$scope.setValidity( { validity: valid } );
+
+			}, true );
+		};
+
+
+
+
+		/**
+		* Checks if a certain field is valid. 
+		*/
+		self.isFieldValid = function( languageId, fieldName ) {
 
 			var requiredFields		= self.getRequiredFields()
-				, valid				= true;
+				, languageData		= $scope.model[ languageId ];
+
+			// No value was set for the language: All it's fields are valid.
+			// Not an object: Invalid, don't care.
+			if( !languageData || !angular.isObject( languageData ) ) {
+				return true;
+			}
+
+			// Field is not required.
+			if( requiredFields.indexOf( fieldName ) === -1 ) {
+				return true;
+			}
+
+			// Not valid: Data is set for this language (i.e. some keys exist)
+			// but current fieldName was not set. 
+			// ATTENTION: '' counts as a set value (empty string).
+			if( !languageData[ fieldName ] && languageData[ fieldName ] !== '' ) {
+				return false;
+			}
+
+			return true;
+
+		};
 
 
-			// Go through all objects. Check if required properties are set.
-			Object.keys( newVal ).forEach( function( languageKey ) {
 
-				var languageData		= newVal[ languageKey ]
-					, usedFields		= Object.keys( languageData );
+		/**
+		* Checks if a certain field in a certain language is valid. Needed to 
+		* set .invalid class on the label.
+		*/
+		$scope.isFieldValid = function( languageId, fieldName ) {
+			return self.isFieldValid( languageId, fieldName );
+		};
 
-				console.log( 'LocaleComponentController: used fields %o, required %o in %o', usedFields, requiredFields, languageData );
 
-				requiredFields.some( function( reqField ) {
-					if( usedFields.indexOf( reqField ) === -1 ) {
-						valid = false;
-						console.log( 'LocaleComponentController: Required field %o missing in %o', reqField, languageData );
-					}
+
+
+
+		/**
+		* Returns an array of the required fields
+		*/
+		self.getRequiredFields = function() {
+			var requiredFields = [];
+			$scope.fieldDefinitions.forEach( function( fieldDef ) {
+				if( fieldDef.required ) {
+					requiredFields.push( fieldDef.name );
+				}
+			} );
+			return requiredFields;
+		};
+
+
+
+		///////////////////////////////////////////////////////////////////////////////////////////////////////////
+		//
+		//   HEIGHT
+		//
+
+
+		/**
+		* Adjusts height of textareas (functionality's very basic. very.)
+		*/
+		$scope.adjustHeight = function( ev ) {
+			self.adjustHeight( $( ev.currentTarget ) );
+		};
+
+
+		self.adjustHeightOfAllAreas = function() {
+			element.find( 'textarea' ).each( function() {
+				self.adjustHeight( $( this ) );
+			} );
+		};
+
+
+
+
+		self.adjustHeight = function( element ) {
+
+			var textarea = element;
+
+			var copy			= $( document.createElement( 'div' ) )
+				, properties	= [ 'font-size', 'font-family', 'font-weight', 'lineHeight', 'width', 'padding-top', 'padding-left', 'padding-right' ];
+
+			properties.forEach( function( prop ) {
+				copy.css( prop, textarea.css( prop ) );
+			} );
+
+			copy
+				.css( 'position', 'relative' )
+				.css( 'top', '-10000px' )
+				.text( textarea.val() )
+				.appendTo( 'body' );
+
+			var h = Math.min( copy.height(), 200 );
+
+			copy.remove();
+
+			// #TODO: Update height of all textareas to the highest one. 
+			textarea.height( Math.max( h, parseInt( textarea.css( 'lineHeight'), 10 ) ) );
+
+		};
+
+
+
+
+
+		///////////////////////////////////////////////////////////////////////////////////////////////////////////
+		//
+		//   UI Stuff
+		//
+
+
+		$scope.isSelected = function( language ) {
+			return $scope.selectedLanguages.indexOf( language ) > -1;
+		};
+
+
+
+		/**
+		* Returns true if a certain language has at least one translation
+		*/
+		$scope.hasTranslation = function( langId ) {
+			
+			if( !$scope.model[ langId ] ) {
+				return false;
+			}
+
+			var propertyCount = 0;
+			for( var i in $scope.model[ langId ] ) {
+				if( $scope.model[ langId ][ i ] ) {
+					propertyCount++;
+				}
+			}
+
+			return propertyCount > 0;
+
+		};
+
+
+
+		/**
+		* Watches $scope.tableName and $scope.fields. Calls getFieldDefinitions.
+		*/
+		self.setupFieldDefinitionWatcher = function() {
+
+			$scope.$watchGroup( [ 'tableName', 'fields' ], function() {
+				self.getFieldDefinitions();
+			} );
+
+		};
+
+
+		/** 
+		* Gets definitions for fields
+		*/
+		self.getFieldDefinitions = function() {
+
+			if( !$scope.fields || !$scope.tableName ) {
+				console.log( 'LocaleComponentController: fields or tableName not yet ready' );
+				return;
+			}
+
+			APIWrapperService.request( {
+				url				: '/' + $scope.tableName
+				, method		: 'OPTIONS'
+			} )
+			.then( function( data ) {
+				self.parseOptionData( data );
+			}, function( err ) {
+				console.error( 'LocaleComponentController: Could not get OPTION data for table %o: %o', $scope.tableName, err );
+			} );
+
+		};
+
+
+		/**
+		* Parses data gotten from OPTIONS call. Goes through OPTIONS data for every field and 
+		* sets fieldDefinitions accoringly.
+		*/
+		self.parseOptionData = function( data ) {
+
+			console.log( 'LocaleComponentController: Parse OPTIONS data %o', data );
+
+			// Reset fieldDefinitions
+			$scope.fieldDefinitions = [];
+
+			$scope.fields.forEach( function( field ) {
+
+				$scope.fieldDefinitions.push( {
+					name			: field
+					, required		: !data[ field ].nullable
+					, valid			: true
 				} );
 
 			} );
 
-			$scope.setValidity( { validity: valid } );
+		};
 
-		}, true );
-	};
 
 
 
+	} ] )
 
-	/**
-	* Checks if a certain field is valid. 
-	*/
-	self.isFieldValid = function( languageId, fieldName ) {
+	.run( function( $templateCache ) {
 
-		var requiredFields		= self.getRequiredFields()
-			, languageData		= $scope.model[ languageId ];
+		$templateCache.put( 'localeComponentTemplate.html',
+			'<div class=\'locale-component\'>' +
+				'<div data-language-menu-component data-selected-languages=\'selectedLanguages\' data-is-multi-select=\'true\' data-has-translation=\'hasTranslation(languageId)\'></div>' +
+				'<div class=\'locale-content clearfix\'>' +
+					'<div class=\'locale-col\' data-ng-repeat=\'lang in selectedLanguages\'>' +
+						'<p>{{ lang.code | uppercase }}</p>' +
+						'<div data-ng-repeat=\'fieldDefinition in fieldDefinitions\'>' +
 
-		// No value was set for the language: All it's fields are valid.
-		// Not an object: Invalid, don't care.
-		if( !languageData || !angular.isObject( languageData ) ) {
-			return true;
-		}
+							'<label data-ng-attr-for=\'locale-{{lang.id}}-{{fielDefinition.name}}\' data-ng-class=\'{ "invalid": !isFieldValid(lang.id, fieldDefinition.name)}\'>' + 
+								// Required asterisk
+								'<span data-translate=\'web.backoffice.{{entityName}}.{{fieldDefinition.name}}\' ></span> <span class=\'required-indicator\'data-ng-show=\'fieldDefinition.required\'>*</span>' +
+							'</label>' +
+							'<textarea data-ng-model=\'model[ lang.id ][ fieldDefinition.name ]\' data-ng-attr-id=\'locale-{{lang.id}}-{{fieldDefinition.name}}\' class=\'form-control\' data-ng-keyup=\'adjustHeight( $event )\' data-ng-focus=\'adjustHeight( $event )\' /></textarea>' +
 
-		// Field is not required.
-		if( requiredFields.indexOf( fieldName ) === -1 ) {
-			return true;
-		}
-
-		// Not valid: Data is set for this language (i.e. some keys exist)
-		// but current fieldName was not set. 
-		// ATTENTION: '' counts as a set value (empty string).
-		if( !languageData[ fieldName ] && languageData[ fieldName ] !== '' ) {
-			return false;
-		}
-
-		return true;
-
-	};
-
-
-
-	/**
-	* Checks if a certain field in a certain language is valid. Needed to 
-	* set .invalid class on the label.
-	*/
-	$scope.isFieldValid = function( languageId, fieldName ) {
-		return self.isFieldValid( languageId, fieldName );
-	};
-
-
-
-
-
-	/**
-	* Returns an array of the required fields
-	*/
-	self.getRequiredFields = function() {
-		var requiredFields = [];
-		$scope.fieldDefinitions.forEach( function( fieldDef ) {
-			if( fieldDef.required ) {
-				requiredFields.push( fieldDef.name );
-			}
-		} );
-		return requiredFields;
-	};
-
-
-
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////
-	//
-	//   HEIGHT
-	//
-
-
-	/**
-	* Adjusts height of textareas (functionality's very basic. very.)
-	*/
-	$scope.adjustHeight = function( ev ) {
-		self.adjustHeight( $( ev.currentTarget ) );
-	};
-
-
-	self.adjustHeightOfAllAreas = function() {
-		element.find( 'textarea' ).each( function() {
-			self.adjustHeight( $( this ) );
-		} );
-	};
-
-
-
-
-	self.adjustHeight = function( element ) {
-
-		var textarea = element;
-
-		var copy			= $( document.createElement( 'div' ) )
-			, properties	= [ 'font-size', 'font-family', 'font-weight', 'lineHeight', 'width', 'padding-top', 'padding-left', 'padding-right' ];
-
-		properties.forEach( function( prop ) {
-			copy.css( prop, textarea.css( prop ) );
-		} );
-
-		copy
-			.css( 'position', 'relative' )
-			.css( 'top', '-10000px' )
-			.text( textarea.val() )
-			.appendTo( 'body' );
-
-		var h = Math.min( copy.height(), 200 );
-
-		copy.remove();
-
-		// #TODO: Update height of all textareas to the highest one. 
-		textarea.height( Math.max( h, parseInt( textarea.css( 'lineHeight'), 10 ) ) );
-
-	};
-
-
-
-
-
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////
-	//
-	//   UI Stuff
-	//
-
-
-	$scope.isSelected = function( language ) {
-		return $scope.selectedLanguages.indexOf( language ) > -1;
-	};
-
-
-
-	/**
-	* Returns true if a certain language has at least one translation
-	*/
-	$scope.hasTranslation = function( langId ) {
-		
-		if( !$scope.model[ langId ] ) {
-			return false;
-		}
-
-		var propertyCount = 0;
-		for( var i in $scope.model[ langId ] ) {
-			if( $scope.model[ langId ][ i ] ) {
-				propertyCount++;
-			}
-		}
-
-		return propertyCount > 0;
-
-	};
-
-
-
-	/**
-	* Watches $scope.tableName and $scope.fields. Calls getFieldDefinitions.
-	*/
-	self.setupFieldDefinitionWatcher = function() {
-
-		$scope.$watchGroup( [ 'tableName', 'fields' ], function() {
-			self.getFieldDefinitions();
-		} );
-
-	};
-
-
-	/** 
-	* Gets definitions for fields
-	*/
-	self.getFieldDefinitions = function() {
-
-		if( !$scope.fields || !$scope.tableName ) {
-			console.log( 'LocaleComponentController: fields or tableName not yet ready' );
-			return;
-		}
-
-		APIWrapperService.request( {
-			url				: '/' + $scope.tableName
-			, method		: 'OPTIONS'
-		} )
-		.then( function( data ) {
-			self.parseOptionData( data );
-		}, function( err ) {
-			console.error( 'LocaleComponentController: Could not get OPTION data for table %o: %o', $scope.tableName, err );
-		} );
-
-	};
-
-
-	/**
-	* Parses data gotten from OPTIONS call. Goes through OPTIONS data for every field and 
-	* sets fieldDefinitions accoringly.
-	*/
-	self.parseOptionData = function( data ) {
-
-		console.log( 'LocaleComponentController: Parse OPTIONS data %o', data );
-
-		// Reset fieldDefinitions
-		$scope.fieldDefinitions = [];
-
-		$scope.fields.forEach( function( field ) {
-
-			$scope.fieldDefinitions.push( {
-				name			: field
-				, required		: !data[ field ].nullable
-				, valid			: true
-			} );
-
-		} );
-
-	};
-
-
-
-
-} ] )
-
-.run( function( $templateCache ) {
-
-	$templateCache.put( 'localeComponentTemplate.html',
-		'<div class=\'locale-component\'>' +
-			'<div data-language-menu-component data-selected-languages=\'selectedLanguages\' data-is-multi-select=\'true\' data-has-translation=\'hasTranslation(languageId)\'></div>' +
-			'<div class=\'locale-content clearfix\'>' +
-				'<div class=\'locale-col\' data-ng-repeat=\'lang in selectedLanguages\'>' +
-					'<p>{{ lang.code | uppercase }}</p>' +
-					'<div data-ng-repeat=\'fieldDefinition in fieldDefinitions\'>' +
-
-						'<label data-ng-attr-for=\'locale-{{lang.id}}-{{fielDefinition.name}}\' data-ng-class=\'{ "invalid": !isFieldValid(lang.id, fieldDefinition.name)}\'>' + 
-							// Required asterisk
-							'<span data-translate=\'web.backoffice.{{entityName}}.{{fieldDefinition.name}}\' ></span> <span class=\'required-indicator\'data-ng-show=\'fieldDefinition.required\'>*</span>' +
-						'</label>' +
-						'<textarea data-ng-model=\'model[ lang.id ][ fieldDefinition.name ]\' data-ng-attr-id=\'locale-{{lang.id}}-{{fieldDefinition.name}}\' class=\'form-control\' data-ng-keyup=\'adjustHeight( $event )\' data-ng-focus=\'adjustHeight( $event )\' /></textarea>' +
-
+						'</div>' +
 					'</div>' +
 				'</div>' +
-			'</div>' +
-		'</div>'
-	);
+			'</div>'
+		);
 
-} );
+	} );
+
+} )();
+
+
+
+( function() {
+
+	'use strict';
+
+	angular
+
+	.module( 'jb.backofficeShared', [] )
+
+	.directive( 'dragDropList', [ function() {
+
+		return {
+				link					: function( $scope, element, attrs, ctrl ) {
+						
+					var dragDropPlugin;
+
+
+
+					// Watch for additions to the DOM. On addition, re-initialize the drag and drop plugin. 
+					// Needed if we have e.g. a list that's populated through ng-repeat: it's filled
+					// with lis _after_ this function is invoked.
+					var observer = new MutationObserver( function( mutations ) {
+						
+						var elementsAdded = 0;
+						[].forEach.call( mutations, function( mutation ) {
+							if( mutation.addedNodes && mutation.addedNodes.length ) {
+								elementsAdded += mutation.addedNodes.length;
+							}
+						} );
+
+						if( elementsAdded > 0 ) {
+							dragDropPlugin.destroy();
+							dragDropPlugin = new DragDropList( element[ 0 ].querySelectorAll( '[draggable="true"]' ) );
+						}
+
+					} );
+
+					observer.observe( element[ 0 ], {
+						childList: true
+					} );
+
+					$scope.$on( '$destroy', function() {
+						observer.disconnect();
+					} );
+
+
+
+					// Initilaize drag and drop plugin
+					dragDropPlugin = new DragDropList( element[ 0 ].querySelectorAll( '[draggable="true"]' ) );
+
+
+
+				}
+				, scope: {
+				}
+			};
+
+
+	} ] );
+
+
+
+	var DragDropList;
+
+	// Hide stuff
+	( function() {
+	
+		var _elements
+			, _currentDragElement;
+
+
+		DragDropList = function( elements ) {
+
+			_elements = elements;
+
+			console.log( 'DragDropList: Initialize for elements %o', elements );
+
+			[].forEach.call( elements, function( element ) {
+			
+				element.setAttribute( 'draggable', true );
+				addHandlers( element );
+
+			} );
+
+		};
+
+		DragDropList.prototype.destroy = function() {
+
+			console.log( 'DragDropList: Destroy event handlers on %o elements', _elements.length );
+
+			[].forEach.call( _elements, function( element ) {
+				removeHandlers( element );
+			} );
+
+		};
+
+
+		function removeHandlers( element ) {
+			
+			element.removeEventListener( 'dragstart', dragStartHandler );
+		
+		}
+
+		function addHandlers( element ) {
+
+			element.addEventListener( 'dragstart', dragStartHandler );
+			element.addEventListener( 'dragenter', dragEnterHandler );
+			element.addEventListener( 'dragover', dragOverHandler );
+			element.addEventListener( 'dragleave', dragLeaveHandler );
+			element.addEventListener( 'drop', dropHandler );
+			element.addEventListener( 'dragend', dragEndHandler );
+
+		}
+
+		function dragStartHandler( ev ) {
+
+			// Use currentTarget instead of target: target my be a child element.
+			ev.currentTarget.style.opacity = '0.4';
+			_currentDragElement = ev.currentTarget;
+			ev.dataTransfer.effectAllowed = 'move';
+			ev.dataTransfer.setData( 'text/html', ev.currentTarget.outerHTML );
+
+		}
+
+
+		function dragEnterHandler( ev ) {
+			ev.target.classList.add( 'drag-over' );
+		}
+
+		function dragLeaveHandler( ev ) {
+			ev.target.classList.remove( 'drag-over' );
+		}
+
+
+		function dragOverHandler( ev ) {
+			
+			if ( ev.preventDefault ) {
+					ev.preventDefault();
+			}
+			ev.dataTransfer.dropEffect = 'move';
+			return false;
+
+		}
+
+
+		function dropHandler( ev ) {
+
+			if (ev.stopPropagation) {
+				ev.stopPropagation();
+			}
+
+			if ( _currentDragElement !== ev.currentTarget ) {
+
+				console.log( 'dragDropList: Drop: %o after %o', _currentDragElement, ev.currentTarget );
+				angular.element( ev.currentTarget ).after( _currentDragElement );
+			
+			}
+
+			return false;
+
+		}
+
+
+		function dragEndHandler( ev ) {
+
+			_currentDragElement.style.opacity = '1';
+			_currentDragElement = undefined;
+			// Make sure all .drag-over classes are removed
+			[].forEach.call( _elements, function( element ) {
+				element.classList.remove( 'drag-over' );
+			} );
+
+		}
+
+
+	} )();
+
+
+
+} )();
+
+
 /**
 * Displays a menu with the supported languages.
 *
@@ -4893,179 +5436,189 @@ angular
 *
 */
 
-angular
+( function() {
 
-.module( 'jb.backofficeShared', [] )
-
-.directive( 'languageMenuComponent', [ function() {
-
-	return {
-		require					: [ 'languageMenuComponent' ]
-		, controller			: 'LanguageMenuComponentController'
-		, controllerAs			: 'languageMenuComponent'
-		, bindToController		: true
-		, templateUrl			: 'languageMenuComponentTemplate.html'
-		, link					: function( scope, element, attrs, ctrl ) {
-			ctrl[ 0 ].init( element );
-		}
-		, scope: {
-			'selectedLanguages'	: '='
-			, 'isMultiSelect'	: '='
-			, 'hasTranslation'	: '&'
-		}
-	};
-
-} ] )
-
-.controller( 'LanguageMenuComponentController', [ 'SessionService', function( SessionService ) {
-
-	var self = this
-		, _element;
+	'use strict';
 
 
-	self.languages = [];
-	self.selectedLanguages = [];
+	angular
 
+	.module( 'jb.backofficeShared' )
 
-	self.init = function( el ) {
-		_element = el;
-		self.getLanguages();
-	};
+	.directive( 'languageMenuComponent', [ function() {
 
-
-
-	/**
-	* Click handler
-	*/
-	self.toggleLanguage = function( ev, lang ) {
-
-		if( ev && ev.originalEvent && ev.originalEvent instanceof Event ) {
-			ev.preventDefault();
-		}
-
-		// Only one language may be selected
-		if( !self.isMultiSelect ) {
-			self.selectedLanguages = [ lang ];
-			return;
-		}
-
-
-		// Don't untoggle last language
-		if( self.selectedLanguages.length === 1 && self.selectedLanguages[ 0 ].id === lang.id ) {
-			return;
-		}
-
-		// Add/remove language to self.selectedLanguages
-
-		// Is language already selected? Strangely we cannot use indexOf – language objects change somehow.
-		var isSelected = false;
-		self.selectedLanguages.some( function( item, index ) {
-			if( item.id === lang.id ) {
-				isSelected = index;
-				return true;
+		return {
+			require					: [ 'languageMenuComponent' ]
+			, controller			: 'LanguageMenuComponentController'
+			, controllerAs			: 'languageMenuComponent'
+			, bindToController		: true
+			, templateUrl			: 'languageMenuComponentTemplate.html'
+			, link					: function( scope, element, attrs, ctrl ) {
+				ctrl[ 0 ].init( element );
 			}
-		} );
-
-		if( isSelected !== false ) {
-			self.selectedLanguages.splice( isSelected, 1 );
-		}
-		else {
-			self.selectedLanguages.push( lang );
-		}
-
-	};
-
-
-
-
-	/**
-	* Returns true if language is selected. 
-	*/
-	self.isSelected = function( language ) {
-
-		var selected = false;
-		self.selectedLanguages.some( function( item ) {
-			if( language.id === item.id ) {
-				selected = true;
-				return true;
+			, scope: {
+				'selectedLanguages'	: '='
+				, 'isMultiSelect'	: '='
+				, 'hasTranslation'	: '&'
 			}
-		} );
+		};
 
-		return selected;
+	} ] )
 
-	};
+	.controller( 'LanguageMenuComponentController', [ 'SessionService', function( SessionService ) {
+
+		var self = this
+			, _element;
+
+
+		self.languages = [];
+		self.selectedLanguages = [];
+
+
+		self.init = function( el ) {
+			_element = el;
+			self.getLanguages();
+		};
 
 
 
-	/**
-	* Returns the languages that the current website supports. 
-	* They need to be stored (on login) in localStorage in the form of
-	* [ {
-	*		id: 2
-	*		, code: 'it'
-	*		, name: 'Italian'
-	* } ]
-	*/
-	self.getLanguages = function() {
+		/**
+		* Click handler
+		*/
+		self.toggleLanguage = function( ev, lang ) {
 
-		var languages = SessionService.get( 'supported-languages', 'local' );
+			if( ev && ev.originalEvent && ev.originalEvent instanceof Event ) {
+				ev.preventDefault();
+			}
 
-		if( !languages ) {
-			console.error( 'LanguageMenuComponentController: supported-languages cannot be retrieved from Session' );
-			return;
-		}
+			// Only one language may be selected
+			if( !self.isMultiSelect ) {
+				self.selectedLanguages = [ lang ];
+				return;
+			}
 
-		languages.forEach( function( language ) {
 
-			self.languages.push( {
-				id			: language.language.id
-				, code		: language.language.code
+			// Don't untoggle last language
+			if( self.selectedLanguages.length === 1 && self.selectedLanguages[ 0 ].id === lang.id ) {
+				return;
+			}
+
+			// Add/remove language to self.selectedLanguages
+
+			// Is language already selected? Strangely we cannot use indexOf – language objects change somehow.
+			var isSelected = false;
+			self.selectedLanguages.some( function( item, index ) {
+				if( item.id === lang.id ) {
+					isSelected = index;
+					return true;
+				}
 			} );
 
-			// Select first language
-			if( self.selectedLanguages.length === 0 ) {
-				self.toggleLanguage( null, self.languages[ 0 ] );
+			if( isSelected !== false ) {
+				self.selectedLanguages.splice( isSelected, 1 );
+			}
+			else {
+				self.selectedLanguages.push( lang );
 			}
 
-			console.log( 'LanguageMenuComponentController: supported languages are %o, selected is %o', self.languages, self.selectedLanguages );
-
-		} );
-
-	};
+		};
 
 
 
 
-	self.checkForTranslation = function( languageId ) {
+		/**
+		* Returns true if language is selected. 
+		*/
+		self.isSelected = function( language ) {
 
-		if( !self.hasTranslation || !angular.isFunction( self.hasTranslation ) ) {
-			console.warn( 'LanguageMenuComponentController: No hasTranslation function was passed' );
-		}
+			var selected = false;
+			self.selectedLanguages.some( function( item ) {
+				if( language.id === item.id ) {
+					selected = true;
+					return true;
+				}
+			} );
 
-		return self.hasTranslation( { 'languageId': languageId } );
+			return selected;
+
+		};
+
+
+
+		/**
+		* Returns the languages that the current website supports. 
+		* They need to be stored (on login) in localStorage in the form of
+		* [ {
+		*		id: 2
+		*		, code: 'it'
+		*		, name: 'Italian'
+		* } ]
+		*/
+		self.getLanguages = function() {
+
+			var languages = SessionService.get( 'supported-languages', 'local' );
+
+			if( !languages ) {
+				console.error( 'LanguageMenuComponentController: supported-languages cannot be retrieved from Session' );
+				return;
+			}
+
+			languages.forEach( function( language ) {
+
+				self.languages.push( {
+					id			: language.language.id
+					, code		: language.language.code
+				} );
+
+				// Select first language
+				if( self.selectedLanguages.length === 0 ) {
+					self.toggleLanguage( null, self.languages[ 0 ] );
+				}
+
+				console.log( 'LanguageMenuComponentController: supported languages are %o, selected is %o', self.languages, self.selectedLanguages );
+
+			} );
+
+		};
+
+
+
+
+		self.checkForTranslation = function( languageId ) {
+
+			if( !self.hasTranslation || !angular.isFunction( self.hasTranslation ) ) {
+				console.warn( 'LanguageMenuComponentController: No hasTranslation function was passed' );
+			}
+
+			return self.hasTranslation( { 'languageId': languageId } );
+		
+		};
+
+
+
+
+	} ] )
+
+	.run( [ '$templateCache', function( $templateCache ) {
+
+		$templateCache.put( 'languageMenuComponentTemplate.html',
+			'<ul class=\'nav nav-tabs\'>' +
+				'<li data-ng-repeat=\'lang in languageMenuComponent.languages\' data-ng-class=\'{active:languageMenuComponent.isSelected(lang)}\'>' +
+					'<a href=\'#\' data-ng-click=\'languageMenuComponent.toggleLanguage( $event, lang )\'>' +
+						'{{lang.code|uppercase}}' +
+						'<span data-ng-if=\'languageMenuComponent.checkForTranslation(lang.id)\' class=\'fa fa-check\'></span>' +
+					'</a>' +
+				'</li>' +
+			'</ul>'
+		);
+
+
+	} ] );
 	
-	};
+
+} )();
 
 
-
-
-} ] )
-
-.run( [ '$templateCache', function( $templateCache ) {
-
-	$templateCache.put( 'languageMenuComponentTemplate.html',
-		'<ul class=\'nav nav-tabs\'>' +
-			'<li data-ng-repeat=\'lang in languageMenuComponent.languages\' data-ng-class=\'{active:languageMenuComponent.isSelected(lang)}\'>' +
-				'<a href=\'#\' data-ng-click=\'languageMenuComponent.toggleLanguage( $event, lang )\'>' +
-					'{{lang.code|uppercase}}' +
-					'<span data-ng-if=\'languageMenuComponent.checkForTranslation(lang.id)\' class=\'fa fa-check\'></span>' +
-				'</a>' +
-			'</li>' +
-		'</ul>'
-	);
-
-
-} ] );
 /*https://raw.githubusercontent.com/dbushell/Nestable/master/jquery.nestable.js*/
 /*!
  * Nestable jQuery Plugin - Copyright (c) 2012 David Bushell - http://dbushell.com/

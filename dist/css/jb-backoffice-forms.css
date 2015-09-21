@@ -121,6 +121,56 @@
   margin-left: -13px;
 }
 
+.backoffice-media-group-component {
+  background-color: white;
+  border-radius: 4px;
+  /** relation-input */
+}
+.backoffice-media-group-component ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.backoffice-media-group-component ol li {
+  padding: 10px;
+  margin: 0;
+  display: block;
+  float: left;
+}
+.backoffice-media-group-component ol li.drag-over {
+  border-right: 3px dotted gray;
+}
+.backoffice-media-group-component ol li div {
+  /*pointer-events: none;*/
+  position: relative;
+}
+.backoffice-media-group-component ol li div button {
+  border: 0;
+  background-color: #d9534f;
+  color: white;
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  font-size: 0.7rem;
+  display: none;
+}
+.backoffice-media-group-component ol li div:hover button {
+  display: block;
+}
+.backoffice-media-group-component ol li div img {
+  max-height: 100px;
+  display: block;
+  height: auto;
+  width: auto;
+}
+.backoffice-media-group-component .relation-select img {
+  max-width: 200px;
+  max-height: 50px;
+}
+.backoffice-media-group-component .relation-select .selected-entities ul {
+  display: none;
+}
+
 .locale-component .nav li {
   margin-right: 10px;
 }

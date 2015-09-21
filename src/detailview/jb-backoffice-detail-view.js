@@ -327,7 +327,7 @@ angular
 
 		// Store number of auto form elements
 		// [data-backoffice-component]: Individual components that get and store data.
-		var autoFormElements		= element.find( '[data-auto-form-element], [data-hidden-input], [data-backoffice-tree-component], [data-backoffice-relation-component], [data-backoffice-component], [data-backoffice-image-component], [data-backoffice-image-detail-component], [data-backoffice-video-component], [data-backoffice-date-component]' );
+		var autoFormElements		= element.find( '[data-auto-form-element], [data-hidden-input], [data-backoffice-tree-component], [data-backoffice-relation-component], [data-backoffice-component], [data-backoffice-image-component], [data-backoffice-image-detail-component], [data-backoffice-video-component], [data-backoffice-date-component], [data-backoffice-media-group-component]' );
 
 		// If element has a parent [data-detail-view] that is different from the current detailView, don't count elements. 
 		// This may happen if we have nested detailViews.
@@ -1214,6 +1214,22 @@ angular
 
 	/**
 	* Goes through all inputs, collects their save calls (by calling getSaveCalls)
+	*
+	* getSaveCalls() may return: 
+	* - false (no call to be made)
+	* - an array of objects or single object, where each object has the following properties
+	*     - url (mandatory): URL to be called as 
+	*           - a <String>: If prefixed with a /, will be an absolute path, else relative to the 
+	*             current entity
+	*           - an <Object> with the properties
+	*                   - path <String>: path
+	*                   - baseEntity <String> 'append|prepend' Whether and where to append
+	*                     the current entity plus its ID. If not set or another value, 
+	*                     current entity is not used at all.
+	*     - method (mandatory, <String>): method to be used (GET,PATCH,POST)
+	*     - headers (optional, <Object>): an object of headers, e.g. { range: '0-10' }
+	*     - data (optional <Object>): data to be sent with a POST or PATCH request
+	* - a Promise
 	*/
 	self.generateSaveCalls = function() {
 

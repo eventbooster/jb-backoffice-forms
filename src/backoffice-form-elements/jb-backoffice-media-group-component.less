@@ -1,0 +1,86 @@
+@import "../../bower_components/bootstrap/less/variables.less";
+
+.backoffice-media-group-component {
+	
+
+	background-color: white;
+	border-radius: @border-radius-base;
+
+	ol {
+
+		list-style: none;
+		padding: 0;
+		margin: 0;
+
+		li {
+
+			padding: 10px;
+			margin: 0;
+			display: block;
+			float: left;
+
+			&.drag-over {
+				border-right: 3px dotted gray;
+			}
+
+
+			div {
+
+				/*pointer-events: none;*/
+				position: relative;
+
+				button {
+					border: 0;
+					background-color: @brand-danger;
+					color: white;
+					position: absolute;
+					right: 10px;
+					top: 10px;
+					font-size: 0.7rem;
+					display: none;
+
+				}
+
+				&:hover button {
+					display: block;
+				}
+
+
+				img {
+
+					max-height: 100px;
+					display:block;
+					height: auto;
+					width: auto;
+
+				}
+
+
+			}
+
+
+
+		}
+
+
+	}
+
+
+	/** relation-input */
+	.relation-select {
+
+		img {
+			max-width: 200px;
+			max-height: 50px;
+		}
+
+		.selected-entities ul {
+			display: none;
+		}
+
+	}
+
+
+
+
+}
