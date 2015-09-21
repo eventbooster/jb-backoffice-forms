@@ -545,6 +545,7 @@ angular
 						ret[ n ] = {
 							type				: 'language'
 							, tableName			: singleFieldData[ n ].table.name
+							, relation			: singleFieldData[ n ].name // Needed if we have a dropdown (relation-input) of type language! See e.g. eb movieType that has a language associated to it.
 						};
 					}
 
@@ -984,12 +985,23 @@ angular
 		// /entityName/entityId must be covered in case of redirects. Subsequent calls
 		// to releations must be made to the new entityId. 
 		for( var i = 0; i < calls.length; i++ ) {
-			if( !calls[ i ].url || calls[ i ].url.indexOf( '/' + self.getEntityName() ) === 0 ) {
+
+			// If url is an object it should never be a call to the mainEnity (as mainEntity: append or prepend will be
+			// used and therefore a relation be created.
+			if( 
+				!angular.isObject( calls[ i ].url ) && 
+				( 
+					!calls[ i ].url || 
+					calls[ i ].url.indexOf( '/' + self.getEntityName() ) === 0 
+				) 
+			) {
 				mainCall = calls[ i ];
 			}
+
 			else {
 				relationCalls.push( calls[ i ] );
 			}
+
 		}
 	
 		// entityId not yet set: New element – but has no fields or no required fields, 
@@ -1168,10 +1180,63 @@ angular
 		// - Take current url + url, if it's relative (doesn't start with a /)
 		// - Take url if it's absolute (starts with a /)
 		var url;
-		if( call.url && call.url.indexOf( '/' ) === 0 ) {
-			url = call.url;
+
+
+		//
+		// Generate final URL 
+		//
+
+
+		// Object
+
+		if( angular.isObject( call.url ) ) {
+
+			// url.path missing – needs to be set if url is an object
+			if( !call.url.path ) {
+				console.error( 'DetailViewController: url property is missing on path on %o', call );
+				return $q.reject( 'Got invalid call data, path property missing on url for ' + JSON.stringify( call ) );
+			}
+
+			// entityName/entityId or entityName
+			var mainEntityUrl = self.getEntityId() ? 
+				self.getEntityName() + '/' + self.getEntityId() : 
+				self.getEntityName();
+
+			// Remove trailing and leading slashes
+			var path = call.url.path.replace( /^\/*/, '' ).replace( /\/*$/, '' );
+
+			if( call.url.mainEntity === 'prepend' ) {
+
+				url = '/' + mainEntityUrl + '/' + path;
+
+			}
+			else if( call.url.mainEntity === 'append' ) {
+
+				url = '/' + path + '/' + mainEntityUrl;
+
+			}
+
+			else {
+				url = call.url.path;
+			}
+
 		}
+
+
+
+		// URL starts with /
+
+		else if( call.url && call.url.indexOf( '/' ) === 0 ) {
+
+			url = call.url;
+
+		}
+
+
+		// Relative URL
+
 		else {
+
 			url = '/' + self.getEntityName();
 
 			// Only use entity's ID if it exists (i.e. we're not newly creating an entity)

@@ -28,7 +28,11 @@ var AutoTextInputController = function( $scope, $attrs ) {
 		if( this.$scope.optionData.required && !this.$scope.data.value ) {
 			return false;
 		}
-		return true;		
+		return true;
+	}.bind( this );
+
+	$scope.isRequired = function() {
+		return this.$scope.optionData.required;
 	}.bind( this );
 
 	//this._validateInput();
@@ -107,7 +111,7 @@ angular
 
 	$templateCache.put( 'autoTextInputTemplate.html',
 		'<div class=\'form-group form-group-sm\'>' +
-			'<label data-backoffice-label data-label-identifier=\'{{data.name}}\' data-is-valid=\'isValid()\'></label>' +
+			'<label data-backoffice-label data-label-identifier=\'{{data.name}}\' data-is-valid=\'isValid()\' data-is-required=\'isRequired()\'></label>' +
 			'<div class=\'col-md-9\'>' +
 				'<input type=\'text\' data-ng-attr-id=\'{{ entityName }}-{{ data.name }}-label\' class=\'form-control input-sm\' data-ng-attrs-required=\'isRequired()\' data-ng-model=\'data.value\'/>' +
 			'</div>' +
