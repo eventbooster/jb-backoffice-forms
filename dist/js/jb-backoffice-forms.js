@@ -703,7 +703,11 @@ var AutoTextInputController = function( $scope, $attrs ) {
 		if( this.$scope.optionData.required && !this.$scope.data.value ) {
 			return false;
 		}
-		return true;		
+		return true;
+	}.bind( this );
+
+	$scope.isRequired = function() {
+		return this.$scope.optionData.required;
 	}.bind( this );
 
 	//this._validateInput();
@@ -782,7 +786,7 @@ angular
 
 	$templateCache.put( 'autoTextInputTemplate.html',
 		'<div class=\'form-group form-group-sm\'>' +
-			'<label data-backoffice-label data-label-identifier=\'{{data.name}}\' data-is-valid=\'isValid()\'></label>' +
+			'<label data-backoffice-label data-label-identifier=\'{{data.name}}\' data-is-valid=\'isValid()\' data-is-required=\'isRequired()\'></label>' +
 			'<div class=\'col-md-9\'>' +
 				'<input type=\'text\' data-ng-attr-id=\'{{ entityName }}-{{ data.name }}-label\' class=\'form-control input-sm\' data-ng-attrs-required=\'isRequired()\' data-ng-model=\'data.value\'/>' +
 			'</div>' +
@@ -2335,8 +2339,11 @@ angular
 				return {
 					// self.propertyName must be first (before _detailViewController.getEntityName()) as the server handles stuff the same way – 
 					// and ESPECIALLY for entities with an alias.
-					url			: '/' + self.propertyName + '/' + _originalData[ 0 ].id + '/' + _detailViewController.getEntityName() + '/' + _detailViewController.getEntityId()
-					, method	: 'DELETE'
+					url					: { 
+						path			: '/' + self.propertyName + '/' + _originalData[ 0 ].id
+						, mainEntity	: 'append'
+					}
+					, method			: 'DELETE'
 				};
 			}
 
@@ -2353,8 +2360,11 @@ angular
 					// Post to /mainEntity/currentId/entityName/entityId, path needs to be entityName/entityId, 
 					// is automatically prefixed by DetailViewController 
 					return {
-						url			:  '/' + self.propertyName + '/' + self.relationModel[ 0 ].id + '/' + _detailViewController.getEntityName() + '/' + _detailViewController.getEntityId()
-						, method	: 'POST'
+						url					:  {
+							path			:'/' + self.propertyName + '/' + self.relationModel[ 0 ].id
+							, mainEntity	: 'append'
+						}
+						, method			: 'POST'
 					};
 			
 				}
@@ -2400,8 +2410,11 @@ angular
 				if( newIds.indexOf( item ) === -1 ) {
 					deleted.push( item );
 					calls.push( {
-						method			: 'DELETE'
-						, url			: '/' + self.propertyName + '/' + item + '/' + _detailViewController.getEntityName() + '/' + _detailViewController.getEntityId()
+						method				: 'DELETE'
+						, url				: {
+							path			: self.propertyName + '/' + item
+							, mainEntity	: 'append'
+						}
 					} );
 				}
 			}.bind( this ) );
@@ -2411,8 +2424,11 @@ angular
 				if( originalIds.indexOf( item ) === -1 ) {
 					added.push( item );
 					calls.push( {
-						method		: 'POST'
-						, url		: '/' + self.propertyName + '/' + item + '/' + _detailViewController.getEntityName() + '/' + _detailViewController.getEntityId()
+						method				: 'POST'
+						, url				: {
+							path			: '/' + self.propertyName + '/' + item
+							, mainEntity	: 'append'
+						}
 					} );
 				}
 			}.bind( this ) );
@@ -3512,6 +3528,7 @@ angular
 						ret[ n ] = {
 							type				: 'language'
 							, tableName			: singleFieldData[ n ].table.name
+							, relation			: singleFieldData[ n ].name // Needed if we have a dropdown (relation-input) of type language! See e.g. eb movieType that has a language associated to it.
 						};
 					}
 
@@ -3951,12 +3968,23 @@ angular
 		// /entityName/entityId must be covered in case of redirects. Subsequent calls
 		// to releations must be made to the new entityId. 
 		for( var i = 0; i < calls.length; i++ ) {
-			if( !calls[ i ].url || calls[ i ].url.indexOf( '/' + self.getEntityName() ) === 0 ) {
+
+			// If url is an object it should never be a call to the mainEnity (as mainEntity: append or prepend will be
+			// used and therefore a relation be created.
+			if( 
+				!angular.isObject( calls[ i ].url ) && 
+				( 
+					!calls[ i ].url || 
+					calls[ i ].url.indexOf( '/' + self.getEntityName() ) === 0 
+				) 
+			) {
 				mainCall = calls[ i ];
 			}
+
 			else {
 				relationCalls.push( calls[ i ] );
 			}
+
 		}
 	
 		// entityId not yet set: New element – but has no fields or no required fields, 
@@ -4134,10 +4162,63 @@ angular
 		// - Take current url + url, if it's relative (doesn't start with a /)
 		// - Take url if it's absolute (starts with a /)
 		var url;
-		if( call.url && call.url.indexOf( '/' ) === 0 ) {
-			url = call.url;
+
+
+		//
+		// Generate final URL 
+		//
+
+
+		// Object
+
+		if( angular.isObject( call.url ) ) {
+
+			// url.path missing – needs to be set if url is an object
+			if( !call.url.path ) {
+				console.error( 'DetailViewController: url property is missing on path on %o', call );
+				return $q.reject( 'Got invalid call data, path property missing on url for ' + JSON.stringify( call ) );
+			}
+
+			// entityName/entityId or entityName
+			var mainEntityUrl = self.getEntityId() ? 
+				self.getEntityName() + '/' + self.getEntityId() : 
+				self.getEntityName();
+
+			// Remove trailing and leading slashes
+			var path = call.url.path.replace( /^\/*/, '' ).replace( /\/*$/, '' );
+
+			if( call.url.mainEntity === 'prepend' ) {
+
+				url = '/' + mainEntityUrl + '/' + path;
+
+			}
+			else if( call.url.mainEntity === 'append' ) {
+
+				url = '/' + path + '/' + mainEntityUrl;
+
+			}
+
+			else {
+				url = call.url.path;
+			}
+
 		}
+
+
+
+		// URL starts with /
+
+		else if( call.url && call.url.indexOf( '/' ) === 0 ) {
+
+			url = call.url;
+
+		}
+
+
+		// Relative URL
+
 		else {
+
 			url = '/' + self.getEntityName();
 
 			// Only use entity's ID if it exists (i.e. we're not newly creating an entity)

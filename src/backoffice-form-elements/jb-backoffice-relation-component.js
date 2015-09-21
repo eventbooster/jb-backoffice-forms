@@ -278,8 +278,11 @@
 				return {
 					// self.propertyName must be first (before _detailViewController.getEntityName()) as the server handles stuff the same way – 
 					// and ESPECIALLY for entities with an alias.
-					url			: '/' + self.propertyName + '/' + _originalData[ 0 ].id + '/' + _detailViewController.getEntityName() + '/' + _detailViewController.getEntityId()
-					, method	: 'DELETE'
+					url					: { 
+						path			: '/' + self.propertyName + '/' + _originalData[ 0 ].id
+						, mainEntity	: 'append'
+					}
+					, method			: 'DELETE'
 				};
 			}
 
@@ -296,8 +299,11 @@
 					// Post to /mainEntity/currentId/entityName/entityId, path needs to be entityName/entityId, 
 					// is automatically prefixed by DetailViewController 
 					return {
-						url			:  '/' + self.propertyName + '/' + self.relationModel[ 0 ].id + '/' + _detailViewController.getEntityName() + '/' + _detailViewController.getEntityId()
-						, method	: 'POST'
+						url					:  {
+							path			:'/' + self.propertyName + '/' + self.relationModel[ 0 ].id
+							, mainEntity	: 'append'
+						}
+						, method			: 'POST'
 					};
 			
 				}
@@ -343,8 +349,11 @@
 				if( newIds.indexOf( item ) === -1 ) {
 					deleted.push( item );
 					calls.push( {
-						method			: 'DELETE'
-						, url			: '/' + self.propertyName + '/' + item + '/' + _detailViewController.getEntityName() + '/' + _detailViewController.getEntityId()
+						method				: 'DELETE'
+						, url				: {
+							path			: self.propertyName + '/' + item
+							, mainEntity	: 'append'
+						}
 					} );
 				}
 			}.bind( this ) );
@@ -354,8 +363,11 @@
 				if( originalIds.indexOf( item ) === -1 ) {
 					added.push( item );
 					calls.push( {
-						method		: 'POST'
-						, url		: '/' + self.propertyName + '/' + item + '/' + _detailViewController.getEntityName() + '/' + _detailViewController.getEntityId()
+						method				: 'POST'
+						, url				: {
+							path			: '/' + self.propertyName + '/' + item
+							, mainEntity	: 'append'
+						}
 					} );
 				}
 			}.bind( this ) );
