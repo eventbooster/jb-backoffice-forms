@@ -513,6 +513,8 @@ angular
 					if( singleFieldData[ j ].name === 'image' ) {
 						ret[ j ] = {
 							type				: 'image'
+							, relationType		: 'single'
+							, relationKey		: singleFieldData[ j ].key
 						};
 					}
 
@@ -559,7 +561,9 @@ angular
 					else if( singleFieldData[ n ].name === 'image' ) {
 						ret[ n ] = {
 							type				: 'image'
-							, tableName			: singleFieldData[ n ].table.name
+							//, tableName			: singleFieldData[ n ].table.name
+							, relationType		: 'multiple'
+							, relationKey		: singleFieldData[ n ].key
 						};
 					}
 
@@ -931,9 +935,10 @@ angular
 			// Save stuff on current entity
 			.then( function() {
 				return self.makeMainSaveCall();
-			}, function( err ) {
-				return $q.reject( err );
-			} );
+			} )
+			.then( function() {
+				return self.executePostSaveTasks();
+			});
 
 	};
 
@@ -963,6 +968,36 @@ angular
 		return $q.all( tasks );
 
 	};
+
+
+
+
+
+
+	/**
+	* Executes save tasks that must be executed after the main entity was created, 
+	* e.g. save the order of images in a mediaGroup: 
+	* 1. Save main entity (done through regular save call)
+	* 2. Update media links (/mediumGroup/id/medium/id) (done through regular save call)
+	* 3. Update order (GET all media from /mediumGroup, then set order on every single relation)
+	*/
+	self.executePostSaveTasks = function() {
+
+		var tasks = [];
+
+		self.registeredComponents.forEach( function( component ) {
+			if( component.afterSaveTasks && angular.isFunction( component.afterSaveTasks ) ) {
+				tasks.push( component.afterSaveTasks() );
+			}
+		} );
+
+		console.log( 'DetailView: executePostSaveTasks has %o tasks', tasks.length );
+
+		return $q.all( tasks );
+
+	};
+
+
 
 
 

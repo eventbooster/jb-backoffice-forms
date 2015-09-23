@@ -1025,6 +1025,7 @@ angular
 			, _detailViewController
 
 			, _relationKey
+			, _singleRelation
 
 			, _originalData;
 
@@ -1037,6 +1038,28 @@ angular
 
 			_detailViewController.registerOptionsDataHandler( self.updateOptionsData );
 			_detailViewController.registerGetDataHandler( self.updateData );
+
+			self.ensureSingleImageRelation();
+
+		};
+
+
+
+		/**
+		* Make sure only one image can be dropped on a _singleRelation relation
+		*/
+		self.ensureSingleImageRelation = function() {
+
+			$scope.$watchCollection( function() {
+				return self.images;
+			}, function(  ) {
+
+				if( _singleRelation && self.images.length > 1 ) {
+					// Take last image in array (push is used to add an image)
+					self.images.splice( 0, self.images.length - 1 );
+				}
+
+			} );
 
 		};
 
@@ -1128,8 +1151,11 @@ angular
 			// Store relation key (e.g. id_image).
 			if( data[ self.propertyName ].relationKey ) {
 				_relationKey = data[ self.propertyName ].relationKey;
+				_singleRelation = true;
 			}
-
+			else {
+				_singleRelation = false;
+			}
 
 			_detailViewController.register( self );
 
@@ -1154,7 +1180,7 @@ angular
 		self.getSaveCalls = function() {
 
 			// Store a signle relation (pretty easy)
-			if( _relationKey ) {
+			if( _singleRelation ) {
 
 				return _saveSingleRelation();
 
@@ -1172,6 +1198,7 @@ angular
 
 
 		function _saveSingleRelation() {
+
 
 			// Removed
 			if( _originalData && _originalData.length && ( !self.images || !self.images.length ) ) {
@@ -1336,6 +1363,7 @@ angular
 				var index = self.images.indexOf( image );
 
 				var newFileObject = _reformatImageObject( data );
+
 				self.images.splice( index, 1, newFileObject );
 
 				console.log( 'BackofficeImageComponentController: Image uploaded, replace %o with %o', self.images[ index ], newFileObject );
@@ -1424,7 +1452,7 @@ angular
 				'<label data-backoffice-label data-label-identifier=\'{{backofficeImageComponent.propertyName}}\' data-is-required=\'false\' data-is-valid=\'true\'></label>' +
 				'<div class=\'col-md-9 backoffice-image-component\' >' +
 					'<div data-file-drop-component data-supported-file-types=\'["image/jpeg"]\' data-model=\'backofficeImageComponent.images\' data-error-handler=\'backofficeImageComponent.handleDropError(error)\'>' +
-						'<ol data-sortable-list-component class=\'clearfix\'>' +
+						'<ol class=\'clearfix\'>' +
 							'<li data-ng-repeat=\'image in backofficeImageComponent.images\'>' +
 								'<a href=\'#\' data-ng-click=\'backofficeImageComponent.openDetailView( $event, image )\'>' +
 									// #Todo: Use smaller file
@@ -1789,7 +1817,7 @@ angular
 
 			, _originalData
 
-			, _selectFields = [ '*', 'video.*', 'video.videoType.*', 'image.*', 'mediumGroup_medium.*' ];
+			, _selectFields = [ '*', 'video.*', 'video.videoType.*', 'image.*', 'mediumGroup_medium.*', 'mediumGroup.*' ];
 
 
 		self.media = [];
@@ -1803,6 +1831,7 @@ angular
 		self.addMediumModel = [];
 
 
+
 		self.init = function( el, detailViewCtrl ) {
 
 			_element = el;
@@ -1813,8 +1842,28 @@ angular
 
 			self.setupAddMediumModelWatcher();
 
+			self.setupOrderChangeListener();
+
 		};
 
+
+		/**
+		* Sort media by their sortOrder (stored on mediumGroup_medium[0].sortOrder)
+		* Modifies self.media.
+		*/
+		self.sortMedia = function() {
+
+			self.media.sort( function( a, b ) {
+
+				var aOrder 		= a.mediumGroup_medium[ 0 ].sortOrder
+					, bOrder 	= b.mediumGroup_medium[ 0 ].sortOrder;
+
+				return aOrder < bOrder ? -1 : 1;
+
+			} );
+
+
+		};
 
 
 
@@ -1826,9 +1875,29 @@ angular
 			if( data[ self.propertyName ] ) {
 
 				self.media 		= data[ self.propertyName ];
+				self.sortMedia();
 				_originalData 	= angular.copy( self.media );
 
 			}
+
+		};
+
+
+
+
+		/**
+		* Listen to orderChange events that are fired on the lis through the drag-droplist directive, 
+		* update array/model accordingly.
+		*/
+		self.setupOrderChangeListener = function() {
+
+			// Called whenever drag-drop-list directive causes the order to change. 
+			// Re-order the media array.
+			_element[ 0 ].addEventListener( 'orderChange', function( ev ) {
+
+				self.media.splice( ev.detail.newOrder, 0, self.media.splice( ev.detail.oldOrder, 1 )[ 0 ] );
+
+			} );
 
 		};
 
@@ -1936,6 +2005,8 @@ angular
 		*/
 		self.getSaveCalls = function() {
 
+
+
 			// Get IDs of entities _before_ anything was edited and curent state.
 			var oldIds = _originalData.map( function( item ) {
 					return item.id;
@@ -1943,6 +2014,8 @@ angular
 			, newIds = self.media.map( function( item ) {
 					return item.id;
 				} );
+
+
 
 			// Get deleted and created medium relations
 			var created = []
@@ -1982,13 +2055,58 @@ angular
 			} );
 
 
-			// 3. Save order
-
-
-
 			return calls;
 
 		};
+
+
+
+
+		/**
+		* Returns highest sortOrder on current media. 
+		*/
+		function getHighestSortOrder() {
+
+			var highestSortOrder = -1;
+			self.media.forEach( function( medium ) {
+
+				if( medium.mediumGroup_medium && medium.mediumGroup_medium.length ) {
+					highestSortOrder = Math.max( highestSortOrder, medium.mediumGroup_medium[ 0 ].sortOrder );
+				}
+
+			} );
+
+			return highestSortOrder;
+
+		}
+
+
+
+		/**
+		* Store order. All media must first have been saved (getSaveCalls was called earlier)
+		*/
+		self.afterSaveTasks = function() {
+
+			var highestSortOrder 	= getHighestSortOrder()
+				, calls 			= [];
+
+			// Update orders
+			self.media.forEach( function( medium ) {
+
+				calls.push( APIWrapperService.request( {
+					url				: '/mediumGroup/' + _detailViewController.getEntityId() + '/medium/' + medium.id
+					, method		: 'PATCH'
+					, data			: {
+						sortOrder	: ++highestSortOrder
+					}
+				} ) );
+				
+			} );
+
+			return $q.all( calls );
+
+		};
+
 
 
 
@@ -3499,6 +3617,8 @@ angular
 					if( singleFieldData[ j ].name === 'image' ) {
 						ret[ j ] = {
 							type				: 'image'
+							, relationType		: 'single'
+							, relationKey		: singleFieldData[ j ].key
 						};
 					}
 
@@ -3545,7 +3665,9 @@ angular
 					else if( singleFieldData[ n ].name === 'image' ) {
 						ret[ n ] = {
 							type				: 'image'
-							, tableName			: singleFieldData[ n ].table.name
+							//, tableName			: singleFieldData[ n ].table.name
+							, relationType		: 'multiple'
+							, relationKey		: singleFieldData[ n ].key
 						};
 					}
 
@@ -3917,9 +4039,10 @@ angular
 			// Save stuff on current entity
 			.then( function() {
 				return self.makeMainSaveCall();
-			}, function( err ) {
-				return $q.reject( err );
-			} );
+			} )
+			.then( function() {
+				return self.executePostSaveTasks();
+			});
 
 	};
 
@@ -3949,6 +4072,36 @@ angular
 		return $q.all( tasks );
 
 	};
+
+
+
+
+
+
+	/**
+	* Executes save tasks that must be executed after the main entity was created, 
+	* e.g. save the order of images in a mediaGroup: 
+	* 1. Save main entity (done through regular save call)
+	* 2. Update media links (/mediumGroup/id/medium/id) (done through regular save call)
+	* 3. Update order (GET all media from /mediumGroup, then set order on every single relation)
+	*/
+	self.executePostSaveTasks = function() {
+
+		var tasks = [];
+
+		self.registeredComponents.forEach( function( component ) {
+			if( component.afterSaveTasks && angular.isFunction( component.afterSaveTasks ) ) {
+				tasks.push( component.afterSaveTasks() );
+			}
+		} );
+
+		console.log( 'DetailView: executePostSaveTasks has %o tasks', tasks.length );
+
+		return $q.all( tasks );
+
+	};
+
+
 
 
 
@@ -4777,9 +4930,9 @@ angular
 		ev.preventDefault();
 		// Doesn't work yet. Probably needs a shared scope as we're 
 		// using it in nested directives.
-		$scope.$apply( function() {
+		/*$scope.$apply( function() {
 			self.state = 'hover';
-		} );
+		} );*/
 		ev.originalEvent.dataTransfer.effectAllowed = 'copy';
 		return false;
 	}
@@ -4794,9 +4947,9 @@ angular
 
 
 	function _dragLeaveHandler( ev ) {
-		$scope.$apply( function() {
+		/*$scope.$apply( function() {
 			self.state = undefined;
-		} );
+		} );*/
 	}
 
 
@@ -4911,6 +5064,7 @@ angular
 
 			// Try to get dimensions if it's an image
 			try {
+
 				var image = new Image();
 				image.src = fileReader.result;
 				image.onload = function() {
@@ -4923,8 +5077,10 @@ angular
 					} );
 
 				};
+
 			}
 			catch( e ) {
+				console.error( 'FileDropComponentController: Error reading file: %o', e );
 			}
 
 
@@ -5484,15 +5640,47 @@ angular
 				ev.stopPropagation();
 			}
 
+			var oldOrder = getElementIndex( _currentDragElement );
+
 			if ( _currentDragElement !== ev.currentTarget ) {
 
 				console.log( 'dragDropList: Drop: %o after %o', _currentDragElement, ev.currentTarget );
 				angular.element( ev.currentTarget ).after( _currentDragElement );
+
+				// Dispatch orderChange event on li
+				// Necessary to change the order on a possible parent directive
+				var orderChangeEvent = new CustomEvent( 'orderChange', { 
+					bubbles			: true
+					, detail		:{	
+						oldOrder	: oldOrder
+						, newOrder	: getElementIndex( ev.currentTarget ) + 1
+					}
+				} );
+				ev.currentTarget.dispatchEvent( orderChangeEvent );
 			
 			}
 
 			return false;
 
+		}
+
+
+		/**
+		* Returns the index (position) of an element within its parent element. 
+		* @param <String> selector: Only respect sibling elements of element that match the selector (TBD)
+		*/
+		function getElementIndex( element ) {
+			var siblings	= element.parentNode.childNodes
+				, index		= 0;
+			for( var i = 0; i < siblings.length; i++ ) {
+				if( element === siblings[ i ] ) {
+					return index;
+				}
+				if( siblings[ i ].nodeType === 1 ) {
+					index++;
+				}
+			}
+			return -1;
 		}
 
 

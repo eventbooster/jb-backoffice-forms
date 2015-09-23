@@ -37,7 +37,7 @@
 
 			, _originalData
 
-			, _selectFields = [ '*', 'video.*', 'video.videoType.*', 'image.*', 'mediumGroup_medium.*' ];
+			, _selectFields = [ '*', 'video.*', 'video.videoType.*', 'image.*', 'mediumGroup_medium.*', 'mediumGroup.*' ];
 
 
 		self.media = [];
@@ -51,6 +51,7 @@
 		self.addMediumModel = [];
 
 
+
 		self.init = function( el, detailViewCtrl ) {
 
 			_element = el;
@@ -61,8 +62,28 @@
 
 			self.setupAddMediumModelWatcher();
 
+			self.setupOrderChangeListener();
+
 		};
 
+
+		/**
+		* Sort media by their sortOrder (stored on mediumGroup_medium[0].sortOrder)
+		* Modifies self.media.
+		*/
+		self.sortMedia = function() {
+
+			self.media.sort( function( a, b ) {
+
+				var aOrder 		= a.mediumGroup_medium[ 0 ].sortOrder
+					, bOrder 	= b.mediumGroup_medium[ 0 ].sortOrder;
+
+				return aOrder < bOrder ? -1 : 1;
+
+			} );
+
+
+		};
 
 
 
@@ -74,9 +95,29 @@
 			if( data[ self.propertyName ] ) {
 
 				self.media 		= data[ self.propertyName ];
+				self.sortMedia();
 				_originalData 	= angular.copy( self.media );
 
 			}
+
+		};
+
+
+
+
+		/**
+		* Listen to orderChange events that are fired on the lis through the drag-droplist directive, 
+		* update array/model accordingly.
+		*/
+		self.setupOrderChangeListener = function() {
+
+			// Called whenever drag-drop-list directive causes the order to change. 
+			// Re-order the media array.
+			_element[ 0 ].addEventListener( 'orderChange', function( ev ) {
+
+				self.media.splice( ev.detail.newOrder, 0, self.media.splice( ev.detail.oldOrder, 1 )[ 0 ] );
+
+			} );
 
 		};
 
@@ -184,6 +225,8 @@
 		*/
 		self.getSaveCalls = function() {
 
+
+
 			// Get IDs of entities _before_ anything was edited and curent state.
 			var oldIds = _originalData.map( function( item ) {
 					return item.id;
@@ -191,6 +234,8 @@
 			, newIds = self.media.map( function( item ) {
 					return item.id;
 				} );
+
+
 
 			// Get deleted and created medium relations
 			var created = []
@@ -230,13 +275,58 @@
 			} );
 
 
-			// 3. Save order
-
-
-
 			return calls;
 
 		};
+
+
+
+
+		/**
+		* Returns highest sortOrder on current media. 
+		*/
+		function getHighestSortOrder() {
+
+			var highestSortOrder = -1;
+			self.media.forEach( function( medium ) {
+
+				if( medium.mediumGroup_medium && medium.mediumGroup_medium.length ) {
+					highestSortOrder = Math.max( highestSortOrder, medium.mediumGroup_medium[ 0 ].sortOrder );
+				}
+
+			} );
+
+			return highestSortOrder;
+
+		}
+
+
+
+		/**
+		* Store order. All media must first have been saved (getSaveCalls was called earlier)
+		*/
+		self.afterSaveTasks = function() {
+
+			var highestSortOrder 	= getHighestSortOrder()
+				, calls 			= [];
+
+			// Update orders
+			self.media.forEach( function( medium ) {
+
+				calls.push( APIWrapperService.request( {
+					url				: '/mediumGroup/' + _detailViewController.getEntityId() + '/medium/' + medium.id
+					, method		: 'PATCH'
+					, data			: {
+						sortOrder	: ++highestSortOrder
+					}
+				} ) );
+				
+			} );
+
+			return $q.all( calls );
+
+		};
+
 
 
 

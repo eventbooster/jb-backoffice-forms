@@ -42,6 +42,7 @@
 			, _detailViewController
 
 			, _relationKey
+			, _singleRelation
 
 			, _originalData;
 
@@ -54,6 +55,28 @@
 
 			_detailViewController.registerOptionsDataHandler( self.updateOptionsData );
 			_detailViewController.registerGetDataHandler( self.updateData );
+
+			self.ensureSingleImageRelation();
+
+		};
+
+
+
+		/**
+		* Make sure only one image can be dropped on a _singleRelation relation
+		*/
+		self.ensureSingleImageRelation = function() {
+
+			$scope.$watchCollection( function() {
+				return self.images;
+			}, function(  ) {
+
+				if( _singleRelation && self.images.length > 1 ) {
+					// Take last image in array (push is used to add an image)
+					self.images.splice( 0, self.images.length - 1 );
+				}
+
+			} );
 
 		};
 
@@ -145,8 +168,11 @@
 			// Store relation key (e.g. id_image).
 			if( data[ self.propertyName ].relationKey ) {
 				_relationKey = data[ self.propertyName ].relationKey;
+				_singleRelation = true;
 			}
-
+			else {
+				_singleRelation = false;
+			}
 
 			_detailViewController.register( self );
 
@@ -171,7 +197,7 @@
 		self.getSaveCalls = function() {
 
 			// Store a signle relation (pretty easy)
-			if( _relationKey ) {
+			if( _singleRelation ) {
 
 				return _saveSingleRelation();
 
@@ -189,6 +215,7 @@
 
 
 		function _saveSingleRelation() {
+
 
 			// Removed
 			if( _originalData && _originalData.length && ( !self.images || !self.images.length ) ) {
@@ -353,6 +380,7 @@
 				var index = self.images.indexOf( image );
 
 				var newFileObject = _reformatImageObject( data );
+
 				self.images.splice( index, 1, newFileObject );
 
 				console.log( 'BackofficeImageComponentController: Image uploaded, replace %o with %o', self.images[ index ], newFileObject );
@@ -441,7 +469,7 @@
 				'<label data-backoffice-label data-label-identifier=\'{{backofficeImageComponent.propertyName}}\' data-is-required=\'false\' data-is-valid=\'true\'></label>' +
 				'<div class=\'col-md-9 backoffice-image-component\' >' +
 					'<div data-file-drop-component data-supported-file-types=\'["image/jpeg"]\' data-model=\'backofficeImageComponent.images\' data-error-handler=\'backofficeImageComponent.handleDropError(error)\'>' +
-						'<ol data-sortable-list-component class=\'clearfix\'>' +
+						'<ol class=\'clearfix\'>' +
 							'<li data-ng-repeat=\'image in backofficeImageComponent.images\'>' +
 								'<a href=\'#\' data-ng-click=\'backofficeImageComponent.openDetailView( $event, image )\'>' +
 									// #Todo: Use smaller file

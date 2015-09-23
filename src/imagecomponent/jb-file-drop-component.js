@@ -94,9 +94,9 @@ angular
 		ev.preventDefault();
 		// Doesn't work yet. Probably needs a shared scope as we're 
 		// using it in nested directives.
-		$scope.$apply( function() {
+		/*$scope.$apply( function() {
 			self.state = 'hover';
-		} );
+		} );*/
 		ev.originalEvent.dataTransfer.effectAllowed = 'copy';
 		return false;
 	}
@@ -111,9 +111,9 @@ angular
 
 
 	function _dragLeaveHandler( ev ) {
-		$scope.$apply( function() {
+		/*$scope.$apply( function() {
 			self.state = undefined;
-		} );
+		} );*/
 	}
 
 
@@ -228,6 +228,7 @@ angular
 
 			// Try to get dimensions if it's an image
 			try {
+
 				var image = new Image();
 				image.src = fileReader.result;
 				image.onload = function() {
@@ -240,8 +241,10 @@ angular
 					} );
 
 				};
+
 			}
 			catch( e ) {
+				console.error( 'FileDropComponentController: Error reading file: %o', e );
 			}
 
 

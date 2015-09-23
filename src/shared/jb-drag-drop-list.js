@@ -149,15 +149,47 @@
 				ev.stopPropagation();
 			}
 
+			var oldOrder = getElementIndex( _currentDragElement );
+
 			if ( _currentDragElement !== ev.currentTarget ) {
 
 				console.log( 'dragDropList: Drop: %o after %o', _currentDragElement, ev.currentTarget );
 				angular.element( ev.currentTarget ).after( _currentDragElement );
+
+				// Dispatch orderChange event on li
+				// Necessary to change the order on a possible parent directive
+				var orderChangeEvent = new CustomEvent( 'orderChange', { 
+					bubbles			: true
+					, detail		:{	
+						oldOrder	: oldOrder
+						, newOrder	: getElementIndex( ev.currentTarget ) + 1
+					}
+				} );
+				ev.currentTarget.dispatchEvent( orderChangeEvent );
 			
 			}
 
 			return false;
 
+		}
+
+
+		/**
+		* Returns the index (position) of an element within its parent element. 
+		* @param <String> selector: Only respect sibling elements of element that match the selector (TBD)
+		*/
+		function getElementIndex( element ) {
+			var siblings	= element.parentNode.childNodes
+				, index		= 0;
+			for( var i = 0; i < siblings.length; i++ ) {
+				if( element === siblings[ i ] ) {
+					return index;
+				}
+				if( siblings[ i ].nodeType === 1 ) {
+					index++;
+				}
+			}
+			return -1;
 		}
 
 
