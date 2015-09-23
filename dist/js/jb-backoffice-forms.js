@@ -394,7 +394,7 @@ AutoDateTimeInputController.prototype.getSaveCalls = function() {
 	}
 
 	// No change
-	if( this.originalData && date.getTime() === this.originalData.getTime() ) {
+	if( this.originalData && date && date.getTime() === this.originalData.getTime() ) {
 		return false;
 	}
 
