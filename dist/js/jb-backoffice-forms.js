@@ -400,10 +400,20 @@ AutoDateTimeInputController.prototype.getSaveCalls = function() {
 	}
 
 	// No change
-	if( this.originalData && date.getTime() === this.originalData.getTime() ) {
+	if( this.originalData && date && date.getTime() === this.originalData.getTime() ) {
 		return false;
 	}
 
+	// Removed data
+	if( this.originalData && !date ) {
+		var emptyData = {};
+		emptyData[ this.$scope.data.name ] = '';
+		return {
+			data: emptyData
+		};
+	}
+
+	// Date change
 	var dateString		= date.getFullYear() + '-' + pad( date.getMonth() + 1 ) + '-' + pad( date.getDate() ) + ' ' + pad( date.getHours() ) + ':' + pad( date.getMinutes() ) + ':' + pad( date.getSeconds() )
 		, data			= {};
 
