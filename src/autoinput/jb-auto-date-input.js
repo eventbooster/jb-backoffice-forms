@@ -64,6 +64,16 @@ AutoDateTimeInputController.prototype.getSaveCalls = function() {
 		return false;
 	}
 
+	// Removed data
+	if( this.originalData && !date ) {
+		var emptyData = {};
+		emptyData[ this.$scope.data.name ] = '';
+		return {
+			data: emptyData
+		};
+	}
+
+	// Date change
 	var dateString		= date.getFullYear() + '-' + pad( date.getMonth() + 1 ) + '-' + pad( date.getDate() ) + ' ' + pad( date.getHours() ) + ':' + pad( date.getMinutes() ) + ':' + pad( date.getSeconds() )
 		, data			= {};
 
