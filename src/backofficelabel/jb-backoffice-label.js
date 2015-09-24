@@ -53,9 +53,11 @@ angular
 
 .run( function( $templateCache ) {
 	$templateCache.put( 'backofficeLabelTemplate.html',
-		'<label class=\'control-label col-md-3\' data-ng-class=\'{invalid: !isValid()}\'>{{checkValidity()}}' +
-			'<span data-ng-if=\'isRequired()||required\' class=\'required-indicator \'>*</span>' +
-			'<span data-translate=\'web.backoffice.{{ entityName }}.{{ labelIdentifier }}\'></span>' +
-		'</label>'
+		'<div class=\'col-md-3\'>' +
+			'<label class=\'control-label\' data-ng-class=\'{invalid: !isValid()}\'>{{checkValidity()}}' +
+				'<span data-ng-if=\'isRequired()||required\' class=\'required-indicator \'>*</span>' +
+				'<span data-translate=\'web.backoffice.{{ entityName }}.{{ labelIdentifier }}\'></span>' +
+			'</label>' +
+		'</div>'
 	);
 } );

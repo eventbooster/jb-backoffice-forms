@@ -327,7 +327,7 @@ angular
 
 		// Store number of auto form elements
 		// [data-backoffice-component]: Individual components that get and store data.
-		var autoFormElements		= element.find( '[data-auto-form-element], [data-hidden-input], [data-backoffice-tree-component], [data-backoffice-relation-component], [data-backoffice-component], [data-backoffice-image-component], [data-backoffice-image-detail-component], [data-backoffice-video-component], [data-backoffice-date-component], [data-backoffice-media-group-component]' );
+		var autoFormElements		= element.find( '[data-auto-form-element], [data-hidden-input], [data-backoffice-tree-component], [data-backoffice-relation-component], [data-backoffice-component], [data-backoffice-image-component], [data-backoffice-image-detail-component], [data-backoffice-video-component], [data-backoffice-date-component], [data-backoffice-media-group-component], [data-backoffice-data-component]' );
 
 		// If element has a parent [data-detail-view] that is different from the current detailView, don't count elements. 
 		// This may happen if we have nested detailViews.
@@ -478,6 +478,13 @@ angular
 				ret[ singleFieldData.name ] = {
 					type		: 'boolean'
 					, required	: !singleFieldData.nullable
+				};
+			}
+
+			// Data
+			if( singleFieldData.name && singleFieldData.type === 'json' ) {
+				ret[ singleFieldData.name ] = {
+					type		: 'json'
 				};
 			}
 

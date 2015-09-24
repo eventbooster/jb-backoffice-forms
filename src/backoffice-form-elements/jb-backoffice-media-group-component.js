@@ -307,6 +307,19 @@
 		*/
 		self.afterSaveTasks = function() {
 
+
+			// No (relevant) changes? Make a quick check.
+			// TBD.
+			/*if( _originalData.length === self.media.length ) {
+
+				var sameOrder = false;
+				_originalData.forEach( function( item, index ) {
+					if( item.sortOrder === )
+				} );
+
+			}*/
+
+
 			var highestSortOrder 	= getHighestSortOrder()
 				, calls 			= [];
 

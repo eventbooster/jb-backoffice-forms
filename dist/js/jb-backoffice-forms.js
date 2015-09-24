@@ -805,6 +805,227 @@ angular
 
 } );
 /***
+* Component for data (JSON) property
+*/
+( function() {
+
+	'use strict';
+
+	angular
+
+	.module( 'jb.backofficeFormComponents' )
+
+	.directive( 'backofficeDataComponent', [ function() {
+
+		return {
+			require				: [ 'backofficeDataComponent', '^detailView' ]
+			, controller		: 'BackofficeDataComponentController'
+			, controllerAs		: 'backofficeDataComponent'
+			, bindToController	: true
+			, templateUrl		: 'backofficeDataComponentTemplate.html'
+			, link				: function( scope, element, attrs, ctrl ) {
+				ctrl[ 0 ].init( element, ctrl[ 1 ] );
+			}
+			, scope: {
+				'propertyName'		: '@for'
+				, 'fields'			: '='
+			}
+
+		};
+
+	} ] )
+
+	.controller( 'BackofficeDataComponentController', [ '$scope', '$rootScope', '$q', 'APIWrapperService', function( $scope, $rootScope, $q, APIWrapperService ) {
+
+		var self = this
+			, _element
+			, _detailViewController
+
+			, _originalData;
+
+		self.data = undefined;
+
+		self.init = function( el, detailViewCtrl ) {
+
+			_element = el;
+			_detailViewController = detailViewCtrl;
+
+			_detailViewController.registerOptionsDataHandler( self.updateOptionsData );
+			_detailViewController.registerGetDataHandler( self.updateData );
+
+		};
+
+
+
+		/**
+		* Check if fields variable passed is valid. Returns true if no error was detected, else throws an error.
+		*/
+		self.checkFields = function() {
+
+			if( !angular.isArray( self.fields ) ) {
+				throw new Error( 'BackofficeDataComponentController: fields passed is not an array: ' + JSON.stringify( self.fields ) );
+			}
+
+
+			self.fields.forEach( function( field ) {
+
+				if( !angular.isObject( field ) ) {
+					throw new Error( 'BackofficeDataComponentController: field passed is not an object: ' + JSON.stringify( field ) );
+				}
+
+				if( !field.name ) {
+					throw new Error( 'BackofficeDataComponentController: field is missing name property: ' + JSON.stringify( field ) );
+				}
+
+			} );
+
+			return true;
+
+		};
+
+
+
+
+		/**
+		* Called with GET data
+		*/
+		self.updateData = function( data ) {
+
+			if( !self.checkFields() ) {
+				return;
+			}
+
+			if( data[ self.propertyName ] ) {
+
+				_originalData 	= JSON.parse( data[ self.propertyName ] );
+				self.data 		= JSON.parse( data[ self.propertyName ] );
+
+			}
+
+
+			// Set selected
+			self.fields.forEach( function( field ) {
+
+				// Add option to remove data
+				field.values.push( undefined );
+
+				// Set selected on field
+				if( self.data[ field.name ] ) {
+					field.selected = self.data[ field.name ];
+				}
+
+			} );
+
+		};
+
+
+
+
+		/**
+		* Called with OPTIONS data 
+		*/
+		self.updateOptionsData = function( data ) {
+
+			if( !data[ self.propertyName ] ) {
+				console.error( 'BackofficeDataComponentController: Missing OPTIONS data for %o in %o', self.propertyName, data );
+				return;
+			}
+
+			_detailViewController.register( self );
+
+		};
+
+
+
+		/**
+		* Returns the fields that need to be selected on the GET call
+		*/
+		self.getSelectFields = function() {
+
+			return [ self.propertyName ];
+
+		};
+
+
+
+
+		/**
+		* Store/Delete files that changed.
+		*/
+		self.getSaveCalls = function() {
+
+
+			// No changes
+			var changed = false;
+			self.fields.forEach( function( field ) {
+				if( _originalData[ field.name ] !== field.selected ) {
+					changed = true;
+				}
+			} );
+
+			if( !changed ) {
+				console.log( 'BackofficeDataComponentController: No changes made.' );
+				return false;
+			}
+
+			var ret = angular.copy( _originalData );
+
+			// Take ret and make necessary modifications.
+			self.fields.forEach( function( field ) {
+
+				// Value deleted
+				if( field.selected === undefined && ret[ field.name ] ) {
+					delete ret[ field.name ];
+				}
+
+				// Update value
+				else {
+
+					// Don't store empty fields (if newly created; if they existed before, 
+					// they were deleted 5 lines above)
+					if( field.selected !== undefined ) {
+						ret[ field.name ] = field.selected;
+					}
+
+				}
+
+			} );
+
+			console.log( 'BackofficeDataComponentController: Store changes %o', ret );
+
+			return {
+				data	: {
+					// Write on the data field
+					data: JSON.stringify( ret )
+				}
+			};
+
+		};
+
+
+	} ] )
+
+
+
+	.run( [ '$templateCache', function( $templateCache ) {
+
+		$templateCache.put( 'backofficeDataComponentTemplate.html',
+			'<div class=\'form-group form-group-sm\' data-ng-repeat="field in backofficeDataComponent.fields">' +
+				//'{{ field | json }}' +
+				'<label data-backoffice-label data-label-identifier=\'{{field.name}}\' data-is-required=\'false\' data-is-valid=\'true\'></label>' +
+				'<div class=\'col-md-9\'>' +
+					'<select class=\'form-control\' data-ng-options=\'value for value in field.values\' data-ng-model=\'field.selected\'></select>' +
+				'</div>' +
+			'</div>'
+		);
+
+	} ] );
+
+
+} )();
+
+
+/***
 * Date/time/date time component for distributed back offices.
 */
 ( function() {
@@ -2087,6 +2308,19 @@ angular
 		*/
 		self.afterSaveTasks = function() {
 
+
+			// No (relevant) changes? Make a quick check.
+			// TBD.
+			/*if( _originalData.length === self.media.length ) {
+
+				var sameOrder = false;
+				_originalData.forEach( function( item, index ) {
+					if( item.sortOrder === )
+				} );
+
+			}*/
+
+
 			var highestSortOrder 	= getHighestSortOrder()
 				, calls 			= [];
 
@@ -3096,10 +3330,12 @@ angular
 
 .run( function( $templateCache ) {
 	$templateCache.put( 'backofficeLabelTemplate.html',
-		'<label class=\'control-label col-md-3\' data-ng-class=\'{invalid: !isValid()}\'>{{checkValidity()}}' +
-			'<span data-ng-if=\'isRequired()||required\' class=\'required-indicator \'>*</span>' +
-			'<span data-translate=\'web.backoffice.{{ entityName }}.{{ labelIdentifier }}\'></span>' +
-		'</label>'
+		'<div class=\'col-md-3\'>' +
+			'<label class=\'control-label\' data-ng-class=\'{invalid: !isValid()}\'>{{checkValidity()}}' +
+				'<span data-ng-if=\'isRequired()||required\' class=\'required-indicator \'>*</span>' +
+				'<span data-translate=\'web.backoffice.{{ entityName }}.{{ labelIdentifier }}\'></span>' +
+			'</label>' +
+		'</div>'
 	);
 } );
 'use strict';
@@ -3431,7 +3667,7 @@ angular
 
 		// Store number of auto form elements
 		// [data-backoffice-component]: Individual components that get and store data.
-		var autoFormElements		= element.find( '[data-auto-form-element], [data-hidden-input], [data-backoffice-tree-component], [data-backoffice-relation-component], [data-backoffice-component], [data-backoffice-image-component], [data-backoffice-image-detail-component], [data-backoffice-video-component], [data-backoffice-date-component], [data-backoffice-media-group-component]' );
+		var autoFormElements		= element.find( '[data-auto-form-element], [data-hidden-input], [data-backoffice-tree-component], [data-backoffice-relation-component], [data-backoffice-component], [data-backoffice-image-component], [data-backoffice-image-detail-component], [data-backoffice-video-component], [data-backoffice-date-component], [data-backoffice-media-group-component], [data-backoffice-data-component]' );
 
 		// If element has a parent [data-detail-view] that is different from the current detailView, don't count elements. 
 		// This may happen if we have nested detailViews.
@@ -3582,6 +3818,13 @@ angular
 				ret[ singleFieldData.name ] = {
 					type		: 'boolean'
 					, required	: !singleFieldData.nullable
+				};
+			}
+
+			// Data
+			if( singleFieldData.name && singleFieldData.type === 'json' ) {
+				ret[ singleFieldData.name ] = {
+					type		: 'json'
 				};
 			}
 
