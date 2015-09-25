@@ -841,9 +841,7 @@ angular
 			, _element
 			, _detailViewController
 
-			, _originalData;
-
-		self.data = undefined;
+			, _originalData = {}; // If no data is available at all, use {}
 
 		self.init = function( el, detailViewCtrl ) {
 
@@ -897,8 +895,24 @@ angular
 
 			if( data[ self.propertyName ] ) {
 
-				_originalData 	= JSON.parse( data[ self.propertyName ] );
-				self.data 		= JSON.parse( data[ self.propertyName ] );
+				// Use {} as default to prevent errors if reading properties from undefined
+				try {
+
+					// When data is set
+					if( angular.isString( data[ self.propertyName ] ) ) {
+						_originalData = JSON.parse( data[ self.propertyName ] );
+					}
+					// When data is empty, [object Object] is returned as string
+					else if( angular.isObject( data[ self.propertyName ] ) ) {
+						_originalData = angular.copy( data[ self.propertyName ] );
+					}
+					else if( !data[ self.propertyName ] ) {
+						_originalData = {};
+					}
+
+				} catch( err ) {
+					console.error( 'BackofficeDataComponentController: Could not parse data ' + data[ self.propertyName ] );					
+				}
 
 			}
 
@@ -907,11 +921,13 @@ angular
 			self.fields.forEach( function( field ) {
 
 				// Add option to remove data
-				field.values.push( undefined );
+				if( field.values.indexOf( undefined ) === -1 ) {
+					field.values.push( undefined );
+				}
 
 				// Set selected on field
-				if( self.data[ field.name ] ) {
-					field.selected = self.data[ field.name ];
+				if( _originalData[ field.name ] ) {
+					field.selected = _originalData[ field.name ];
 				}
 
 			} );
@@ -968,7 +984,7 @@ angular
 				return false;
 			}
 
-			var ret = angular.copy( _originalData );
+			var ret = _originalData ? angular.copy( _originalData ) : {};
 
 			// Take ret and make necessary modifications.
 			self.fields.forEach( function( field ) {
@@ -1013,8 +1029,11 @@ angular
 			'<div class=\'form-group form-group-sm\' data-ng-repeat="field in backofficeDataComponent.fields">' +
 				//'{{ field | json }}' +
 				'<label data-backoffice-label data-label-identifier=\'{{field.name}}\' data-is-required=\'false\' data-is-valid=\'true\'></label>' +
-				'<div class=\'col-md-9\'>' +
+				'<div class=\'col-md-8\'>' +
 					'<select class=\'form-control\' data-ng-options=\'value for value in field.values\' data-ng-model=\'field.selected\'></select>' +
+				'</div>' +
+				'<div class=\'col-md-1\'>' + 
+
 				'</div>' +
 			'</div>'
 		);
@@ -2476,6 +2495,13 @@ angular
 			, _deletable
 			, _multiSelect
 
+			// Entity can have an alias: Another name where we have to SAVE the data to, 
+			// but cannot get data from – e.g. media -> medium for blogPosts (as medium 
+			// is already taken for the main image)
+			// If there is an alias, self.propertyName is the alias, _entityName the original
+			// entity name to get data from.
+			, _entityName
+
 			// Original data gotten from server; needed to calculate differences
 			// (when storing data)
 			, _originalData;
@@ -2544,6 +2570,13 @@ angular
 			_required			= elementData.required;
 			_multiSelect		= elementData.relationType !== 'single';
 
+			if( elementData.alias ) {
+				_entityName = elementData.relation;
+			}
+			else {
+				_entityName = self.propertyName;
+			}
+
 			self.replaceElement( _multiSelect, _deletable );
 
 			// Now let detailViewController know we're ready to get GET data
@@ -2583,7 +2616,7 @@ angular
 
 			template
 				.find( '[data-relation-input]')
-				.attr( 'data-relation-entity-endpoint', self.propertyName )
+				.attr( 'data-relation-entity-endpoint', _entityName )
 				.attr( 'data-relation-interactive', true )
 				.attr( 'data-deletable', deletable )
 				.attr( 'data-relation-entity-search-field', self.searchField )
@@ -3872,11 +3905,12 @@ angular
 							type				: 'relation'
 
 							// Link to entity's collection (e.g. city)
+							// referencedModelName is the same as modelName for has many (but referenced as it's hasOne)
 							, relation			: singleFieldData[ j ].hasAlias ? singleFieldData[ j ].referencedModelName : singleFieldData[ j ].name
 
 							// If property is an alias, set alias here. Alias for event is e.g. parentEvent (EventBooster).
 							// Alias must be used to save relation, but is not available to GET data. 
-							// GET /name
+							// GET /originalEntityNameName
 							// POST /alias/id/otherEntity/id
 							, alias				: singleFieldData[ j ].hasAlias ? singleFieldData[ j ].name : false
 
@@ -3908,7 +3942,7 @@ angular
 					else if( singleFieldData[ n ].name === 'image' ) {
 						ret[ n ] = {
 							type				: 'image'
-							//, tableName			: singleFieldData[ n ].table.name
+							//, tableName		: singleFieldData[ n ].table.name
 							, relationType		: 'multiple'
 							, relationKey		: singleFieldData[ n ].key
 						};
@@ -3920,7 +3954,8 @@ angular
 							type				: 'relation'
 							
 							// relation and alias: See hasOne
-							, relation			: singleFieldData[ n ].hasAlias ? singleFieldData[ n ].referencedModelName : singleFieldData[ n ].name
+							// use modelName instead of referencedModelName as model is not referenced, but mapped
+							, relation			: singleFieldData[ n ].hasAlias ? singleFieldData[ n ].modelName : singleFieldData[ n ].name
 							, alias				: singleFieldData[ n ].hasAlias ? singleFieldData[ n ].name : false
 
 							, relationType		: 'multiple'
@@ -3942,7 +3977,7 @@ angular
 						type					: 'relation'
 
 						// relation and alias: See hasOne
-						, relation			: singleFieldData[ p ].hasAlias ? singleFieldData[ p ].referencedModelName : singleFieldData[ p ].name
+						, relation			: singleFieldData[ p ].hasAlias ? singleFieldData[ p ].modelName : singleFieldData[ p ].name
 						, alias				: singleFieldData[ p ].hasAlias ? singleFieldData[ p ].name : false
 
 						, relationType			: 'multiple' // #todo: always multiple?

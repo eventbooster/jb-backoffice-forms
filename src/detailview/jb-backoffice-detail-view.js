@@ -532,11 +532,12 @@ angular
 							type				: 'relation'
 
 							// Link to entity's collection (e.g. city)
+							// referencedModelName is the same as modelName for has many (but referenced as it's hasOne)
 							, relation			: singleFieldData[ j ].hasAlias ? singleFieldData[ j ].referencedModelName : singleFieldData[ j ].name
 
 							// If property is an alias, set alias here. Alias for event is e.g. parentEvent (EventBooster).
 							// Alias must be used to save relation, but is not available to GET data. 
-							// GET /name
+							// GET /originalEntityNameName
 							// POST /alias/id/otherEntity/id
 							, alias				: singleFieldData[ j ].hasAlias ? singleFieldData[ j ].name : false
 
@@ -568,7 +569,7 @@ angular
 					else if( singleFieldData[ n ].name === 'image' ) {
 						ret[ n ] = {
 							type				: 'image'
-							//, tableName			: singleFieldData[ n ].table.name
+							//, tableName		: singleFieldData[ n ].table.name
 							, relationType		: 'multiple'
 							, relationKey		: singleFieldData[ n ].key
 						};
@@ -580,7 +581,8 @@ angular
 							type				: 'relation'
 							
 							// relation and alias: See hasOne
-							, relation			: singleFieldData[ n ].hasAlias ? singleFieldData[ n ].referencedModelName : singleFieldData[ n ].name
+							// use modelName instead of referencedModelName as model is not referenced, but mapped
+							, relation			: singleFieldData[ n ].hasAlias ? singleFieldData[ n ].modelName : singleFieldData[ n ].name
 							, alias				: singleFieldData[ n ].hasAlias ? singleFieldData[ n ].name : false
 
 							, relationType		: 'multiple'
@@ -602,7 +604,7 @@ angular
 						type					: 'relation'
 
 						// relation and alias: See hasOne
-						, relation			: singleFieldData[ p ].hasAlias ? singleFieldData[ p ].referencedModelName : singleFieldData[ p ].name
+						, relation			: singleFieldData[ p ].hasAlias ? singleFieldData[ p ].modelName : singleFieldData[ p ].name
 						, alias				: singleFieldData[ p ].hasAlias ? singleFieldData[ p ].name : false
 
 						, relationType			: 'multiple' // #todo: always multiple?

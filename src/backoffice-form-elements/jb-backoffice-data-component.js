@@ -35,9 +35,7 @@
 			, _element
 			, _detailViewController
 
-			, _originalData;
-
-		self.data = undefined;
+			, _originalData = {}; // If no data is available at all, use {}
 
 		self.init = function( el, detailViewCtrl ) {
 
@@ -91,8 +89,24 @@
 
 			if( data[ self.propertyName ] ) {
 
-				_originalData 	= JSON.parse( data[ self.propertyName ] );
-				self.data 		= JSON.parse( data[ self.propertyName ] );
+				// Use {} as default to prevent errors if reading properties from undefined
+				try {
+
+					// When data is set
+					if( angular.isString( data[ self.propertyName ] ) ) {
+						_originalData = JSON.parse( data[ self.propertyName ] );
+					}
+					// When data is empty, [object Object] is returned as string
+					else if( angular.isObject( data[ self.propertyName ] ) ) {
+						_originalData = angular.copy( data[ self.propertyName ] );
+					}
+					else if( !data[ self.propertyName ] ) {
+						_originalData = {};
+					}
+
+				} catch( err ) {
+					console.error( 'BackofficeDataComponentController: Could not parse data ' + data[ self.propertyName ] );					
+				}
 
 			}
 
@@ -101,11 +115,13 @@
 			self.fields.forEach( function( field ) {
 
 				// Add option to remove data
-				field.values.push( undefined );
+				if( field.values.indexOf( undefined ) === -1 ) {
+					field.values.push( undefined );
+				}
 
 				// Set selected on field
-				if( self.data[ field.name ] ) {
-					field.selected = self.data[ field.name ];
+				if( _originalData[ field.name ] ) {
+					field.selected = _originalData[ field.name ];
 				}
 
 			} );
@@ -162,7 +178,7 @@
 				return false;
 			}
 
-			var ret = angular.copy( _originalData );
+			var ret = _originalData ? angular.copy( _originalData ) : {};
 
 			// Take ret and make necessary modifications.
 			self.fields.forEach( function( field ) {
@@ -207,8 +223,11 @@
 			'<div class=\'form-group form-group-sm\' data-ng-repeat="field in backofficeDataComponent.fields">' +
 				//'{{ field | json }}' +
 				'<label data-backoffice-label data-label-identifier=\'{{field.name}}\' data-is-required=\'false\' data-is-valid=\'true\'></label>' +
-				'<div class=\'col-md-9\'>' +
+				'<div class=\'col-md-8\'>' +
 					'<select class=\'form-control\' data-ng-options=\'value for value in field.values\' data-ng-model=\'field.selected\'></select>' +
+				'</div>' +
+				'<div class=\'col-md-1\'>' + 
+
 				'</div>' +
 			'</div>'
 		);

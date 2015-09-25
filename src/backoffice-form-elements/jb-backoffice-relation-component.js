@@ -53,6 +53,13 @@
 			, _deletable
 			, _multiSelect
 
+			// Entity can have an alias: Another name where we have to SAVE the data to, 
+			// but cannot get data from – e.g. media -> medium for blogPosts (as medium 
+			// is already taken for the main image)
+			// If there is an alias, self.propertyName is the alias, _entityName the original
+			// entity name to get data from.
+			, _entityName
+
 			// Original data gotten from server; needed to calculate differences
 			// (when storing data)
 			, _originalData;
@@ -121,6 +128,13 @@
 			_required			= elementData.required;
 			_multiSelect		= elementData.relationType !== 'single';
 
+			if( elementData.alias ) {
+				_entityName = elementData.relation;
+			}
+			else {
+				_entityName = self.propertyName;
+			}
+
 			self.replaceElement( _multiSelect, _deletable );
 
 			// Now let detailViewController know we're ready to get GET data
@@ -160,7 +174,7 @@
 
 			template
 				.find( '[data-relation-input]')
-				.attr( 'data-relation-entity-endpoint', self.propertyName )
+				.attr( 'data-relation-entity-endpoint', _entityName )
 				.attr( 'data-relation-interactive', true )
 				.attr( 'data-deletable', deletable )
 				.attr( 'data-relation-entity-search-field', self.searchField )
