@@ -35,7 +35,7 @@
 			, _element
 			, _detailViewController
 
-			, _originalData
+			, _originalData = []
 
 			, _selectFields = [ '*', 'video.*', 'video.videoType.*', 'image.*', 'mediumGroup_medium.*', 'mediumGroup.*' ];
 
@@ -69,21 +69,15 @@
 
 		/**
 		* Sort media by their sortOrder (stored on mediumGroup_medium[0].sortOrder)
-		* Modifies self.media.
 		*/
-		self.sortMedia = function() {
+		function sortMedia( a, b ) {
 
-			self.media.sort( function( a, b ) {
+			var aOrder 		= a.mediumGroup_medium[ 0 ].sortOrder
+				, bOrder 	= b.mediumGroup_medium[ 0 ].sortOrder;
 
-				var aOrder 		= a.mediumGroup_medium[ 0 ].sortOrder
-					, bOrder 	= b.mediumGroup_medium[ 0 ].sortOrder;
+			return aOrder < bOrder ? -1 : 1;
 
-				return aOrder < bOrder ? -1 : 1;
-
-			} );
-
-
-		};
+		}
 
 
 
@@ -94,8 +88,15 @@
 			
 			if( data[ self.propertyName ] ) {
 
-				self.media 		= data[ self.propertyName ];
-				self.sortMedia();
+				var media 		= data[ self.propertyName ] || [];
+
+				try {
+					self.media = media.sort( sortMedia );
+				} catch( err ) {
+					console.error( 'BackofficeMediaGroupComponentController: Properties mediumGroup_medium, it\'s items or sortOrder missing' );
+					self.media = media;
+				}
+
 				_originalData 	= angular.copy( self.media );
 
 			}
@@ -172,9 +173,7 @@
 			} )
 			.then( function( data ) {
 				
-				console.error( 'add %o to media', data );
 				self.media.push( data );
-				console.error( self.media );
 
 			}, function( err ) {
 
@@ -225,7 +224,7 @@
 		*/
 		self.getSaveCalls = function() {
 
-
+			console.error( _originalData );
 
 			// Get IDs of entities _before_ anything was edited and curent state.
 			var oldIds = _originalData.map( function( item ) {
