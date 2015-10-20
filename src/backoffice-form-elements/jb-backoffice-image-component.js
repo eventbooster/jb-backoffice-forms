@@ -181,10 +181,15 @@
 						, url		: 'image/' + id
 					} );*/ 
 					// Remove image iself (try to; not the relation)
+
+					// Remove the relation; don't remove image itself as it might be used otherwise. 
+					// Relation must be removed to get updates from the server when eventData changes
+					// (on EventBooster – just ask Tobi)
 					calls.push( {
 						method		: 'DELETE'
-						, url		: '/image/' + id
+						, url		: 'image/' + id
 					} );
+
 				}
 			} );
 
