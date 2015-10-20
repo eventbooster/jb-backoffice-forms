@@ -389,7 +389,7 @@
 				'</div>' +
 
 				'<div class=\'row\'>' +
-					'<div class=\'col-md-9\'>' +
+					'<div class=\'col-md-12\'>' +
 
 						'<div class="relation-select" ' +
 							'data-relation-input ' +
@@ -403,11 +403,11 @@
 						'</div>' +
 
 					'</div>' +
-					'<div class=\'col-md-3\'>' +
+					/*'<div class=\'col-md-3\'>' +
 
 						'<button class="btn btn btn-success" data-ng-attr-ui-sref="app.detail({entityName:\'{{backofficeMediaGroupComponent.propertyName}}\',entityId:\'new\'})">{{ \'web.backoffice.mediumGroup.createMedium\' | translate }}</button>' +
 
-					'</div>' +
+					'</div>' +*/
 				'</div>' +
 			'</div>'
 
