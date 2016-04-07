@@ -32,7 +32,7 @@
 				'suggestionTemplate'	: '@'
 				, 'searchField'			: '@'
 				, 'propertyName'		: '@for'
-				, 'relationModel'		: '=ngModel'
+			//	, 'relationModel'		: '=ngModel' Caused error since angular 1.4.fuckyou
 			}
 
 		};

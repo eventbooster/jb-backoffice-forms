@@ -2409,7 +2409,7 @@ angular
 				'</div>' +
 
 				'<div class=\'row\'>' +
-					'<div class=\'col-md-9\'>' +
+					'<div class=\'col-md-12\'>' +
 
 						'<div class="relation-select" ' +
 							'data-relation-input ' +
@@ -2423,11 +2423,11 @@ angular
 						'</div>' +
 
 					'</div>' +
-					'<div class=\'col-md-3\'>' +
+					/*'<div class=\'col-md-3\'>' +
 
 						'<button class="btn btn btn-success" data-ng-attr-ui-sref="app.detail({entityName:\'{{backofficeMediaGroupComponent.propertyName}}\',entityId:\'new\'})">{{ \'web.backoffice.mediumGroup.createMedium\' | translate }}</button>' +
 
-					'</div>' +
+					'</div>' +*/
 				'</div>' +
 			'</div>'
 
@@ -2473,7 +2473,7 @@ angular
 				'suggestionTemplate'	: '@'
 				, 'searchField'			: '@'
 				, 'propertyName'		: '@for'
-				, 'relationModel'		: '=ngModel'
+			//	, 'relationModel'		: '=ngModel' Caused error since angular 1.4.fuckyou
 			}
 
 		};
@@ -6113,6 +6113,7 @@ angular
 		self.getLanguages = function() {
 
 			var languages = SessionService.get( 'supported-languages', 'local' );
+			console.log( 'languageMenuComponent: Got languages %o', languages );
 
 			if( !languages ) {
 				console.error( 'LanguageMenuComponentController: supported-languages cannot be retrieved from Session' );

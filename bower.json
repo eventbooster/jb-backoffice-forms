@@ -1,6 +1,5 @@
 {
 	"name"			: "jb-backoffice-forms"
-	, "version"		: "0.2.15"
 	, "main"		: "src/jb-backoffice-forms.js"
 	, "dependencies": {
 		"angular"	: ">=1.3.0"

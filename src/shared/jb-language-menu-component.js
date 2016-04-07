@@ -131,6 +131,7 @@
 		self.getLanguages = function() {
 
 			var languages = SessionService.get( 'supported-languages', 'local' );
+			console.log( 'languageMenuComponent: Got languages %o', languages );
 
 			if( !languages ) {
 				console.error( 'LanguageMenuComponentController: supported-languages cannot be retrieved from Session' );
