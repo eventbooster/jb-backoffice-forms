@@ -16,26 +16,51 @@
 	.directive( 'backofficeImageComponent', [ function() {
 
 		return {
-			require				: [ 'backofficeImageComponent', '^detailView' ]
-			, controller		: 'BackofficeImageComponentController'
+			  controller		: 'BackofficeImageComponentController'
 			, controllerAs		: 'backofficeImageComponent'
 			, bindToController	: true
-			, templateUrl		: 'backofficeImageComponentTemplate.html'
 			, link				: function( scope, element, attrs, ctrl ) {
-				ctrl[ 0 ].init( element, ctrl[ 1 ] );
+				ctrl.init( scope, element, attrs);
 			}
 			, scope: {
-				'propertyName'		: '@for'
+				  'propertyName'	: '@for'
 				, 'pathField'		: '@' // Field that has to be selected to get the image's path, e.g. path or bucket.url
 				, 'imageModel'		: '=model'
-				//, 'imageDetailState': '@' // State to display the image's detail
+				, 'label'			: '@'
 			}
-
+            , template		    : '<div class="row">' +
+            '<label data-backoffice-label data-label-identifier="{{backofficeImageComponent.label}}" data-is-required="false" data-is-valid="true"></label>' +
+            '<div class="col-md-9 backoffice-image-component" >' +
+            '<div data-file-drop-component data-supported-file-types="[\'image/jpeg\']" data-model="backofficeImageComponent.images" data-error-handler="backofficeImageComponent.handleDropError(error)">' +
+            '<ol class="clearfix">' +
+            '<li data-ng-repeat="image in backofficeImageComponent.images">' +
+            '<a href="#" data-ng-click="backofficeImageComponent.openDetailView( $event, image )">' +
+                // #Todo: Use smaller file
+            '<img data-ng-attr-src="{{image.url || image.fileData}}"/>' +
+            '<button class="remove" data-ng-click="backofficeImageComponent.removeImage($event,image)">&times</button>' +
+            '</a>' +
+            '<span class="image-size-info" data-ng-if="!!image.width && !!image.height">{{image.width}}&times;{{image.height}} Pixels</span>' +
+            '<span class="image-file-size-info" data-ng-if="!!image.fileSize">{{image.fileSize/1000/1000 | number: 1 }} MB</span>' +
+            '<span class="focal-point-info" data-ng-if="!!image.focalPoint">Focal Point</span>' +
+            '</li>' +
+            '<li><button class="add-file-button" data-ng-click="backofficeImageComponent.uploadFile()">+</button></li>' +
+            '</ol>' +
+            '<input type="file" multiple/>' +
+            '</div>' +
+            '</div>' +
+            '</div>'
 		};
 
 	} ] )
 
-	.controller( 'BackofficeImageComponentController', [ '$scope', '$rootScope', '$q', '$state', 'APIWrapperService', function( $scope, $rootScope, $q, $state, APIWrapperService ) {
+	.controller( 'BackofficeImageComponentController', [
+			  '$scope'
+			, '$rootScope'
+			, '$q'
+			, '$state'
+			, 'APIWrapperService'
+			, 'backofficeSubcomponentsService'
+			, function( $scope, $rootScope, $q, $state, APIWrapperService, componentsService) {
 
 		var self = this
 			, _element
@@ -48,17 +73,20 @@
 
 		self.images = [];
 
-		self.init = function( el, detailViewCtrl ) {
+		self.init = function( scope, element, attrs) {
 
-			_element = el;
-			_detailViewController = detailViewCtrl;
-
-			_detailViewController.registerOptionsDataHandler( self.updateOptionsData );
-			_detailViewController.registerGetDataHandler( self.updateData );
+			_element = element;
 
 			self.ensureSingleImageRelation();
 
+            componentsService.registerComponent(scope, self);
+
 		};
+
+        self.registerAt = function(parent){
+            parent.registerOptionsDataHandler( self.updateOptionsData );
+            parent.registerGetDataHandler( self.updateData );
+        };
 
 
 
@@ -174,7 +202,7 @@
 				_singleRelation = false;
 			}
 
-			_detailViewController.register( self );
+			//_detailViewController.register( self );
 
 		};
 
@@ -457,36 +485,6 @@
 
 
 
-
-	} ] )
-
-
-
-	.run( [ '$templateCache', function( $templateCache ) {
-
-		$templateCache.put( 'backofficeImageComponentTemplate.html',
-			'<div class=\'row\'>' +
-				'<label data-backoffice-label data-label-identifier=\'{{backofficeImageComponent.propertyName}}\' data-is-required=\'false\' data-is-valid=\'true\'></label>' +
-				'<div class=\'col-md-9 backoffice-image-component\' >' +
-					'<div data-file-drop-component data-supported-file-types=\'["image/jpeg"]\' data-model=\'backofficeImageComponent.images\' data-error-handler=\'backofficeImageComponent.handleDropError(error)\'>' +
-						'<ol class=\'clearfix\'>' +
-							'<li data-ng-repeat=\'image in backofficeImageComponent.images\'>' +
-								'<a href=\'#\' data-ng-click=\'backofficeImageComponent.openDetailView( $event, image )\'>' +
-									// #Todo: Use smaller file
-									'<img data-ng-attr-src=\'{{image.url || image.fileData}}\'/>' +
-									'<button class=\'remove\' data-ng-click=\'backofficeImageComponent.removeImage($event,image)\'>&times</button>' +
-								'</a>' +
-								'<span class=\'image-size-info\' data-ng-if=\'!!image.width && !!image.height\'>{{image.width}}&times;{{image.height}} Pixels</span>' +
-								'<span class=\'image-file-size-info\' data-ng-if=\'!!image.fileSize\'>{{image.fileSize/1000/1000 | number: 1 }} MB</span>' +
-								'<span class=\'focal-point-info\' data-ng-if=\'!!image.focalPoint\'>Focal Point</span>' +
-							'</li>' +
-							'<li><button class=\'add-file-button\' data-ng-click=\'backofficeImageComponent.uploadFile()\'>+</button></li>' +
-						'</ol>' +
-						'<input type=\'file\' multiple/>' +
-					'</div>' +
-				'</div>' +
-			'</div>'
-		);
 
 	} ] );
 

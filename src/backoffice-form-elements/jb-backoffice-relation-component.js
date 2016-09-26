@@ -26,7 +26,7 @@
 			, controllerAs		: 'backofficeRelationComponent'
 			, bindToController	: true
 			, link				: function( scope, element, attrs, ctrl ) {
-				ctrl[ 0 ].init( element, ctrl[ 1 ] );
+				ctrl[ 0 ].init( scope, element, attrs, ctrl[ 1 ] );
 			}
 			, scope: {
 				'suggestionTemplate'	: '@'
@@ -39,7 +39,13 @@
 
 	} ] )
 
-	.controller( 'BackofficeRelationComponentController', [ '$scope', '$compile', '$templateCache', 'RelationInputService', function( $scope, $compile, $templateCache, RelationInputService ) {
+	.controller( 'BackofficeRelationComponentController', [
+            '$scope',
+            '$compile',
+            '$templateCache',
+            'RelationInputService',
+            'backofficeFormEvents',
+            function( $scope, $compile, $templateCache, RelationInputService, formEvents ) {
 
 		var self = this
 			, _element
@@ -64,30 +70,27 @@
 			// (when storing data)
 			, _originalData;
 
-
-		
 		// Model for relationInput
-		self.relationModel = undefined;
+		self.relationModel  = undefined;
+        self.formEvents     = formEvents;
 
 
 
 		/**
 		* Called by link function
 		*/
-		self.init = function( el, detailViewCtrl ) {
+		self.init = function( scope, element, attrs, detailViewCtrl ) {
 
-			_element = el;
+			_element = element;
 			_detailViewController = detailViewCtrl;
-
-			// Registers itself with detailViewController
-			_detailViewController.registerOptionsDataHandler( self.updateOptionsData );
-			_detailViewController.registerGetDataHandler( self.updateData );
-
+            scope.$emit(self.formEvents.registerComponent, self);
 		};
 
-
-
-
+                self.registerAt = function(parent){
+                    // Registers itself with detailViewController
+                    parent.registerOptionsDataHandler( self.updateOptionsData );
+                    parent.registerGetDataHandler( self.updateData );
+                };
 
 		/**
 		* GET data gotten from detailView
@@ -103,8 +106,7 @@
 				modelValue = angular.isArray( data[ self.propertyName ] ) ? data[ self.propertyName ] : [ data[ self.propertyName ] ];
 			}
 
-			self.relationModel = modelValue; 
-
+			self.relationModel = modelValue;
 			// Store data in _originalData to calculate differences when saving
 			_originalData = angular.copy( modelValue );
 
@@ -115,9 +117,9 @@
 
 
 
-		/**
-		* Parse option data gotten from detailViewController
-		*/
+        /**
+		 * Extracts the options data and injects the element itself.
+		 */
 		self.updateOptionsData = function( data ) {
 			
 			console.log( 'BackofficeRelationComponentController: Got options data %o', data[ self.propertyName ] );
@@ -134,12 +136,8 @@
 			else {
 				_entityName = self.propertyName;
 			}
-
+            // @todo: it might be better to insert the element
 			self.replaceElement( _multiSelect, _deletable );
-
-			// Now let detailViewController know we're ready to get GET data
-			_detailViewController.register( self );
-
 		};
 
 
@@ -154,7 +152,7 @@
 
 			// Select fields prefixed with the entity's name
 				, prefixedSelectFields		= [];
-			
+			// @todo: this only makes sense if the property name is the same as the entity!
 			selectFields.forEach( function( selectField ) {
 				prefixedSelectFields.push( self.propertyName + '.' + selectField );
 			} );
@@ -163,13 +161,15 @@
 
 		};
 
-
-
 		/**
-		* Replaces itself with the relation-input element
-		*/
+		 * Replaces itself with the relation-input element.
+		 * Queries the template and injects the necessary values.
+         * And replaces itself with the relation input and sets the endpoint based on the current entity name.
+         *
+         * @todo: resolve the endpoint using a service
+		 */
 		self.replaceElement = function( multiSelect, deletable ) {
-
+            // This happens synchronously, and is therefore not a problem
 			var template = $( $templateCache.get( 'backofficeRelationComponentTemplate.html') );
 
 			template
@@ -184,7 +184,6 @@
 
 			_element.replaceWith( template );
 			$compile( template )( $scope );
-
 		};
 
 
@@ -373,6 +372,7 @@
 			}.bind( this ) );
 
 			// Added: in newData, but not in _originalData
+
 			newIds.forEach( function( item ) {
 				if( originalIds.indexOf( item ) === -1 ) {
 					added.push( item );
@@ -409,8 +409,8 @@
 			'<div class=\'form-group\'>' +
 				'<label data-backoffice-label ' +
 					'data-label-identifier=\'{{backofficeRelationComponent.propertyName}}\' ' +
-					'data-is-required=\'backofficeRelationComponent.isRequired()\' ' + 
-					'data-is-valid=\'backofficeRelationComponent.isValid()\'>' + 
+					'data-is-required=\'backofficeRelationComponent.isRequired()\' ' +
+					'data-is-valid=\'backofficeRelationComponent.isValid()\'>' +
 				'</label>' +
 				'<div data-relation-input ' +
 					'class=\'relation-select col-md-9\'>' +
@@ -419,9 +419,5 @@
 		);
 
 	} ] );
-
-
-
-
 } )();
 

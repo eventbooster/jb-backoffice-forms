@@ -1,11 +1,17 @@
 @import "../../bower_components/bootstrap/less/variables.less";
 
 .locale-component {
-	
+  	position: relative;
+	overflow: hidden;
 	.nav li {
+	  	&.active {
+		  a:focus {background-color: @nav-tabs-active-link-hover-bg;}
+		}
 		margin-right: 10px;
 
 		a {
+		  	&:focus { background-color:transparent; }
+
 			padding: 4px 8px;
 
 			.fa {
@@ -22,12 +28,18 @@
 		padding-top: 10px;
 		background-color: @nav-tabs-active-link-hover-bg;
 
-		.locale-col {
-			float: left;
-			padding: 0 5px;
-			width: 100%;
-			box-sizing: border-box;
+	  	display: -webkit-box;
+	  	display: -moz-box;
+	  	display: -ms-flexbox;
+	  	display: -webkit-flex;
+	  	display: flex;
 
+		.locale-col {
+			padding: 0 5px;
+			/*width: 100%;*/
+			box-sizing: border-box;
+		    /* force flexbox to shrink the elements if they overflow the container */
+			min-width: 0;
 			p {
 				font-size: 0.8em;
 				margin: 0;

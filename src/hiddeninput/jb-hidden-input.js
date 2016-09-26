@@ -50,6 +50,7 @@ angular
 	};
 
 	self.isValid = function() {
+
 		return true;
 	};
 

@@ -1,121 +1,104 @@
-'use strict';
+(function(undefined) {
+    'use strict';
 
-/**
-* Auto text input. Inherits from AutoInput. Contains description for options passed.
-*/
+    /**
+     *
+     */
+    var AutoTextInputController = function ($scope, $attrs, componentsService) {
 
-/**
-* - Define function
-* - Call AutoInputController.call()
-* - Set prototype to Object.create(AutoInputController)
-* - Set constructor to self.prototype
-* - Register as angular controller
-*
-* - setData	         : Is called when data is received in DetailView
-* - getSaveCalls     : Is called when user tries to save data. Return object with
-*                      url, headers and data properties
-* - select           : Is selected in getData call
-*/
-var AutoTextInputController = function( $scope, $attrs ) {
+        this.$scope = $scope;
+        this.$attrs = $attrs;
+        this.name = $attrs['for'];
+        this.label =  this.name;
+        this.select = this.name;
+        this.componentsService = componentsService;
+        this.originalData = undefined;
+        this.required = true;
 
-	AutoInputController.call( this, $scope, $attrs );
+        $attrs.$observe('label', function(label){
+            this.label = label;
+        }.bind(this))
+    };
 
-	// Set select to this field's for attribute
-	// (that corresponds to data.name)
-	this.select = this.$scope.data.name;
+    AutoTextInputController.prototype.isRequired = function(){
+        return this.required === true;
+    };
 
-	$scope.isValid = function() {
-		if( this.$scope.optionData.required && !this.$scope.data.value ) {
-			return false;
-		}
-		return true;
-	}.bind( this );
+    AutoTextInputController.prototype.isValid = function () {
+        if(this.isRequired()) return !!this.$scope.data.value;
+        return true;
+    };
 
-	$scope.isRequired = function() {
-		return this.$scope.optionData.required;
-	}.bind( this );
+    AutoTextInputController.prototype.registerAt = function(parent){
+        parent.registerGetDataHandler(this.updateData.bind(this));
+        parent.registerOptionsDataHandler(this.handleOptionsData.bind(this));
+    };
 
-	//this._validateInput();
+    AutoTextInputController.prototype.handleOptionsData = function(data){
+        var spec = data[this.name];
+        if(!angular.isDefined(spec)) return console.error('No options data available for text-field %o', this.name);
+        this.required = spec.required === true;
+    };
 
-};
+    AutoTextInputController.prototype.init = function (scope) {
+        this.componentsService.registerComponent(scope, this);
+    };
 
-AutoTextInputController.prototype = Object.create( AutoInputController.prototype );
-AutoTextInputController.prototype.constructor = AutoTextInputController;
+    AutoTextInputController.prototype.preLink = function (scope) {
+        scope.data = {
+              name: this.name
+            , value: undefined
+            , valid: false
+        };
+    };
 
+    AutoTextInputController.prototype.updateData = function (data) {
+        this.originalData = this.$scope.data.value = data[this.name];
+    };
 
-AutoTextInputController.prototype.updateData = function( data ) {
-	this.originalData = this.$scope.data.value = data[ this.$attrs.for ];
-};
+    AutoTextInputController.prototype.getSaveCalls = function () {
 
-AutoTextInputController.prototype.getSaveCalls = function() {
+        if (this.originalData === this.$scope.data.value) return [];
 
-	if( this.originalData === this.$scope.data.value ) {
-		return false;
-	}
+        var data = {};
+        data[this.name] = this.$scope.data.value;
 
-	var data = {};
-	data[ this.$scope.data.name ] = this.$scope.data.value;
+        return [{
+            data: data
+        }];
+    };
 
-	return {
-		url			: ''
-		, data		: data
-		// entityId may be undefined, false or ''
-		, method	: ( !this.detailViewController.getEntityId() && this.detailViewController.getEntityId() !== 0 ) ? 'POST' : 'PATCH'
-	};
-	
-};
+    var _module = angular.module('jb.backofficeAutoFormElement');
+        _module.controller('AutoTextInputController', [
+            '$scope' ,
+            '$attrs' ,
+            'backofficeSubcomponentsService' ,
+            AutoTextInputController]);
 
-/*AutoTextInputController.prototype._validateInput = function() {
+    /**
+     * Directive for an autoFormElement of type 'text'
+     */
+        _module.directive('autoTextInput', [function () {
 
-	// Update validity for label
-	this.$scope.$watch( 'data.value', function( newValue ) {
-		if( this.$scope.optionData.required && !newValue ) {
-			this.$scope.data.valid = false;
-		}
-		else {
-			this.$scope.data.valid = true;
-		}
-		console.log( 'AutoTextInputController: set validity to ' + this.$scope.data.valid );
-	}.bind( this ) );
+            return {
+                  scope : true
+                , controllerAs: '$ctrl'
+                , link: {
+                    post: function (scope, element, attrs, ctrl) {
+                        ctrl.init(scope, element, attrs);
+                    }
+                    , pre: function(scope, element, attrs, ctrl){
+                        ctrl.preLink(scope, element, attrs);
+                    }
+                }
+                , controller: 'AutoTextInputController'
+                , template: '<div class=\'form-group form-group-sm\'>' +
+                                '<label data-backoffice-label data-label-identifier="{{$ctrl.label}}" data-is-valid="$ctrl.isValid()" data-is-required="$ctrl.isRequired()"></label>' +
+                                '<div class="col-md-9">' +
+                                    '<input type="text" data-ng-attr-id="data.name" class="form-control input-sm" data-ng-attrs-required="$ctrl.isRequired()" data-ng-model="data.value"/>' +
+                                '</div>' +
+                            '</div>'
+            };
 
-};*/
-
-
-
-
-
-angular
-.module( 'jb.backofficeAutoFormElement' )
-
-.controller( 'AutoTextInputController', AutoTextInputController )
-
-/**
-* Directive for an autoFormElement of type 'text'
-*/
-.directive( 'autoTextInput', [ function() {
-
-	return {
-		link			: function( scope, element, attrs, ctrl ) {
-			ctrl[ 1 ].init( element, ctrl[ 0 ] );
-		}
-		, controller	: 'AutoTextInputController'
-		, require		: [ '^detailView', 'autoTextInput' ]
-		, templateUrl	: 'autoTextInputTemplate.html'
-	};
-
-} ] )
-
-
-
-.run( function( $templateCache ) {
-
-	$templateCache.put( 'autoTextInputTemplate.html',
-		'<div class=\'form-group form-group-sm\'>' +
-			'<label data-backoffice-label data-label-identifier=\'{{data.name}}\' data-is-valid=\'isValid()\' data-is-required=\'isRequired()\'></label>' +
-			'<div class=\'col-md-9\'>' +
-				'<input type=\'text\' data-ng-attr-id=\'{{ entityName }}-{{ data.name }}-label\' class=\'form-control input-sm\' data-ng-attrs-required=\'isRequired()\' data-ng-model=\'data.value\'/>' +
-			'</div>' +
-		'</div>'
-	);
-
-} );
+        }]);
+})();

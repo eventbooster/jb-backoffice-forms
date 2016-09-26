@@ -8,7 +8,7 @@
 * - Make element, detailViewController, entityName and entityId available
 * - … (needs refactoring!)
 */
-var AutoInputController = function( $scope, $attrs ) {
+var AutoInputController = function( $scope, $attrs) {
 
 	// Make angular stuff available to methods
 	this.$attrs				= $attrs;
@@ -31,7 +31,7 @@ var AutoInputController = function( $scope, $attrs ) {
 		, valid		: true
 	};
 
-	// Needs to be defined in controller.
+	// Needs to be defined in controller.slkdjf
 	/*this.isValid				= function() {
 		return $scope.data.valid;
 	};*/

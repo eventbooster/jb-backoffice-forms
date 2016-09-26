@@ -1,164 +1,133 @@
-'use strict';
+(function () {
+    'use strict';
 
+    /**
+     * @notes: removed jQuery dependency, made the types injectable, did cleanup
+     * @notes:  The directive triggers an additional compilation phase after it has gotten the options data, therefore
+     *          the options are available within the sub components controllers. While this is necessary to render
+     *          the content correctly, it also creates a fixed dependency between some components and the
+     *          auto-form-element. The main problem is the fact that not all components need the same data. Further,
+     *          some components require the option data to be able to register their selects.
+     *
+     * @todo: remove the explicit dependency to the parent controller
+     * @todo: emit registration event after linking phase
+     * @todo:
+     */
 
+    /**
+     * Directive for autoFormElements: Replaces itself with the corresponding input element
+     * as soon as the detailView directive has gotten the necessary data (type, required etc.)
+     * from the server through an options call
+     */
+    var typeKey = 'jb.backofficeAutoFormElement.types'
+        , _module = angular.module('jb.backofficeAutoFormElement', ['jb.backofficeFormEvents']);
 
-/**
-* Directive for autoFormElements: Replaces itself with the corresponding input element
-* as soon as the detailView directive has gotten the necessary data (type, required etc.)
-* from the server through an options call
-*/
-angular
-.module( 'jb.backofficeAutoFormElement', [] )
-.directive( 'autoFormElement', [ '$compile', function( $compile ) {
+    _module.value(typeKey, {
+          'text': 'text'
+        , 'number': 'text'
+        , 'boolean': 'checkbox'
+        , 'relation': 'relation'
+        , 'language': 'language'
+        , 'image': 'image'
+        , 'datetime': 'dateTime'
+        , 'date': 'dateTime'
+    });
 
-	return {
-		require		: [ 'autoFormElement', '^detailView' ]
-		, link		: function( scope, element, attrs, ctrl ) {
+    _module.directive('autoFormElement', ['$compile', function ($compile) {
 
-			ctrl[ 0 ].init( element, ctrl[ 1 ] );
+        return {
+              controllerAs      : '$ctrl'
+            , bindToController  : true
+            , link : {
+                post: function (scope, element, attrs, ctrl) {
+                    ctrl.init(scope, element, attrs);
+                }
+                , pre: function (scope, element, attrs, ctrl) {
+                    ctrl.preLink(scope, element, attrs);
+                }
+            }
+            , controller        : 'AutoFormElementController'
+            // If we leave it out and use $scope.$new(), angular misses detailView controller
+            // as soon as we use it twice on one site.
+            // @todo: add explicit bindings to find out where the data comes from
+            , scope             : true
+        };
+    }]);
 
-		}
-		, controller	: 'AutoFormElementController'
-		// If we leave it out and use $scope.$new(), angular misses detailView controller
-		// as soon as we use it twice on one site. 
-		, scope			: true
-	};
+    function AutoFormElementController($scope, $attrs, $compile, $rootScope, fieldTypes, subcomponentsService) {
+        this.$scope     = $scope;
+        this.$attrs     = $attrs;
+        this.$compile   = $compile;
+        this.$rootScope = $rootScope;
+        this.fieldTypes = fieldTypes;
 
-} ] )
+        this.name       = $attrs.for;
+        this.label      = this.name;
+        this.$attrs.$observe('label', function(value){
+            this.label = value;
+        }.bind(this));
 
+        this.subcomponentsService   = subcomponentsService;
+        this.registry               = null;
+    }
 
-.controller( 'AutoFormElementController', [ '$scope', '$attrs', '$compile', '$rootScope', function( $scope, $attrs, $compile, $rootScope ) {
+    AutoFormElementController.prototype.preLink = function (scope, element, attrs) {
+        this.registry = this.subcomponentsService.registryFor(scope);
+        this.registry.listen();
+    };
 
-	var scope					= $scope
-		,self					= this
-		, element
-		, detailViewController;
+    AutoFormElementController.prototype.init = function (scope, element, attrs) {
+        this.element = element;
+        this.registry.registerYourself();
+        this.registry.registerOptionsDataHandler(this.updateElement.bind(this));
+    };
 
+    AutoFormElementController.prototype.updateElement = function(fieldSpec){
+            var   elementType
+                , elementSpec = fieldSpec[this.name];
 
+            if (!elementSpec || !elementSpec.type) {
+                console.error('AutoFormElement: fieldSpec %o is missing type for field %o', fieldSpec, this.name);
+                return;
+            }
 
-	/**
-	* Is called when OPTION data is gotten in detailViewController; inits the replacement of the element
-	*/
-	self.optionUpdateHandler = function( data ) {
+            elementType = this.fieldTypes[elementSpec.type];
 
-		if( !data || !data[ name ] ) {
-			console.error( 'AutoFormElement: Can\'t update element, specs for field %o missing in %o', name, data );
-			return;
-		}
+            if (!elementType) {
+                console.error('AutoFormElement: Unknown type %o', fieldSpec.type);
+                console.error('AutoFormElement: elementType missing for element %o', this.element);
+                return;
+            }
 
-		var fieldSpec		= data[ name ];
-		self.updateElement( fieldSpec );
+            console.log('AutoFormElement: Create new %s from %o', elementType, fieldSpec);
 
-		// Remove handler; if getOptions is called multiple times in detailViewController, 
-		// it will throw an error as the function is not available any more.
-		detailViewController.removeOptionsDataHandler( self.optionUpdateHandler );
+            // camelCase to camel-case
+            var dashedCasedElementType = elementType.replace(/[A-Z]/g, function (v) {
+                return '-' + v.toLowerCase();
+            });
 
-	};
+            // @todo: Pass attributes of original directive to replacement, is this necessary?
+            // @todo: just create the template string accordingly? Can we find out which attributes are bindings and stuff?
+            // @todo: or iterate the attributes create the attributes on the child element?
+            this.$scope.originalAttributes = this.$attrs;
 
+            var newElement = angular.element('<div data-auto-' + dashedCasedElementType + '-input data-for="' + this.name + '" label="' + this.label + '"></div>');
+            // @todo: not sure if we still need to prepend the new element when we actually just inject the registry
+            this.element.replaceWith(newElement);
+            this.registry.unregisterOptionsDataHandler(this.updateElement);
+            // now the registry should know all the subcomponents
+            this.$compile(newElement)(this.$scope);
+            // delegate to the options data handlers of the components
+            this.registry.optionsDataHandler(fieldSpec);
+    };
 
-	self.init = function( el, detViewController ) {
-
-		detailViewController = detViewController;
-
-		// $scope.$on won't work with multiple detail-view directives on one page (controller detailView cannot be
-		// found). Therefore use callbacks … :-)
-		//console.error( 'devview %o for %o', detailViewController, el.data( 'for' ) );
-		detailViewController.registerOptionsDataHandler( self.optionUpdateHandler );
-
-		element = el;
-
-	};
-
-
-	var name = $attrs[ 'for' ];
-
-	// field property updated in detailView (i.e. OPTION data gotten from serer)
-	// Select element's attributes, compile fitting directive
-	/*$scope.$on( 'fieldDataUpdate', function( ev, args ) {
-
-		console.error( 'AutoFormElement: fieldDataUpdate %o', args );
-
-		if( !args.fields || !args.fields[ name ] ) {
-			console.error( 'AutoFormElement: Can\'t update element, specs for field %o missing in %o', name, args );
-			return;
-		}
-
-		var fieldSpec		= args.fields[ name ];
-		self.updateElement( fieldSpec );
-
-	} );*/
-
-
-	/**
-	* Replaces element with the correct element of the type corresponding
-	* to the current property's type (text, email etc.)
-	*/
-	self.updateElement = function( fieldSpec ) {
-
-		var elementType;
-
-		if( !fieldSpec || !fieldSpec.type ) {
-			console.error( 'AutoFormElement: fieldSpec %o is missing type', fieldSpec );
-			return;
-		}
-
-		switch( fieldSpec.type ) {
-			case 'text':
-				elementType = 'text';
-				break;
-
-			case 'number':
-				elementType = 'text';
-				break;
-
-			case 'boolean':
-				elementType = 'checkbox';
-				break;
-
-			case 'relation':
-				elementType = 'relation';
-				break;
-
-			case 'language':
-				elementType = 'language';
-				break;
-
-			case 'image':
-				elementType = 'image';
-				break;
-
-			case 'datetime':
-				elementType = 'dateTime';
-				break;
-
-			default:
-				console.error( 'AutoFormElement: Unknown type %o', fieldSpec.type );
-
-		}
-		
-		if( !elementType ) {
-			console.error( 'AutoFormElement: elementType missing for element %o', element );
-			return;
-		}
-
-		console.log( 'AutoFormElement: Create new %s from %o', elementType, fieldSpec );
-
-		// camelCase to camel-case
-		var dashedCasedElementType = elementType.replace( /[A-Z]/g, function( v ) { return '-' + v.toLowerCase(); } );
-
-
-		// Pass OPTION data to directive :-)
-		scope.optionData = fieldSpec;
-
-		// Pass attributes of original directive to replacement
-		scope.originalAttributes = $attrs;
-
-		var newElement = $( '<div data-auto-' + dashedCasedElementType + '-input data-for=\'' + name + '\'></div>' );
-
-		element.replaceWith( newElement );
-		$compile( newElement )( scope );
-
-	};
-
-} ] );
+    _module.controller('AutoFormElementController', [
+        '$scope',
+        '$attrs',
+        '$compile',
+        '$rootScope',
+        typeKey,
+        'backofficeSubcomponentsService',
+        AutoFormElementController ]);
+})();
 

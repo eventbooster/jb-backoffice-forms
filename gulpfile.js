@@ -9,7 +9,10 @@ var gulp		= require( 'gulp' )
 
 
 var paths		= {
-	jsSrc		: 'src/*/*.js'
+	//avoid loading spec files
+	  jsSrc		: [
+		    'src/*/*.js'
+		  , '!src/*/*.spec.js']
 	, jsDest	: 'dist/js'
 	, cssSrc	: 'src/**/*.less'
 	, cssDest	: 'dist/css'
@@ -18,14 +21,14 @@ var paths		= {
 
 gulp.task( 'scripts', function() {
 
-	return gulp.src( [ paths.jsSrc ] )
+	return gulp.src( paths.jsSrc )
 		.pipe( order( [
 			// As all other auto components inherit from jb-auto-input, it
 			// must be first
 			'autoinput/jb-auto-input.js',
 			// Holds the module definition
 			'backoffice-form-elements/jb-backoffice-form-components.js',
-			'*/*.js'
+			'**/*.js'
 			], { base: './src/' } ) ) // does not seem to work without base –
 		.pipe( gulpPrint() )
 		.pipe( jshint() )
@@ -49,9 +52,6 @@ gulp.task( 'less', function() {
 		.pipe( gulp.dest( paths.cssDest ) );
 
 } );
-
-
-
 
 gulp.task( 'watch', function() {
 

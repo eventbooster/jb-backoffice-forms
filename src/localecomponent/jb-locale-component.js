@@ -13,13 +13,12 @@
 
 		return {
 			link				: function( scope, element, attrs, ctrl ) {
-				ctrl[ 0 ].init( element, ctrl[ 1 ] );
+				ctrl.init(element);
 			}
 			, controller		: 'LocaleComponentController'
-			, require			: [ 'localeComponent' ]
 			, templateUrl		: 'localeComponentTemplate.html'
 			, scope				: {
-				fields			: '='
+				  fields		: '='
 				, model			: '='
 				, entityName	: '=' // For translation
 				, tableName		: '='
@@ -30,17 +29,23 @@
 
 	} ] )
 
-	.controller( 'LocaleComponentController', [ '$scope', 'APIWrapperService', function( $scope, APIWrapperService ) {
+	.controller( 'LocaleComponentController', [
+              '$scope'
+            , 'APIWrapperService'
+            , 'backofficeFormEvents'
+            , function( $scope, APIWrapperService, formEvents ) {
 
-		var self = this
+		var   self = this
 			, element;
 
+        this.formEvents = formEvents;
 
-		// Array with 
-		// {
-		//	id		: 1
-		//	, code	: 'de'
+		// [
+		// 	{
+		//		id		: 1 ,
+		//		code	: 'de'
 		//	}
+		// ]
 		$scope.languages			= [];
 		
 
@@ -65,6 +70,7 @@
 			element = el;
 
 			// Adjust height of textareas
+            //@todo: update this as soon as we receive data
 			setTimeout( function() {
 				self.adjustHeightOfAllAreas();
 			}, 1000 );
@@ -72,7 +78,7 @@
 			self.setupFieldDefinitionWatcher();
 			self.setupValidityWatcher();
 			self.setupSelectedLanguagesWatcher();
-
+			$scope.$emit(formEvents.registerComponents, self);
 		};
 
 

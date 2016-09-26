@@ -171,11 +171,21 @@
   display: none;
 }
 
+.locale-component {
+  position: relative;
+  overflow: hidden;
+}
 .locale-component .nav li {
   margin-right: 10px;
 }
+.locale-component .nav li.active a:focus {
+  background-color: #fff;
+}
 .locale-component .nav li a {
   padding: 4px 8px;
+}
+.locale-component .nav li a:focus {
+  background-color: transparent;
 }
 .locale-component .nav li a .fa {
   font-size: 0.7em;
@@ -184,13 +194,19 @@
 }
 .locale-component .locale-content {
   padding-top: 10px;
-  background-color: #ffffff;
+  background-color: #fff;
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
 }
 .locale-component .locale-content .locale-col {
-  float: left;
   padding: 0 5px;
-  width: 100%;
+  /*width: 100%;*/
   box-sizing: border-box;
+  /* force flexbox to shrink the elements if they overflow the container */
+  min-width: 0;
 }
 .locale-component .locale-content .locale-col p {
   font-size: 0.8em;

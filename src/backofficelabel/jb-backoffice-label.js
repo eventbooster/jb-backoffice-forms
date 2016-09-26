@@ -1,63 +1,35 @@
-angular
-.module( 'jb.backofficeAutoFormElement' )
+(function (undefined) {
+    "use strict";
 
-.directive( 'backofficeLabel', [ '$templateCache', '$compile', function( $templateCache, $compile ) {
-	return {
-		link				: function( $scope, element, attrs, ctrl ) {
+    var _module = angular.module('jb.backofficeAutoFormElement');
 
-			
-			var scope	= $scope.$new()
-				, tpl	= $( $templateCache.get( 'backofficeLabelTemplate.html' ) );
+    _module.controller('backofficeLabelController', ['$scope', function ($scope) {
+        this.$scope = $scope;
+    }]);
 
-			// Set validity to true for old components; in template, 
-			// we test for !valid||!isValid
-			scope.valid = true;
+    _module.directive('backofficeLabel', ['$templateCache', '$compile', function ($templateCache, $compile) {
+        return {
+            link: function ($scope, element, attrs, ctrl) {
+                var tpl = angular.element($templateCache.get('backofficeLabelTemplate.html'));
+                element.replaceWith(tpl);
+                $compile(tpl)($scope);
+            }
+            , scope: {
+                  labelIdentifier: '@'
+                , isRequired: '&'
+                , isValid: '&'
+            }
+        };
+    }]);
 
-			// scope.required is used for old (auto) elements
-			scope.required = scope.name = scope.entityName = undefined;
-
-			$scope.entityName = ctrl[ 0 ].getEntityName();
-
-			$scope.$watch( 'data', function( newValue ) {
-
-				if( !newValue ) {
-					scope.valid = scope.name = undefined;
-					return;
-				}
-
-				scope.valid		= newValue.valid;
-				scope.name		= newValue.name;
-				console.log( 'backofficeLabel: Updated data %o', newValue );
-			}, true );
-
-			$scope.$watch( 'entityName', function( newValue ) {
-				scope.entityName = newValue;
-			} );
-
-			$scope.$watch( 'optionData.required', function( newValue ) {
-				scope.required = newValue;
-			} );
-
-			element.replaceWith( tpl );
-			$compile( tpl )( scope );
-
-		}
-		, require: [ '^detailView' ]
-		, scope: {
-			labelIdentifier	: '@'
-			, isRequired	: '&'
-			, isValid		: '&'
-		}
-	};
-} ] )
-
-.run( function( $templateCache ) {
-	$templateCache.put( 'backofficeLabelTemplate.html',
-		'<div class=\'col-md-3\'>' +
-			'<label class=\'control-label\' data-ng-class=\'{invalid: !isValid()}\'>{{checkValidity()}}' +
-				'<span data-ng-if=\'isRequired()||required\' class=\'required-indicator \'>*</span>' +
-				'<span data-translate=\'web.backoffice.{{ entityName }}.{{ labelIdentifier }}\'></span>' +
-			'</label>' +
-		'</div>'
-	);
-} );
+    _module.run(function ($templateCache) {
+            $templateCache.put('backofficeLabelTemplate.html',
+                '<div class="col-md-3">' +
+                    '<label class="control-label" data-ng-class="{invalid: !isValid()}">' +
+                        '<span data-ng-if="isRequired()||required" class="required-indicator">*</span>' +
+                        '<span data-translate="{{labelIdentifier}}"></span>' +
+                    '</label>' +
+                '</div>'
+            );
+        });
+})();

@@ -2,63 +2,66 @@
 * Component for a single image to
 * - set focal points
 */
-( function() {
+( function(undefined) {
 
 	'use strict';
 
-	angular
-
-	.module( 'jb.backofficeFormComponents' )
+	var _module = angular.module( 'jb.backofficeFormComponents' );
 
 	/**
 	* <input data-backoffice-image-component 
 	*	data-for="enity">
 	*/
-	.directive( 'backofficeImageDetailComponent', [ function() {
+	_module.directive( 'backofficeImageDetailComponent', [ function() {
 
 		return {
-			require				: [ 'backofficeImageDetailComponent', '^detailView' ]
-			, controller		: 'BackofficeImageDetailComponentController'
+			  controller		: 'BackofficeImageDetailComponentController'
 			, controllerAs		: 'backofficeImageDetailComponent'
 			, bindToController	: true
-			, templateUrl		: 'backofficeImageDetailComponentTemplate.html'
 			, link				: function( scope, element, attrs, ctrl ) {
-				ctrl[ 0 ].init( element, ctrl[ 1 ] );
+				ctrl.init(scope, element, attrs);
 			}
+			, template : '<label data-backoffice-label data-label-identifier="{{backofficeImageDetailComponent.label}}" data-is-required="false" data-is-valid="true"></label>' +
+			'<div class="col-md-9 backoffice-image-detail-component">' +
+			'<div class="image-container">' +
+			'<img data-ng-attr-src="{{backofficeImageDetailComponent.image[ backofficeImageDetailComponent.pathField ]}}" data-ng-click="backofficeImageDetailComponent.setFocalPointClickHandler($event)"/>' +
+			'<div class="focal-point-indicator" data-ng-if="backofficeImageDetailComponent.getFocalPoint()" data-ng-attr-style="top:{{backofficeImageDetailComponent.getFocalPointInPercent().y}}%;left:{{backofficeImageDetailComponent.getFocalPointInPercent().x}}%"></div>' +
+			'</div>' +
+			'<div data-ng-if="!backofficeImageDetailComponent.getFocalPoint()">{{ "web.backoffice.image.focalPointNotSet" | translate }}</div>' +
+			'<div data-ng-if="backofficeImageDetailComponent.getFocalPoint()">{{ "web.backoffice.image.focalPoint" | translate }}: {{ backofficeImageDetailComponent.getFocalPoint().x }} / {{backofficeImageDetailComponent.getFocalPoint().y}} </div>' +
+			'</div>'
 			, scope: {
-				pathField		: '@'
+                  pathField : '@'
+                , label     : '@'
 			}
 
 		};
 
-	} ] )
+	} ] );
 
-	.controller( 'BackofficeImageDetailComponentController', [ '$scope', function( $scope ) {
+	_module.controller( 'BackofficeImageDetailComponentController', [
+          '$scope'
+        , 'backofficeSubcomponentsService'
+        , function( $scope, componentsService) {
 
 		var self = this
 			, _element
 			, _detailViewController
 
 			//, _imageRenderingIds = []
-
 			, _originalFocalPoint;
 
 
 		self.image = {};
 
 
-		self.init = function( el, detailViewCtrl ) {
-			_element = el;
-			_detailViewController = detailViewCtrl;
-
-			_detailViewController.registerOptionsDataHandler( self.updateOptionsData );
-			_detailViewController.registerGetDataHandler( self.updateData );
-
+		self.init = function( scope, element, attrs ) {
+            componentsService.registerComponent(scope, self);
 		};
 
-		self.updateOptionsData = function( data ) {
-			_detailViewController.register( self );
-		};
+        self.registerAt = function(parent){
+            parent.registerGetDataHandler( self.updateData );
+        };
 
 		self.updateData = function( data ) {
 
@@ -87,15 +90,6 @@
 					console.error( 'BackofficeImageDetailComponentController: Could not parse focalPoint ' + data.focalPoint + ': ' + e.message );
 				}
 			}
-
-
-			// Store IDs of imageRenderings
-			/*if( data.imageRendering && data.imageRendering.length ) {
-				_imageRenderingIds = data.imageRendering.map( function( item ) {
-					return item.id;
-				} );
-			}*/
-
 			_originalFocalPoint = angular.copy( data.focalPoint );
 
 		};
@@ -132,21 +126,12 @@
 			// PATCH on image automatically deletes imageRenderings. No need to do it manually.
 			calls.push( {
 				// It's always PATCH, as the image does exist
-				method			: 'PATCH'
-				, url			: '/' + _detailViewController.getEntityName() + '/' + _detailViewController.getEntityId()
+				  method	    : 'PATCH'
+				, url			: ''
 				, data			: {
 					focalPoint	: JSON.stringify( self.image.focalPoint )
 				}
 			} );
-
-
-			// Remove existing image renderings
-			/*_imageRenderingIds.forEach( function( imageRenderingId ) {
-				calls.push( {
-					method			: 'DELETE'
-					, url			: '/imageRendering/' + imageRenderingId
-				} );
-			} );*/
 
 			return calls;
 
@@ -204,26 +189,6 @@
 			};
 
 		};
-
-	} ] )
-
-
-
-	.run( [ '$templateCache', function( $templateCache ) {
-
-		$templateCache.put( 'backofficeImageDetailComponentTemplate.html',
-
-			'<label data-backoffice-label data-label-identifier=\'image\' data-is-required=\'false\' data-is-valid=\'true\'></label>' +
-			'<div class=\'col-md-9 backoffice-image-detail-component\'>' +
-				'<div class=\'image-container\'>' +
-					'<img data-ng-attr-src=\'{{backofficeImageDetailComponent.image[ backofficeImageDetailComponent.pathField ]}}\' data-ng-click=\'backofficeImageDetailComponent.setFocalPointClickHandler($event)\'/>' +
-					'<div class=\'focal-point-indicator\' data-ng-if=\'backofficeImageDetailComponent.getFocalPoint()\' data-ng-attr-style=\'top:{{backofficeImageDetailComponent.getFocalPointInPercent().y}}%;left:{{backofficeImageDetailComponent.getFocalPointInPercent().x}}%\'></div>' +
-				'</div>' +
-				'<div data-ng-if=\'!backofficeImageDetailComponent.getFocalPoint()\'>{{ \'web.backoffice.image.focalPointNotSet\' | translate }}</div>' +
-				'<div data-ng-if=\'backofficeImageDetailComponent.getFocalPoint()\'>{{ \'web.backoffice.image.focalPoint\' | translate }}: {{ backofficeImageDetailComponent.getFocalPoint().x }} / {{backofficeImageDetailComponent.getFocalPoint().y}} </div>' +
-			'</div>'
-
-		);
 
 	} ] );
 
