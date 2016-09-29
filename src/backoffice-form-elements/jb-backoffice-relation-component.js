@@ -226,12 +226,12 @@
 		*/
 		self.getSingleSelectSaveCalls = function() {
 
-
+			var calls = [];
 			// Relations missing; happens if relations were not set on server nor changed
 			// by user
 			if( !self.relationModel ) {
 				console.log( 'AutoRelationInputController: relationModel empty' );
-				return false;
+				return calls;
 			}
 
 
@@ -246,13 +246,13 @@
 					// No values
 					if( self.relationModel.length === 0 && _originalData.length === 0 ) {
 						console.log( 'BackofficeRelationComponentController: No changes and no relations for required relation %o', self.propertyName );
-						return false;
+						return calls;
 					}
 
 					// Same value
 					if( self.relationModel.length && _originalData.length && self.relationModel[ 0 ] && _originalData[ 0 ] && self.relationModel[ 0 ].id === _originalData[ 0 ].id ) {
 						console.log( 'BackofficeRelationComponentController: No changes on required relation %o', self.propertyName );
-						return false;
+						return calls;
 					}
 
 				}
@@ -267,20 +267,20 @@
 				// Creating main entity
 				if( !_detailViewController.getEntityId() ) {
 
-					return {
+					return [{
 						url			: false // Use main entity URL
 						, method	: 'POST'
 						, data		: relationData
-					};
+					}];
 				}
 
 				// Updating main entity
 				else {
-					return {
+					return [{
 						url			: false // Use main entity URL
 						, method	: 'PATCH'
 						, data		: relationData
-					};
+					}];
 				}
 
 			}
@@ -288,7 +288,7 @@
 
 			// Element was removed
 			if( self.relationModel.length === 0 && _originalData && _originalData.length !== 0 ) {
-				return {
+				return [{
 					// self.propertyName must be first (before _detailViewController.getEntityName()) as the server handles stuff the same way – 
 					// and ESPECIALLY for entities with an alias.
 					url					: { 
@@ -296,7 +296,7 @@
 						, mainEntity	: 'append'
 					}
 					, method			: 'DELETE'
-				};
+				}];
 			}
 
 			// Update
@@ -311,20 +311,20 @@
 
 					// Post to /mainEntity/currentId/entityName/entityId, path needs to be entityName/entityId, 
 					// is automatically prefixed by DetailViewController 
-					return {
+					return [{
 						url					:  {
 							path			:'/' + self.propertyName + '/' + self.relationModel[ 0 ].id
 							, mainEntity	: 'append'
 						}
 						, method			: 'POST'
-					};
+					}]
 			
 				}
 
 			}
 
 			// No changes
-			return false;
+			return calls;
 
 		};
 
@@ -387,10 +387,6 @@
 			}.bind( this ) );
 
 			console.log( 'BackofficeRelationComponentController: Added %o, deleted %o – calls: %o', added, deleted, calls );
-
-			if( calls.length === 0 ) {
-				return false;
-			}
 
 			return calls;
 

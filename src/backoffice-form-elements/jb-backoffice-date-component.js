@@ -12,28 +12,43 @@
 	.directive( 'backofficeDateComponent', [ function() {
 
 		return {
-			require				: [ 'backofficeDateComponent', '^detailView' ]
-			, controller		: 'BackofficeDateComponentController'
-			, controllerAs		: 'backofficeDateComponent'
+			  controller		: 'BackofficeDateComponentController'
+			, controllerAs		: '$ctrl'
 			, bindToController	: true
-			, templateUrl		: 'backofficeDateComponentTemplate.html'
+			, template 			:
+				'<div class="form-group form-group-sm">' +
+					'<label data-backoffice-label data-label-identifier="{{$ctrl.label}}" data-is-required="$ctrl.isRequired()" data-is-valid="$ctrl.isValid()"></label>' +
+						'<div data-ng-class="{ \"col-md-9\": !$ctrl.showTime(), \"col-md-5\": $ctrl.showTime()}">' +
+							'<input type="date" class="form-control input-sm" data-ng-model="backofficeDateComponent.date">' +
+						'</div>' +
+					'<div class="col-md-4" data-ng-if="$ctrl.showTime()">' +
+						'<input type="time" class="form-control input-sm" data-ng-model="$ctrl.date" />' +
+					'</div>' +
+				'</div>'
 			, link				: function( scope, element, attrs, ctrl ) {
-				ctrl[ 0 ].init( element, ctrl[ 1 ] );
+				ctrl.init( scope, element, attrs );
 			}
 			, scope: {
-				'propertyName'		: '@for'
+				  'propertyName' 	: '@for'
+				, 'label'			: '@'
 			}
 
 		};
 
 	} ] )
 
-	.controller( 'BackofficeDateComponentController', [ '$scope', '$rootScope', '$q', 'APIWrapperService', function( $scope, $rootScope, $q, APIWrapperService ) {
+	.controller(
+          'BackofficeDateComponentController'
+        , [
+              '$scope'
+            , '$rootScope'
+            , '$q'
+            , 'APIWrapperService'
+            , 'backofficeSubcomponentsService'
+            , function( $scope, $rootScope, $q, APIWrapperService, componentsService) {
 
-		var self = this
+		var   self = this
 			, _element
-			, _detailViewController
-
 			, _originalData
 
 			, _required
@@ -41,13 +56,10 @@
 
 		self.date = undefined;
 
-		self.init = function( el, detailViewCtrl ) {
+		self.init = function( scope, element, attrs ) {
 
-			_element = el;
-			_detailViewController = detailViewCtrl;
-
-			_detailViewController.registerOptionsDataHandler( self.updateOptionsData );
-			_detailViewController.registerGetDataHandler( self.updateData );
+			_element = element;
+            componentsService.registerComponent(scope, this);
 
 		};
 
@@ -66,7 +78,10 @@
 		};
 
 
-
+        self.registerAt = function(parent){
+            parent.registerOptionsDataHandler(self.updateOptionsData.bind(self));
+            parent.registerGetDataHandler(self.updateData.bind(self));
+        };
 
 		/**
 		* Called with OPTIONS data 
@@ -78,16 +93,8 @@
 				return;
 			}
 
-			if(  data[ self.propertyName ].required ) {
-				_required = true;
-			}
-
-			if(  data[ self.propertyName ].time ) {
-				_showTime = true;
-			}
-
-			_detailViewController.register( self );
-
+			_required = data[self.propertyName].required === true;
+            _showTime = data[self.propertyName].time === true;
 		};
 
 
@@ -109,6 +116,7 @@
 		*/
 		self.getSaveCalls = function() {
 
+            var calls = [];
 			function pad( nr ) {
 				return nr < 10 ? '0' + nr : nr;
 			}
@@ -122,15 +130,10 @@
 				var data = {};
 				data[ self.propertyName ] = self.date.getFullYear() + '-' + pad( self.date.getMonth() + 1 ) + '-' + pad( self.date.getDate() ) + ' ' + pad( self.date.getHours() ) + ':' + pad( self.date.getMinutes() ) + ':' + pad( self.date.getSeconds() );
 
-				return {
-					method			: _detailViewController.getEntityId() ? 'PATCH' : 'POST'
-					, data			: data
-				};
+				calls.push({ data: data});
 
 			}
-
-			return false;
-
+			return calls;
 		};
 
 
@@ -149,25 +152,6 @@
 		};
 
 
-
-	} ] )
-
-
-
-	.run( [ '$templateCache', function( $templateCache ) {
-
-		$templateCache.put( 'backofficeDateComponentTemplate.html',
-			'<div class=\'form-group form-group-sm\'>' +
-				'<label data-backoffice-label data-label-identifier=\'{{backofficeDateComponent.propertyName}}\' data-is-required=\'backofficeDateComponent.isRequired()\' data-is-valid=\'backofficeDateComponent.isValid()\'></label>' +
-				// input[time] and input[date] are bound to the same model. Should work nicely.
-				'<div data-ng-class=\'{ "col-md-9": !backofficeDateComponent.showTime(), "col-md-5": backofficeDateComponent.showTime()}\'>' +
-					'<input type=\'date\' class=\'form-control input-sm\' data-ng-model=\'backofficeDateComponent.date\'>' +
-				'</div>' +
-				'<div class=\'col-md-4\' data-ng-if=\'backofficeDateComponent.showTime()\'>' +
-					'<input type=\'time\' class=\'form-control input-sm\' data-ng-model=\'backofficeDateComponent.date\' />' +
-				'</div>' +
-			'</div>'
-		);
 
 	} ] );
 

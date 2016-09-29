@@ -28,17 +28,18 @@
     });
 
     function BackofficeSubcomponentsRegistry($q, formEvents, scope){
-        this.registeredComponents = [];
-        this.scope = scope;
-        this.optionsDataHandlers   = [];
+        this.registeredComponents   = [];
+        this.scope                  = scope;
+        this.optionsDataHandlers    = [];
         this.getDataHandlers        = [];
-        this.$q = $q;
-        this.formEvents = formEvents;
+        this.$q                     = $q;
+        this.formEvents             = formEvents;
     }
 
     BackofficeSubcomponentsRegistry.prototype.listen = function(){
         this.scope.$on(this.formEvents.registerComponent, function(event, component){
             console.log('REGISTRATION OF:', component);
+            // this check should not be necessary anymore, since we emit the registration event on the parent scope
             if(component === this) return;
             event.stopPropagation();
             this.registerComponent(component);
@@ -53,6 +54,8 @@
 
     BackofficeSubcomponentsRegistry.prototype.getSaveCalls = function(){
         return this.registeredComponents.reduce(function(calls, component){
+            var subcalls = component.getSaveCalls();
+            if(subcalls === false) debugger;
             return calls.concat(component.getSaveCalls());
         }, []);
     };
@@ -70,7 +73,7 @@
                 return subcalls.concat(component.afterSaveTasks());
             }
             return subcalls;
-        });
+        }, []);
         return this.$q.all(calls);
     };
 
@@ -80,7 +83,7 @@
                 return subcalls.concat(component.beforeSaveTasks());
             }
             return subcalls;
-        });
+        }, []);
         return this.$q.all(calls);
     };
 
@@ -92,16 +95,16 @@
         }, []);
     };
     /**
-     * @todo: make use of promises!
-     * @param datasdsdf
+     * @param data
      */
     BackofficeSubcomponentsRegistry.prototype.optionsDataHandler = function(data){
-        this.optionsDataHandlers.forEach(function(handler){
-            handler(data);
-        });
+        return this.$q.all(this.optionsDataHandlers.map(function(handler){
+            return this.$q.when(handler(data));
+        }, this));
     };
 
     BackofficeSubcomponentsRegistry.prototype.registerOptionsDataHandler = function(handler){
+        if(!angular.isFunction(handler)) debugger;
         this.optionsDataHandlers.push(handler);
     };
 
@@ -124,7 +127,7 @@
     };
 
     BackofficeSubcomponentsRegistry.prototype.registerYourself = function(scope){
-        (scope || this.scope).$emit(this.formEvents.registerComponent, this);
+        (scope || this.scope).$parent.$emit(this.formEvents.registerComponent, this);
     };
 
     BackofficeSubcomponentsRegistry.prototype.registerAt = function(parent){
@@ -144,7 +147,7 @@
                         return registry;
                     }
                     , registerComponent : function(scope, component){
-                        scope.$emit(formEvents.registerComponent, component);
+                        scope.$parent.$emit(formEvents.registerComponent, component);
                     }
                 }
             }

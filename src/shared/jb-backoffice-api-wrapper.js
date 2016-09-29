@@ -3,7 +3,9 @@
     var _module = angular.module('jb.backofficeAPIWrapper', ['jb.apiWrapper']);
 
     /**
-     * @todo: make the representation more explicit by preserving the type of the relation!
+     * @todo: make the representation more explicit by preserving the types of the relation! The components need to be
+     * aware of where to take their option data anyway.
+     *
      * @param apiWrapper
      * @constructor
      */
@@ -56,6 +58,8 @@
             if (relation.entity === 'image')    relation.type = 'image';
 
             options[property] = relation;
+            options.internalMappings = options.internalMappings || {};
+            options.internalMappings[relation.relation] = relation;
         });
     };
 
@@ -103,7 +107,7 @@
                 , relation      : fieldSpec.hasAlias ? fieldSpec.name : fieldSpec.modelName
                 , relatedKey    : fieldSpec.referencedColumn
                 , alias         : fieldSpec.hasAlias ? fieldSpec.name : false
-                , relationType  : 'multiple' // #todo: always multiple?
+                , relationType  : 'multiple'
                 , required      : false //!singleFieldData[ p ].nullable won't work, as nullable ain't set
                 , originalRelation : 'belongsTo'
             };
@@ -154,7 +158,7 @@
         this.normalizeMappings(hasMany, options);
         this.normalizeFields(optionsData, options);
 
-        console.log('DetailView: parsed options are %o', options);
+        console.log('BackofficeAPIWrapperService: parsed options are %o', options);
         return options;
     };
 

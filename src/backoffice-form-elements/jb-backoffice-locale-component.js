@@ -28,8 +28,7 @@
                             '</div>' +
                             '<div class="locale-content clearfix">' +
                                 '<div class="locale-col" ng-repeat="language in $ctrl.getSelectedLanguages()">' +
-                                '<p>{{ language.code | uppercase }}</p>' +
-                                // now get the field definition , iterate through the fields and bind them to the inputs
+                                    '<p>{{ language.code | uppercase }}</p>' +
                                     '<ul>' +
                                         '<li ng-repeat="field in $ctrl.getFields()">' +
                                             '<label ng-attr-for="locale-{{language.code}}-{{field.name}}" ng-class="{ \'invalid\' : !$ctrl.fieldIsValid($ctrl.locales[ language.id ], field.name)}">' +
@@ -210,8 +209,10 @@
      */
     BackofficeEntityLocaleController.prototype.handleOptionsData = function(data){
         var spec;
-        if(!data && !angular.isDefined(data[this.relationName])) return console.error('No OPTIONS data found in locale component.');
+
+        if(!data || !angular.isDefined(data[this.relationName])) return console.error('No OPTIONS data found in locale component.');
         spec            = data[this.relationName];
+
         this.options    = spec;
         this.loadFields().then(function(fields){
             this.$timeout(function(){
@@ -307,8 +308,10 @@
 
     BackofficeEntityLocaleController.prototype.handleGetData = function(data){
         var locales             = data[this.options.tableName];
-        this.originalLocales    = this.normalizeModel(locales);
-        this.locales            = angular.copy(this.originalLocales);
+        if(locales){
+            this.originalLocales    = this.normalizeModel(locales);
+            this.locales            = angular.copy(this.originalLocales);
+        }
         if(this.getSelectedLanguages().length === 0) {
             return this.$timeout(function(){ this.toggleLanguage(null, this.supportedLanguages[0]);}.bind(this));
         }
@@ -339,6 +342,7 @@
      * @returns {*}
      */
     BackofficeEntityLocaleController.prototype.getSelectFields = function(){
+
         var   localeTableName   = this.options.tableName
             , languageSelector  = [localeTableName, 'language', '*'].join('.')
             , selects;

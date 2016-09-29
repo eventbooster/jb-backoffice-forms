@@ -14,10 +14,6 @@
         this.componentsService = componentsService;
         this.originalData = undefined;
         this.required = true;
-
-        $attrs.$observe('label', function(label){
-            this.label = label;
-        }.bind(this))
     };
 
     AutoTextInputController.prototype.isRequired = function(){
@@ -81,8 +77,12 @@
         _module.directive('autoTextInput', [function () {
 
             return {
-                  scope : true
+                  scope : {
+                        label: '@'
+                      , name: '@for'
+                  }
                 , controllerAs: '$ctrl'
+                , bindToController: true
                 , link: {
                     post: function (scope, element, attrs, ctrl) {
                         ctrl.init(scope, element, attrs);
