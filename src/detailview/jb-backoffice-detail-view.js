@@ -1,4 +1,4 @@
-(function(undefined) {
+(function (undefined) {
     'use strict';
 
     /**
@@ -18,51 +18,66 @@
      */
 
     var _module = angular.module('jb.backofficeDetailView', [
-          'jb.apiWrapper'
+        'jb.apiWrapper'
         , 'pascalprecht.translate'
         , 'jb.backofficeFormEvents'
     ]);
 
     _module.directive('detailView', [function () {
 
-            return {
-                link: {
-                    pre: function (scope, element, attrs, ctrl) {
-                        if (angular.isFunction(ctrl.preLink)) {
-                            ctrl.preLink(scope, element, attrs);
-                        }
+        return {
+            link: {
+                pre: function (scope, element, attrs, ctrl) {
+                    if (angular.isFunction(ctrl.preLink)) {
+                        ctrl.preLink(scope, element, attrs);
                     }
-                    , post: function (scope, element, attrs, ctrl) {
-                        ctrl.init(scope, element, attrs);
-                    }
-
                 }
-                , controller        : 'DetailViewController'
-                , bindToController  : true
-                , controllerAs      : '$ctrl'
+                , post: function (scope, element, attrs, ctrl) {
+                    ctrl.init(scope, element, attrs);
+                }
 
-                /**
-                 * We cannot use an isolated scope here: the nested elements would be attached to the parent scope
-                 * and we would not be able to listen to the corresponding events.
-                 *
-                 *  {
+            }
+            , controller        : 'DetailViewController'
+            , bindToController  : true
+            , controllerAs      : '$ctrl'
+
+            /**
+             * We cannot use an isolated scope here: the nested elements would be attached to the parent scope
+             * and we would not be able to listen to the corresponding events.
+             *
+             *  {
                  *        'entityName'  : '<'
                  *      , 'entityId'    : '<'
                  *      , 'isRoot'      :
                  *  }
-                 */
-                , scope: true
-            };
+             */
+            , scope: true
+        };
 
-        }]);
+    }]);
+    /**
+     * @todo: do a clean implementation!
+     */
+    function DetailViewController($scope, $rootScope, $q, $filter, $state, APIWrapperService, subcomponentsService, boAPIWrapper) {
+        this.$scope             = $scope;
+        this.$rootScope         = $rootScope;
+        this.$q                 = $q;
+        this.$filter            = $filter;
+        this.$state             = $state;
+        this.api                = APIWrapperService;
+        this.boAPI              = boAPIWrapper;
+        this.componentsService  = subcomponentsService;
+        // this will be resolved in the linking phase
+        this.componentsRegistry = null;
+    }
 
-        function DetailViewController (){
+    DetailViewController.prototype.init = function(scope, element, attrs){
 
-        }
+    };
 
-        _module.controller('DetailViewController',
+    _module.controller('DetailViewController',
         [
-              '$scope'
+            '$scope'
             , '$rootScope'
             , '$q'
             , '$attrs'
@@ -78,24 +93,18 @@
              * Private vars
              */
 
-            var   self      = this
+            var self = this
                 , element;
 
-            self.componentsService      = subcomponentsService;
-            self.componentsRegistry     = null;
-            // @todo: check if this is still needed
-            self.fields                 = undefined;
-            /**
-             * Scope vars
-             * @todo: remove whatever necessary
-             */
+            self.componentsService = subcomponentsService;
+            self.componentsRegistry = null;
+
+            $scope.$watchGroup(['$ctrl.entityName', '$ctrl.entityId'], function () {
+                self.setTitle();
+            });
 
             /**
              * Set up the registry waiting for subcomponents in the pre-link phase.
-             *
-             * @param scope
-             * @param element
-             * @param attrs
              */
             self.preLink = function (scope, element, attrs) {
                 self.componentsRegistry = self.componentsService.registryFor(scope);
@@ -139,26 +148,15 @@
              */
 
             self.setTitle = function () {
+                var   titleSuffix = self.getEntityName()
+                    , titlePrefix = $filter('translate')('web.backoffice.create');
 
-                if (self.parseUrl().isNew) {
-                    $scope.title = $filter('translate')('web.backoffice.create') + ': ';
+                if (self.entityId) {
+                    titlePrefix = $filter('translate')('web.backoffice.edit');
+                    titleSuffix = titleSuffix + ' #'+ self.entityId;
                 }
-                else {
-                    $scope.title = $filter('translate')('web.backoffice.edit') + ': ';
-                }
-
-                $scope.title += self.getEntityName();
-
-                if (self.getEntityId()) {
-                    $scope.title += ' #' + self.getEntityId();
-                }
+                $scope.title = [titlePrefix , titleSuffix].join(': ');
             };
-
-
-            $scope.$watchGroup(['entityName', 'entityId'], function () {
-                self.setTitle();
-            });
-
 
             /**
              * Init (called from directive's link function)
@@ -187,29 +185,29 @@
                  *
                  * @todo: can we detect if we are root by checking if 'registerAt' was called?
                  */
-                self.isRoot         = attrs.hasOwnProperty('isRoot');
-                self.hasEntityName  = attrs.hasOwnProperty('entityName');
-                self.hasEntityId    = attrs.hasOwnProperty('entityId');
+                self.isRoot = attrs.hasOwnProperty('isRoot');
+                self.hasEntityName = attrs.hasOwnProperty('entityName');
+                self.hasEntityId = attrs.hasOwnProperty('entityId');
 
-                if(self.hasEntityName){
+                if (self.hasEntityName) {
                     var nameDeferred = $q.defer();
-                    $attrs.$observe('entityName', function(value){
+                    $attrs.$observe('entityName', function (value) {
                         self.setEntityName(value);
                         nameDeferred.resolve();
                     });
                     promises.push(nameDeferred.promise);
                 }
 
-                if(self.hasEntityId){
+                if (self.hasEntityId) {
                     var idDeferred = $q.defer();
-                    $attrs.$observe('entityId', function(value){
+                    $attrs.$observe('entityId', function (value) {
                         self.setEntityId(value);
                         idDeferred.resolve();
                     });
                     promises.push(idDeferred.promise);
                 }
 
-                if(!self.hasEntityName && !self.hasEntityId){
+                if (!self.hasEntityName && !self.hasEntityId) {
                     var stateParams = self.parseUrl();
                     self.setEntityName(stateParams.name);
                     self.setEntityId(stateParams.id);
@@ -217,61 +215,74 @@
                 // register myself as a component to possible parents
                 self.componentsService.registerComponent(scope, this);
 
-                $q.all(promises).then(function(){
+                $q.all(promises).then(function () {
                     // load option data if we are root
-                    if(self.isRoot) self.getOptionData().then(
-                          self.getData
-                        , function(error){ console.error(error); }
+                    if (self.isRoot) self.getOptionData().then(
+                        self.getData
+                        , function (error) {
+                            console.error(error);
+                        }
                     )
                 });
             };
 
-            self.setEntityName = function(name){
-                self.entityName     = name;
-                $scope.entityName   = name;
+            self.setEntityName = function (name) {
+                self.entityName = name;
+                $scope.entityName = name;
             };
 
-            self.setEntityId = function(id){
-                self.entityId       = id;
-                $scope.entityId     = id;
+            self.setEntityId = function (id) {
+                self.entityId = id;
+                $scope.entityId = id;
             };
 
-            self.registerAt = function(parent){
+            self.registerAt = function (parent) {
                 parent.registerOptionsDataHandler(self.handleOptionsData);
                 parent.registerGetDataHandler(self.handleGetData);
             };
             /**
-             * @todo: handle aliases
+             * Also, we have to differ between:
+             *
+             *  1. hasOne       : just take the value
+             *  2. belongsTo    : take the first of the values
+             *
              * @param data
              */
-            self.handleGetData = function(data){
+            self.handleGetData = function (data) {
                 var ownData = data[self.entityName];
-                if(!angular.isDefined(ownData)) return console.error('No data available for related %o', self.entityName);
-                if(!self.getEntityId()){
-                    var pKey = self.optionData.relationKey;
+                if (!angular.isDefined(ownData)) return console.error('No data available for related %o', self.entityName);
+                // ugh we might get the entityId through the scope!!
+                if (!self.entityId) {
+                    var pKey = self.optionData.relatedKey;
                     self.setEntityId(ownData[pKey]);
                 }
                 self.distributeData(ownData);
             };
 
-            self.getSaveCalls = function(){
-                return self.generateSaveCalls();
+            self.getSaveCalls = function () {
+                var calls = self.generateSaveCalls();
+                return calls;
             };
             /**
              * This is shitty! We need to load more options data as soon as we receive the options to to be able to
              * distribute options to the nested fields.
              * @param fields
              */
-            self.internallyHandleOptionsData = function(fields){
+            self.internallyHandleOptionsData = function (fields) {
                 self.fields = fields;
                 return self.componentsRegistry.optionsDataHandler(fields);
             };
             /**
              * These are passed in from outside (nested detail view).
              * @param data
+             * We need to differ between:
+             *
+             *  1. hasOne:      set the foreign key on the original entity (pre save task)
+             *  2. belongsTo:   set the foreign key of the referenced entity (post save task)
+             *
              * @todo: make adjustments to the optionData
              */
-            self.handleOptionsData = function(data){
+            self.handleOptionsData = function (data) {
                 var optionData = data[self.entityName];
                 self.optionData = optionData;
                 return self.getOptionData();
@@ -286,13 +297,13 @@
                 return self
                     .makeOptionRequest('/' + self.getEntityName())
                     .then(
-                          self.internallyHandleOptionsData
-                        , function (err) {
-                            $rootScope.$broadcast('notification', {
-                                'type': 'error'
-                                , 'message': 'web.backoffice.detail.optionsLoadingError'
-                                , variables: { errorMessage: err }
-                            });
+                    self.internallyHandleOptionsData
+                    , function (err) {
+                        $rootScope.$broadcast('notification', {
+                            'type': 'error'
+                            , 'message': 'web.backoffice.detail.optionsLoadingError'
+                            , variables: {errorMessage: err}
+                        });
 
                     });
 
@@ -304,14 +315,14 @@
              */
             self.makeOptionRequest = function (url) {
                 return boAPIWrapper
-                        .getOptions(url)
-                        .then(function (data) {
-                            console.log('DetailView: Got OPTIONS data for %o %o', url, data);
-                            self.fields = data;
-                            return self.fields;
-                        }, function (err) {
-                            return $q.reject(err);
-                        });
+                    .getOptions(url)
+                    .then(function (data) {
+                        console.log('DetailView: Got OPTIONS data for %o %o', url, data);
+                        self.fields = data;
+                        return self.fields;
+                    }, function (err) {
+                        return $q.reject(err);
+                    });
             };
 
             /**
@@ -328,15 +339,15 @@
                 self
                     .makeGetRequest()
                     .then(
-                          self.distributeData
-                        , function (err) {
-                            $rootScope.$broadcast('notification', {
-                                type: 'error'
-                                , message: 'web.backoffice.detail.loadingError'
-                                , variables: {
-                                    errorMessage: err
-                                }
-                            });
+                    self.distributeData
+                    , function (err) {
+                        $rootScope.$broadcast('notification', {
+                            type: 'error'
+                            , message: 'web.backoffice.detail.loadingError'
+                            , variables: {
+                                errorMessage: err
+                            }
+                        });
                     });
 
             };
@@ -353,8 +364,8 @@
              * Collects the select fields if the detail view is nested. This is the external API.
              * @returns {Array}
              */
-            self.getSelectFields = function(){
-                return self.getSelectParameters().map(function(select){
+            self.getSelectFields = function () {
+                return self.getSelectParameters().map(function (select) {
                     return [this.getEntityName(), select].join('.');
                 }.bind(this));
             };
@@ -398,18 +409,22 @@
              */
             self.makeGetRequest = function () {
 
-                var   url    = self.getEntityUrl()
+                var url = self.getEntityUrl()
                     , select = self.getSelectParameters();
 
                 console.log('DetailView: Get Data from %o with select %o', url, select);
 
                 return APIWrapperService.request({
-                      url       : url
-                    , headers   : { select: select }
-                    , method    : 'GET'
+                    url: url
+                    , headers: {select: select}
+                    , method: 'GET'
                 }).then(
-                      function (data) { return data;}.bind(this)
-                    , function (err) { return $q.reject(err); });
+                    function (data) {
+                        return data;
+                    }.bind(this)
+                    , function (err) {
+                        return $q.reject(err);
+                    });
 
             };
 
@@ -483,7 +498,7 @@
 
             };
 
-            self.isValid = function(){
+            self.isValid = function () {
                 return self.componentsRegistry.isValid()
             };
             /**
@@ -491,13 +506,14 @@
              */
             self.makeSaveRequest = function () {
 
-               if(!self.isValid()) return $q.reject(new Error('Not all required fields filled out.'));
+                if (!self.isValid()) return $q.reject(new Error('Not all required fields filled out.'));
 
                 // Pre-save tasks (upload images)
                 return self.executePreSaveTasks()
 
                     // Save stuff on current entity
-                    .then(function () {
+                    .then(function (entity) {
+                        // current entity state
                         return self.makeMainSaveCall();
                     })
                     .then(function () {
@@ -514,7 +530,9 @@
              * Calls beforeSaveTasks on registered components. They must return a promise.
              */
             self.executePreSaveTasks = function () {
-                return self.componentsRegistry.getBeforeSaveTasks();
+                var entity  = {};
+                entity.meta = {};
+                return self.componentsRegistry.getBeforeSaveTasks($q.when(entity));
             };
 
 
@@ -852,7 +870,7 @@
              * - a Promise
              */
             self.generateSaveCalls = function () {
-                return self.componentsRegistry.getSaveCalls().reduce(function(calls, componentCalls){
+                return self.componentsRegistry.getSaveCalls().reduce(function (calls, componentCalls) {
                     self.addCall(componentCalls, calls);
                     return calls;
                 }, []);
@@ -926,8 +944,8 @@
                 console.log('DetailView: Make DELETE request');
 
                 return APIWrapperService.request({
-                      url       : '/' + self.getEntityName() + '/' + self.getEntityId()
-                    , method    : 'DELETE'
+                    url: '/' + self.getEntityName() + '/' + self.getEntityId()
+                    , method: 'DELETE'
                 });
             };
 

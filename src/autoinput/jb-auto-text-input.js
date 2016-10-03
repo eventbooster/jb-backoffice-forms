@@ -4,11 +4,12 @@
     /**
      *
      */
-    var AutoTextInputController = function ($scope, $attrs, componentsService) {
+    var AutoTextInputController = function ($scope, $attrs, $q, componentsService) {
 
         this.$scope = $scope;
         this.$attrs = $attrs;
         this.name = $attrs['for'];
+        this.$q = $q;
         this.label =  this.name;
         this.select = this.name;
         this.componentsService = componentsService;
@@ -28,6 +29,15 @@
     AutoTextInputController.prototype.registerAt = function(parent){
         parent.registerGetDataHandler(this.updateData.bind(this));
         parent.registerOptionsDataHandler(this.handleOptionsData.bind(this));
+    };
+
+    AutoTextInputController.prototype.getBeforeSaveTasks = function(initialPromise){
+        return initialPromise.then(function(entity){
+            if (this.originalData !== this.$scope.data.value){
+                entity[this.name] = this.$scope.data.value;
+            }
+            return entity;
+        }.bind(this));
     };
 
     AutoTextInputController.prototype.handleOptionsData = function(data){
@@ -68,6 +78,7 @@
         _module.controller('AutoTextInputController', [
             '$scope' ,
             '$attrs' ,
+            '$q' ,
             'backofficeSubcomponentsService' ,
             AutoTextInputController]);
 

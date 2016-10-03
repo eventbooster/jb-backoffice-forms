@@ -67,24 +67,24 @@
         return true;
     };
 
-    BackofficeSubcomponentsRegistry.prototype.getAfterSaveTasks = function(){
+    BackofficeSubcomponentsRegistry.prototype.getAfterSaveTasks = function(entity){
         var calls = this.registeredComponents.reduce(function(subcalls, component){
             if(angular.isFunction(component.afterSaveTasks)){
                 return subcalls.concat(component.afterSaveTasks());
             }
             return subcalls;
-        }, []);
+        }, [this.$q.when(entity)]);
         return this.$q.all(calls);
     };
 
-    BackofficeSubcomponentsRegistry.prototype.getBeforeSaveTasks = function(){
-        var calls = this.registeredComponents.reduce(function(subcalls, component){
-            if(angular.isFunction(component.beforeSaveTasks)){
-                return subcalls.concat(component.beforeSaveTasks());
+    BackofficeSubcomponentsRegistry.prototype.getBeforeSaveTasks = function(initialPromise){
+        var calls = this.registeredComponents.reduce(function(basePromise, component){
+            if(angular.isFunction(component.getBeforeSaveTasks)){
+                return component.getBeforeSaveTasks(basePromise);
             }
-            return subcalls;
-        }, []);
-        return this.$q.all(calls);
+            return basePromise;
+        }, initialPromise);
+        return calls;
     };
 
     BackofficeSubcomponentsRegistry.prototype.getSelectFields = function () {

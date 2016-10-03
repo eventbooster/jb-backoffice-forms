@@ -11,7 +11,8 @@
             , controllerAs: '$ctrl'
             , bindToController: true
             , scope: {
-                  fields        : '<'
+                // @todo: ignored fields
+                  fieldsExclude : '<'
                 , entityName    : '@entity'
                 , relationName  : '@relation'
             }
@@ -75,6 +76,7 @@
         this.componentsService  = componentsService;
         this.options            = null;
         this.fieldDefinitions   = null;
+        this.fields             = [];
         this.selectedLanguages  = [];
         this.locales            = [];
         this.originalLocales    = [];
@@ -136,21 +138,27 @@
     BackofficeEntityLocaleController.prototype.adjustElementHeight = function(element){
 
         var   scrollHeight  = element[0].scrollHeight
-            , clientHeight  = element[0].clientHeight
-            , hasOverflow   = scrollHeight > clientHeight
-            , targetWidth   = element.width()
-            , overflow      = hasOverflow ? 'scroll' : 'auto'
-            , textValue     = element.val();
+            , textValue     = element.val()
+            , targetWidth;
+
 
         if(!this.heightElementInitialized) this.initializeHeightElement(element);
 
+        // remove the scrollbar
+        element.height(scrollHeight);
+        // measure the width after the scrollbar has gone
+        targetWidth = element.width();
+        // set the corresponding width to the height measuring container
         this.heightElement.width(targetWidth);
-        this.heightElement.css('overflow-y', overflow);
-        // adds the content or a placeholder text (to preserve the basic height)
+        // sanitize newlines so they are correctly displayed in the height element
         textValue = textValue.replace(/(\n\r?)/g, '<br>').replace(/(\<br\>\s*)$/, '<br><br>');
+        // adds the content or a placeholder text (to preserve the basic height)
         if(textValue.trim() == '') textValue = 'empty';
-
+        // insert the content as html to be sure linebreaks are rendered correctly
         this.heightElement.html(textValue);
+        // set the width
+        this.heightElement.width(targetWidth);
+        // port the height of the element
         element.height(this.heightElement.height());
     };
 
@@ -196,7 +204,7 @@
 
     BackofficeEntityLocaleController.prototype.translationIsEmpty = function(data){
         return this.fields.reduce(function(previous, field){
-            return previous && !data[field];
+            return previous && !data[field] && data[field].trim() !== '';
         }, true);
     };
 
@@ -216,7 +224,8 @@
         this.options    = spec;
         this.loadFields().then(function(fields){
             this.$timeout(function(){
-                this.fieldDefinitions = fields;
+                this.fieldDefinitions = this.filterFields(fields);
+                this.fields = Object.keys(this.fieldDefinitions);
             }.bind(this));
         }.bind(this), function(error){
             console.error(error);
@@ -231,13 +240,19 @@
         var url = '/' + this.options.tableName;
         if(this.fieldDefinitions) return this.$q.when(this.fieldDefinitions);
         return this.boAPI.getOptions(url).then(function(fields){
-            return this.fields.reduce(function(map, fieldName){
-                map[fieldName] = fields[fieldName];
-                return map;
-            }.bind(this), {});
+            return fields.internalFields;
         }.bind(this), function(error){
             console.error(error);
         });
+    };
+
+    BackofficeEntityLocaleController.prototype.filterFields = function(fields){
+        return Object.keys(fields).reduce(function(sanitizedFields, fieldName){
+            if(!this.fieldsExclude || this.fieldsExclude.indexOf(fieldName) == -1){
+                sanitizedFields[fieldName] = fields[fieldName];
+            }
+            return sanitizedFields;
+        }.bind(this), {});
     };
 
     BackofficeEntityLocaleController.prototype._localeIsEmpty = function(locale){
@@ -260,6 +275,7 @@
             // otherwise all fields are new
             return this.fields;
         }
+
         // collect all fields which do not hold the same value
         return this.fields.reduce(function(changedFields, fieldName){
             if(locale[fieldName] != originalLocale[fieldName]){
@@ -302,7 +318,6 @@
                 }
             }
         }, this);
-
         return calls;
     };
 
@@ -345,12 +360,12 @@
 
         var   localeTableName   = this.options.tableName
             , languageSelector  = [localeTableName, 'language', '*'].join('.')
-            , selects;
+            , selects           = [];
 
-        selects =  this.fields.map(function(field){
+        /*selects =  this.fields.map(function(field){default
             return [localeTableName, field].join('.');
-        }, this);
-
+        }, this);*/
+        selects.push([localeTableName, '*'].join('.'));
         selects.push(languageSelector);
         return selects;
     };

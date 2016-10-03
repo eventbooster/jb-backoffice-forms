@@ -708,11 +708,12 @@ AutoInputController.prototype.init = function( el, detViewController ) {
     /**
      *
      */
-    var AutoTextInputController = function ($scope, $attrs, componentsService) {
+    var AutoTextInputController = function ($scope, $attrs, $q, componentsService) {
 
         this.$scope = $scope;
         this.$attrs = $attrs;
         this.name = $attrs['for'];
+        this.$q = $q;
         this.label =  this.name;
         this.select = this.name;
         this.componentsService = componentsService;
@@ -732,6 +733,15 @@ AutoInputController.prototype.init = function( el, detViewController ) {
     AutoTextInputController.prototype.registerAt = function(parent){
         parent.registerGetDataHandler(this.updateData.bind(this));
         parent.registerOptionsDataHandler(this.handleOptionsData.bind(this));
+    };
+
+    AutoTextInputController.prototype.getBeforeSaveTasks = function(initialPromise){
+        return initialPromise.then(function(entity){
+            if (this.originalData !== this.$scope.data.value){
+                entity[this.name] = this.$scope.data.value;
+            }
+            return entity;
+        }.bind(this));
     };
 
     AutoTextInputController.prototype.handleOptionsData = function(data){
@@ -772,6 +782,7 @@ AutoInputController.prototype.init = function( el, detViewController ) {
         _module.controller('AutoTextInputController', [
             '$scope' ,
             '$attrs' ,
+            '$q' ,
             'backofficeSubcomponentsService' ,
             AutoTextInputController]);
 
@@ -1913,7 +1924,8 @@ AutoInputController.prototype.init = function( el, detViewController ) {
             , controllerAs: '$ctrl'
             , bindToController: true
             , scope: {
-                  fields        : '<'
+                // @todo: ignored fields
+                  fieldsExclude : '<'
                 , entityName    : '@entity'
                 , relationName  : '@relation'
             }
@@ -1977,6 +1989,7 @@ AutoInputController.prototype.init = function( el, detViewController ) {
         this.componentsService  = componentsService;
         this.options            = null;
         this.fieldDefinitions   = null;
+        this.fields             = [];
         this.selectedLanguages  = [];
         this.locales            = [];
         this.originalLocales    = [];
@@ -2038,21 +2051,27 @@ AutoInputController.prototype.init = function( el, detViewController ) {
     BackofficeEntityLocaleController.prototype.adjustElementHeight = function(element){
 
         var   scrollHeight  = element[0].scrollHeight
-            , clientHeight  = element[0].clientHeight
-            , hasOverflow   = scrollHeight > clientHeight
-            , targetWidth   = element.width()
-            , overflow      = hasOverflow ? 'scroll' : 'auto'
-            , textValue     = element.val();
+            , textValue     = element.val()
+            , targetWidth;
+
 
         if(!this.heightElementInitialized) this.initializeHeightElement(element);
 
+        // remove the scrollbar
+        element.height(scrollHeight);
+        // measure the width after the scrollbar has gone
+        targetWidth = element.width();
+        // set the corresponding width to the height measuring container
         this.heightElement.width(targetWidth);
-        this.heightElement.css('overflow-y', overflow);
-        // adds the content or a placeholder text (to preserve the basic height)
+        // sanitize newlines so they are correctly displayed in the height element
         textValue = textValue.replace(/(\n\r?)/g, '<br>').replace(/(\<br\>\s*)$/, '<br><br>');
+        // adds the content or a placeholder text (to preserve the basic height)
         if(textValue.trim() == '') textValue = 'empty';
-
+        // insert the content as html to be sure linebreaks are rendered correctly
         this.heightElement.html(textValue);
+        // set the width
+        this.heightElement.width(targetWidth);
+        // port the height of the element
         element.height(this.heightElement.height());
     };
 
@@ -2098,7 +2117,7 @@ AutoInputController.prototype.init = function( el, detViewController ) {
 
     BackofficeEntityLocaleController.prototype.translationIsEmpty = function(data){
         return this.fields.reduce(function(previous, field){
-            return previous && !data[field];
+            return previous && !data[field] && data[field].trim() !== '';
         }, true);
     };
 
@@ -2118,7 +2137,8 @@ AutoInputController.prototype.init = function( el, detViewController ) {
         this.options    = spec;
         this.loadFields().then(function(fields){
             this.$timeout(function(){
-                this.fieldDefinitions = fields;
+                this.fieldDefinitions = this.filterFields(fields);
+                this.fields = Object.keys(this.fieldDefinitions);
             }.bind(this));
         }.bind(this), function(error){
             console.error(error);
@@ -2133,13 +2153,19 @@ AutoInputController.prototype.init = function( el, detViewController ) {
         var url = '/' + this.options.tableName;
         if(this.fieldDefinitions) return this.$q.when(this.fieldDefinitions);
         return this.boAPI.getOptions(url).then(function(fields){
-            return this.fields.reduce(function(map, fieldName){
-                map[fieldName] = fields[fieldName];
-                return map;
-            }.bind(this), {});
+            return fields.internalFields;
         }.bind(this), function(error){
             console.error(error);
         });
+    };
+
+    BackofficeEntityLocaleController.prototype.filterFields = function(fields){
+        return Object.keys(fields).reduce(function(sanitizedFields, fieldName){
+            if(!this.fieldsExclude || this.fieldsExclude.indexOf(fieldName) == -1){
+                sanitizedFields[fieldName] = fields[fieldName];
+            }
+            return sanitizedFields;
+        }.bind(this), {});
     };
 
     BackofficeEntityLocaleController.prototype._localeIsEmpty = function(locale){
@@ -2162,6 +2188,7 @@ AutoInputController.prototype.init = function( el, detViewController ) {
             // otherwise all fields are new
             return this.fields;
         }
+
         // collect all fields which do not hold the same value
         return this.fields.reduce(function(changedFields, fieldName){
             if(locale[fieldName] != originalLocale[fieldName]){
@@ -2204,7 +2231,6 @@ AutoInputController.prototype.init = function( el, detViewController ) {
                 }
             }
         }, this);
-
         return calls;
     };
 
@@ -2247,12 +2273,12 @@ AutoInputController.prototype.init = function( el, detViewController ) {
 
         var   localeTableName   = this.options.tableName
             , languageSelector  = [localeTableName, 'language', '*'].join('.')
-            , selects;
+            , selects           = [];
 
-        selects =  this.fields.map(function(field){
+        /*selects =  this.fields.map(function(field){default
             return [localeTableName, field].join('.');
-        }, this);
-
+        }, this);*/
+        selects.push([localeTableName, '*'].join('.'));
         selects.push(languageSelector);
         return selects;
     };
@@ -4051,24 +4077,24 @@ angular
         return true;
     };
 
-    BackofficeSubcomponentsRegistry.prototype.getAfterSaveTasks = function(){
+    BackofficeSubcomponentsRegistry.prototype.getAfterSaveTasks = function(entity){
         var calls = this.registeredComponents.reduce(function(subcalls, component){
             if(angular.isFunction(component.afterSaveTasks)){
                 return subcalls.concat(component.afterSaveTasks());
             }
             return subcalls;
-        }, []);
+        }, [this.$q.when(entity)]);
         return this.$q.all(calls);
     };
 
-    BackofficeSubcomponentsRegistry.prototype.getBeforeSaveTasks = function(){
-        var calls = this.registeredComponents.reduce(function(subcalls, component){
-            if(angular.isFunction(component.beforeSaveTasks)){
-                return subcalls.concat(component.beforeSaveTasks());
+    BackofficeSubcomponentsRegistry.prototype.getBeforeSaveTasks = function(initialPromise){
+        var calls = this.registeredComponents.reduce(function(basePromise, component){
+            if(angular.isFunction(component.getBeforeSaveTasks)){
+                return component.getBeforeSaveTasks(basePromise);
             }
-            return subcalls;
-        }, []);
-        return this.$q.all(calls);
+            return basePromise;
+        }, initialPromise);
+        return calls;
     };
 
     BackofficeSubcomponentsRegistry.prototype.getSelectFields = function () {
@@ -4172,7 +4198,7 @@ angular
             );
         });
 })();
-(function(undefined) {
+(function (undefined) {
     'use strict';
 
     /**
@@ -4192,51 +4218,66 @@ angular
      */
 
     var _module = angular.module('jb.backofficeDetailView', [
-          'jb.apiWrapper'
+        'jb.apiWrapper'
         , 'pascalprecht.translate'
         , 'jb.backofficeFormEvents'
     ]);
 
     _module.directive('detailView', [function () {
 
-            return {
-                link: {
-                    pre: function (scope, element, attrs, ctrl) {
-                        if (angular.isFunction(ctrl.preLink)) {
-                            ctrl.preLink(scope, element, attrs);
-                        }
+        return {
+            link: {
+                pre: function (scope, element, attrs, ctrl) {
+                    if (angular.isFunction(ctrl.preLink)) {
+                        ctrl.preLink(scope, element, attrs);
                     }
-                    , post: function (scope, element, attrs, ctrl) {
-                        ctrl.init(scope, element, attrs);
-                    }
-
                 }
-                , controller        : 'DetailViewController'
-                , bindToController  : true
-                , controllerAs      : '$ctrl'
+                , post: function (scope, element, attrs, ctrl) {
+                    ctrl.init(scope, element, attrs);
+                }
 
-                /**
-                 * We cannot use an isolated scope here: the nested elements would be attached to the parent scope
-                 * and we would not be able to listen to the corresponding events.
-                 *
-                 *  {
+            }
+            , controller        : 'DetailViewController'
+            , bindToController  : true
+            , controllerAs      : '$ctrl'
+
+            /**
+             * We cannot use an isolated scope here: the nested elements would be attached to the parent scope
+             * and we would not be able to listen to the corresponding events.
+             *
+             *  {
                  *        'entityName'  : '<'
                  *      , 'entityId'    : '<'
                  *      , 'isRoot'      :
                  *  }
-                 */
-                , scope: true
-            };
+             */
+            , scope: true
+        };
 
-        }]);
+    }]);
+    /**
+     * @todo: do a clean implementation!
+     */
+    function DetailViewController($scope, $rootScope, $q, $filter, $state, APIWrapperService, subcomponentsService, boAPIWrapper) {
+        this.$scope             = $scope;
+        this.$rootScope         = $rootScope;
+        this.$q                 = $q;
+        this.$filter            = $filter;
+        this.$state             = $state;
+        this.api                = APIWrapperService;
+        this.boAPI              = boAPIWrapper;
+        this.componentsService  = subcomponentsService;
+        // this will be resolved in the linking phase
+        this.componentsRegistry = null;
+    }
 
-        function DetailViewController (){
+    DetailViewController.prototype.init = function(scope, element, attrs){
 
-        }
+    };
 
-        _module.controller('DetailViewController',
+    _module.controller('DetailViewController',
         [
-              '$scope'
+            '$scope'
             , '$rootScope'
             , '$q'
             , '$attrs'
@@ -4252,24 +4293,18 @@ angular
              * Private vars
              */
 
-            var   self      = this
+            var self = this
                 , element;
 
-            self.componentsService      = subcomponentsService;
-            self.componentsRegistry     = null;
-            // @todo: check if this is still needed
-            self.fields                 = undefined;
-            /**
-             * Scope vars
-             * @todo: remove whatever necessary
-             */
+            self.componentsService = subcomponentsService;
+            self.componentsRegistry = null;
+
+            $scope.$watchGroup(['$ctrl.entityName', '$ctrl.entityId'], function () {
+                self.setTitle();
+            });
 
             /**
              * Set up the registry waiting for subcomponents in the pre-link phase.
-             *
-             * @param scope
-             * @param element
-             * @param attrs
              */
             self.preLink = function (scope, element, attrs) {
                 self.componentsRegistry = self.componentsService.registryFor(scope);
@@ -4313,26 +4348,15 @@ angular
              */
 
             self.setTitle = function () {
+                var   titleSuffix = self.getEntityName()
+                    , titlePrefix = $filter('translate')('web.backoffice.create');
 
-                if (self.parseUrl().isNew) {
-                    $scope.title = $filter('translate')('web.backoffice.create') + ': ';
+                if (self.entityId) {
+                    titlePrefix = $filter('translate')('web.backoffice.edit');
+                    titleSuffix = titleSuffix + ' #'+ self.entityId;
                 }
-                else {
-                    $scope.title = $filter('translate')('web.backoffice.edit') + ': ';
-                }
-
-                $scope.title += self.getEntityName();
-
-                if (self.getEntityId()) {
-                    $scope.title += ' #' + self.getEntityId();
-                }
+                $scope.title = [titlePrefix , titleSuffix].join(': ');
             };
-
-
-            $scope.$watchGroup(['entityName', 'entityId'], function () {
-                self.setTitle();
-            });
-
 
             /**
              * Init (called from directive's link function)
@@ -4361,29 +4385,29 @@ angular
                  *
                  * @todo: can we detect if we are root by checking if 'registerAt' was called?
                  */
-                self.isRoot         = attrs.hasOwnProperty('isRoot');
-                self.hasEntityName  = attrs.hasOwnProperty('entityName');
-                self.hasEntityId    = attrs.hasOwnProperty('entityId');
+                self.isRoot = attrs.hasOwnProperty('isRoot');
+                self.hasEntityName = attrs.hasOwnProperty('entityName');
+                self.hasEntityId = attrs.hasOwnProperty('entityId');
 
-                if(self.hasEntityName){
+                if (self.hasEntityName) {
                     var nameDeferred = $q.defer();
-                    $attrs.$observe('entityName', function(value){
+                    $attrs.$observe('entityName', function (value) {
                         self.setEntityName(value);
                         nameDeferred.resolve();
                     });
                     promises.push(nameDeferred.promise);
                 }
 
-                if(self.hasEntityId){
+                if (self.hasEntityId) {
                     var idDeferred = $q.defer();
-                    $attrs.$observe('entityId', function(value){
+                    $attrs.$observe('entityId', function (value) {
                         self.setEntityId(value);
                         idDeferred.resolve();
                     });
                     promises.push(idDeferred.promise);
                 }
 
-                if(!self.hasEntityName && !self.hasEntityId){
+                if (!self.hasEntityName && !self.hasEntityId) {
                     var stateParams = self.parseUrl();
                     self.setEntityName(stateParams.name);
                     self.setEntityId(stateParams.id);
@@ -4391,61 +4415,74 @@ angular
                 // register myself as a component to possible parents
                 self.componentsService.registerComponent(scope, this);
 
-                $q.all(promises).then(function(){
+                $q.all(promises).then(function () {
                     // load option data if we are root
-                    if(self.isRoot) self.getOptionData().then(
-                          self.getData
-                        , function(error){ console.error(error); }
+                    if (self.isRoot) self.getOptionData().then(
+                        self.getData
+                        , function (error) {
+                            console.error(error);
+                        }
                     )
                 });
             };
 
-            self.setEntityName = function(name){
-                self.entityName     = name;
-                $scope.entityName   = name;
+            self.setEntityName = function (name) {
+                self.entityName = name;
+                $scope.entityName = name;
             };
 
-            self.setEntityId = function(id){
-                self.entityId       = id;
-                $scope.entityId     = id;
+            self.setEntityId = function (id) {
+                self.entityId = id;
+                $scope.entityId = id;
             };
 
-            self.registerAt = function(parent){
+            self.registerAt = function (parent) {
                 parent.registerOptionsDataHandler(self.handleOptionsData);
                 parent.registerGetDataHandler(self.handleGetData);
             };
             /**
-             * @todo: handle aliases
+             * Also, we have to differ between:
+             *
+             *  1. hasOne       : just take the value
+             *  2. belongsTo    : take the first of the values
+             *
              * @param data
              */
-            self.handleGetData = function(data){
+            self.handleGetData = function (data) {
                 var ownData = data[self.entityName];
-                if(!angular.isDefined(ownData)) return console.error('No data available for related %o', self.entityName);
-                if(!self.getEntityId()){
-                    var pKey = self.optionData.relationKey;
+                if (!angular.isDefined(ownData)) return console.error('No data available for related %o', self.entityName);
+                // ugh we might get the entityId through the scope!!
+                if (!self.entityId) {
+                    var pKey = self.optionData.relatedKey;
                     self.setEntityId(ownData[pKey]);
                 }
                 self.distributeData(ownData);
             };
 
-            self.getSaveCalls = function(){
-                return self.generateSaveCalls();
+            self.getSaveCalls = function () {
+                var calls = self.generateSaveCalls();
+                return calls;
             };
             /**
              * This is shitty! We need to load more options data as soon as we receive the options to to be able to
              * distribute options to the nested fields.
              * @param fields
              */
-            self.internallyHandleOptionsData = function(fields){
+            self.internallyHandleOptionsData = function (fields) {
                 self.fields = fields;
                 return self.componentsRegistry.optionsDataHandler(fields);
             };
             /**
              * These are passed in from outside (nested detail view).
              * @param data
+             * We need to differ between:
+             *
+             *  1. hasOne:      set the foreign key on the original entity (pre save task)
+             *  2. belongsTo:   set the foreign key of the referenced entity (post save task)
+             *
              * @todo: make adjustments to the optionData
              */
-            self.handleOptionsData = function(data){
+            self.handleOptionsData = function (data) {
                 var optionData = data[self.entityName];
                 self.optionData = optionData;
                 return self.getOptionData();
@@ -4460,13 +4497,13 @@ angular
                 return self
                     .makeOptionRequest('/' + self.getEntityName())
                     .then(
-                          self.internallyHandleOptionsData
-                        , function (err) {
-                            $rootScope.$broadcast('notification', {
-                                'type': 'error'
-                                , 'message': 'web.backoffice.detail.optionsLoadingError'
-                                , variables: { errorMessage: err }
-                            });
+                    self.internallyHandleOptionsData
+                    , function (err) {
+                        $rootScope.$broadcast('notification', {
+                            'type': 'error'
+                            , 'message': 'web.backoffice.detail.optionsLoadingError'
+                            , variables: {errorMessage: err}
+                        });
 
                     });
 
@@ -4478,14 +4515,14 @@ angular
              */
             self.makeOptionRequest = function (url) {
                 return boAPIWrapper
-                        .getOptions(url)
-                        .then(function (data) {
-                            console.log('DetailView: Got OPTIONS data for %o %o', url, data);
-                            self.fields = data;
-                            return self.fields;
-                        }, function (err) {
-                            return $q.reject(err);
-                        });
+                    .getOptions(url)
+                    .then(function (data) {
+                        console.log('DetailView: Got OPTIONS data for %o %o', url, data);
+                        self.fields = data;
+                        return self.fields;
+                    }, function (err) {
+                        return $q.reject(err);
+                    });
             };
 
             /**
@@ -4502,15 +4539,15 @@ angular
                 self
                     .makeGetRequest()
                     .then(
-                          self.distributeData
-                        , function (err) {
-                            $rootScope.$broadcast('notification', {
-                                type: 'error'
-                                , message: 'web.backoffice.detail.loadingError'
-                                , variables: {
-                                    errorMessage: err
-                                }
-                            });
+                    self.distributeData
+                    , function (err) {
+                        $rootScope.$broadcast('notification', {
+                            type: 'error'
+                            , message: 'web.backoffice.detail.loadingError'
+                            , variables: {
+                                errorMessage: err
+                            }
+                        });
                     });
 
             };
@@ -4527,8 +4564,8 @@ angular
              * Collects the select fields if the detail view is nested. This is the external API.
              * @returns {Array}
              */
-            self.getSelectFields = function(){
-                return self.getSelectParameters().map(function(select){
+            self.getSelectFields = function () {
+                return self.getSelectParameters().map(function (select) {
                     return [this.getEntityName(), select].join('.');
                 }.bind(this));
             };
@@ -4572,18 +4609,22 @@ angular
              */
             self.makeGetRequest = function () {
 
-                var   url    = self.getEntityUrl()
+                var url = self.getEntityUrl()
                     , select = self.getSelectParameters();
 
                 console.log('DetailView: Get Data from %o with select %o', url, select);
 
                 return APIWrapperService.request({
-                      url       : url
-                    , headers   : { select: select }
-                    , method    : 'GET'
+                    url: url
+                    , headers: {select: select}
+                    , method: 'GET'
                 }).then(
-                      function (data) { return data;}.bind(this)
-                    , function (err) { return $q.reject(err); });
+                    function (data) {
+                        return data;
+                    }.bind(this)
+                    , function (err) {
+                        return $q.reject(err);
+                    });
 
             };
 
@@ -4657,7 +4698,7 @@ angular
 
             };
 
-            self.isValid = function(){
+            self.isValid = function () {
                 return self.componentsRegistry.isValid()
             };
             /**
@@ -4665,13 +4706,14 @@ angular
              */
             self.makeSaveRequest = function () {
 
-               if(!self.isValid()) return $q.reject(new Error('Not all required fields filled out.'));
+                if (!self.isValid()) return $q.reject(new Error('Not all required fields filled out.'));
 
                 // Pre-save tasks (upload images)
                 return self.executePreSaveTasks()
 
                     // Save stuff on current entity
-                    .then(function () {
+                    .then(function (entity) {
+                        // current entity state
                         return self.makeMainSaveCall();
                     })
                     .then(function () {
@@ -4688,7 +4730,9 @@ angular
              * Calls beforeSaveTasks on registered components. They must return a promise.
              */
             self.executePreSaveTasks = function () {
-                return self.componentsRegistry.getBeforeSaveTasks();
+                var entity  = {};
+                entity.meta = {};
+                return self.componentsRegistry.getBeforeSaveTasks($q.when(entity));
             };
 
 
@@ -5026,7 +5070,7 @@ angular
              * - a Promise
              */
             self.generateSaveCalls = function () {
-                return self.componentsRegistry.getSaveCalls().reduce(function(calls, componentCalls){
+                return self.componentsRegistry.getSaveCalls().reduce(function (calls, componentCalls) {
                     self.addCall(componentCalls, calls);
                     return calls;
                 }, []);
@@ -5100,8 +5144,8 @@ angular
                 console.log('DetailView: Make DELETE request');
 
                 return APIWrapperService.request({
-                      url       : '/' + self.getEntityName() + '/' + self.getEntityId()
-                    , method    : 'DELETE'
+                    url: '/' + self.getEntityName() + '/' + self.getEntityId()
+                    , method: 'DELETE'
                 });
             };
 
