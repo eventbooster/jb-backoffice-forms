@@ -17,13 +17,9 @@
      * - getSelectFields: Returns select fields (replaces the select property)
      */
 
-    var _module = angular.module('jb.backofficeDetailView', [
-        'jb.apiWrapper'
-        , 'pascalprecht.translate'
-        , 'jb.backofficeFormEvents'
-    ]);
+    var _module = angular.module('jb.formComponents');
 
-    _module.directive('detailView', [function () {
+    _module.directive('jbFormView', [function () {
 
         return {
             link: {
@@ -84,7 +80,7 @@
             , '$filter'
             , '$state'
             , 'APIWrapperService'
-            , 'backofficeSubcomponentsService'
+            , 'JBFormComponentsService'
             , 'BackofficeAPIWrapperService'
             , function ($scope, $rootScope, $q, $attrs, $filter, $state, APIWrapperService, subcomponentsService, boAPIWrapper) {
 
@@ -482,18 +478,17 @@
                         return entityId || null;
 
 
-                    }, function (err) {
+                    }).catch(function(err) {
 
-                        $rootScope.$broadcast('notification', {
-                            type: 'error'
-                            , message: 'web.backoffice.detail.saveError'
-                            , variables: {
-                                errorMessage: err.message
-                            }
-                        });
+                            $rootScope.$broadcast('notification', {
+                                type: 'error'
+                                , message: 'web.backoffice.detail.saveError'
+                                , variables: {
+                                    errorMessage: err.message
+                                }
+                            });
 
-                        return $q.reject(err);
-
+                            return $q.reject(err);
                     });
 
             };
@@ -532,7 +527,7 @@
             self.executePreSaveTasks = function () {
                 var entity  = {};
                 entity.meta = {};
-                return self.componentsRegistry.getBeforeSaveTasks($q.when(entity));
+                return self.componentsRegistry.getBeforeSaveTasks();
             };
 
 
@@ -561,7 +556,6 @@
              * @todo: the post save tasks should create relations having access to the previously saved id (store it into a meta parameter)
              */
             self.makeMainSaveCall = function () {
-
                 var calls = self.generateSaveCalls();
 
                 console.log('DetailView: Save calls are %o', calls);

@@ -20,7 +20,7 @@ describe('AutoFormElementController', function(){
             , $rootScope : _$rootScope_
         };
 
-        controller = $controller('AutoFormElementController', dependencies);
+        controller = $controller('jbFormAutoInputController', dependencies);
     }));
 
     it('should be defined', function(){

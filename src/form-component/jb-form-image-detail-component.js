@@ -6,16 +6,16 @@
 
 	'use strict';
 
-	var _module = angular.module( 'jb.backofficeFormComponents' );
+	var _module = angular.module( 'jb.formComponents' );
 
 	/**
 	* <input data-backoffice-image-component 
 	*	data-for="enity">
 	*/
-	_module.directive( 'backofficeImageDetailComponent', [ function() {
+	_module.directive( 'jbFormImageDetailComponent', [ function() {
 
 		return {
-			  controller		: 'BackofficeImageDetailComponentController'
+			  controller		: 'JBFormImageDetailComponentController'
 			, controllerAs		: 'backofficeImageDetailComponent'
 			, bindToController	: true
 			, link				: function( scope, element, attrs, ctrl ) {
@@ -40,9 +40,9 @@
 
 	} ] );
 
-	_module.controller( 'BackofficeImageDetailComponentController', [
+	_module.controller( 'JBFormImageDetailComponentController', [
           '$scope'
-        , 'backofficeSubcomponentsService'
+        , 'JBFormComponentsService'
         , function( $scope, componentsService) {
 
 		var self = this
@@ -88,7 +88,7 @@
 					}
 				}
 				catch( e ) {
-					console.error( 'BackofficeImageDetailComponentController: Could not parse focalPoint ' + data.focalPoint + ': ' + e.message );
+					console.error( 'JBFormImageDetailComponentController: Could not parse focalPoint ' + data.focalPoint + ': ' + e.message );
 				}
 			}
 			_originalFocalPoint = angular.copy( data.focalPoint );
@@ -150,7 +150,7 @@
 				x		: Math.round( ev.offsetX / ev.target.width * self.image.width )
 				, y		: Math.round( ev.offsetY / ev.target.height * self.image.height )
 			};
-			console.log( 'BackofficeImageDetailComponentController: Set focal point to ', JSON.stringify( newFocalPoint ) );
+			console.log( 'JBFormImageDetailComponentController: Set focal point to ', JSON.stringify( newFocalPoint ) );
 
 			self.image.focalPoint = newFocalPoint;
 

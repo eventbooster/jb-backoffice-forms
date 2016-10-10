@@ -18,21 +18,18 @@
      * as soon as the detailView directive has gotten the necessary data (type, required etc.)
      * from the server through an options call
      */
-    var   typeKey = 'jb.backofficeAutoFormElement.types'
-        , _module = angular.module('jb.backofficeAutoFormElement', ['jb.backofficeFormEvents']);
+    var   typeKey = 'jb.formAutoInputTypes'
+        , _module = angular.module('jb.formComponents');
 
     _module.value(typeKey, {
           'text'    : 'text'
         , 'number'  : 'text'
         , 'boolean' : 'checkbox'
-        , 'relation': 'relation'
-        , 'language': 'language'
-        , 'image'   : 'image'
-        , 'datetime': 'dateTime'
-        , 'date'    : 'dateTime'
+        , 'datetime': 'date-time'
+        , 'date'    : 'date-time'
     });
 
-    _module.directive('autoFormElement', ['$compile', function ($compile) {
+    _module.directive('jbFormAutoInput', ['$compile', function ($compile) {
 
         return {
               controllerAs      : '$ctrl'
@@ -45,15 +42,12 @@
                     ctrl.preLink(scope, element, attrs);
                 }
             }
-            , controller        : 'AutoFormElementController'
-            // If we leave it out and use $scope.$new(), angular misses detailView controller
-            // as soon as we use it twice on one site.
-            // @todo: add explicit bindings to find out where the data comes from
+            , controller        : 'AutoInputController'
             , scope             : true
         };
     }]);
 
-    function AutoFormElementController($scope, $attrs, $compile, $rootScope, fieldTypes, subcomponentsService) {
+    function AutoInputController($scope, $attrs, $compile, $rootScope, fieldTypes, subcomponentsService) {
         this.$scope     = $scope;
         this.$attrs     = $attrs;
         this.$compile   = $compile;
@@ -70,18 +64,18 @@
         this.registry               = null;
     }
 
-    AutoFormElementController.prototype.preLink = function (scope, element, attrs) {
+    AutoInputController.prototype.preLink = function (scope, element, attrs) {
         this.registry = this.subcomponentsService.registryFor(scope);
         this.registry.listen();
     };
 
-    AutoFormElementController.prototype.init = function (scope, element, attrs) {
+    AutoInputController.prototype.init = function (scope, element, attrs) {
         this.element = element;
         this.registry.registerOptionsDataHandler(this.updateElement.bind(this));
         this.registry.registerYourself();
     };
 
-    AutoFormElementController.prototype.updateElement = function(fieldSpec){
+    AutoInputController.prototype.updateElement = function(fieldSpec){
             var   elementType
                 , elementSpec = fieldSpec[this.name];
 
@@ -105,7 +99,7 @@
                 return '-' + v.toLowerCase();
             });
 
-            var newElement = angular.element('<div auto-' + dashedCasedElementType + '-input data-for="' + this.name + '" label="' + this.label + '"></div>');
+            var newElement = angular.element('<div jb-form-' + dashedCasedElementType + '-input for="' + this.name + '" label="' + this.label + '"></div>');
             // @todo: not sure if we still need to prepend the new element when we actually just inject the registry
             this.element.replaceWith(newElement);
             this.registry.unregisterOptionsDataHandler(this.updateElement);
@@ -115,13 +109,13 @@
             this.registry.optionsDataHandler(fieldSpec);
     };
 
-    _module.controller('AutoFormElementController', [
+    _module.controller('AutoInputController', [
         '$scope',
         '$attrs',
         '$compile',
         '$rootScope',
         typeKey,
-        'backofficeSubcomponentsService',
-        AutoFormElementController ]);
+        'JBFormComponentsService',
+        AutoInputController ]);
 })();
 

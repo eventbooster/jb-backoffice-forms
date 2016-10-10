@@ -1,14 +1,15 @@
+/*
 (function(undefined) {
 
     'use strict';
 
-    /**
+    /!**
      * Auto language input. Inherits from AutoInput.
      *
      * @todo: remove the dependency to the detailViewController
      * @todo: remove the dependency to the optionData (Does not work outside the auto-form-element since the optionData
      * is required and usually is not available during compilation and linking!)
-     */
+     *!/
 
     var AutoLanguageInputController = function ($scope, $attrs, componentsService) {
 
@@ -37,11 +38,11 @@
         // This structure is needed so that we can access the properties directly in the DOM
         // through ngmodel.
         this.$scope.locales = {};
-        /**
+        /!**
          * @todo: pass the fields through the attributes
          * @todo: this is a different requirement than the other auto-input types have, I'd prefer to remove the
          *        language from the auto-input directive
-         */
+         *!/
         $scope.fields = $scope.$eval(this.$scope.originalAttributes.fields);
         $scope.tableName = this.$scope.optionData.tableName;
 
@@ -169,12 +170,12 @@
             return;
         }
 
-        /**
+        /!**
          * Loop over the properties of the locale data.
          * All fields starting with 'id_' are relations to other entities.
          *
          * @todo: use the option data distinguish foreign keys instead of relying on the convention
-         */
+         *!/
         localeData.forEach(function (locale) {
 
             var languageId = locale.id_language;
@@ -238,11 +239,11 @@
                 , link: function (scope, element, attrs, ctrl) {
                     ctrl[0].init(element, ctrl[1]);
                 }
-                /**
+                /!**
                  * Component itself is never required and always valid. Only single fields may be required or invalid.
                  * 1. tableName is set in this constructor coming from options call
                  * 2. locales is set in the controller, also based on the options data (added to the selects within the controllers constructor)
-                 */
+                 *!/
                 , template:
                     '<div class="row">' +
                         '<div data-locale-component class="col-md-12" data-fields="fields" data-table-name="tableName" data-model="locales" data-set-validity="setValidity(validity)" data-entity-name="entityName"></div>' +
@@ -264,3 +265,4 @@
 
 
 
+*/

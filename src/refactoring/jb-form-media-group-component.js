@@ -6,15 +6,13 @@
 
 	'use strict';
 
-	angular
+	var _module = angular.module( 'jb.formComponents' )
 
-	.module( 'jb.backofficeFormComponents' )
-
-	.directive( 'backofficeMediaGroupComponent', [ function() {
+	.directive( 'jbFormMediaGroupComponent', [ function() {
 
 		return {
 			require				: [ 'backofficeMediaGroupComponent', '^detailView' ]
-			, controller		: 'BackofficeMediaGroupComponentController'
+			, controller		: 'JBFormMediaGroupComponentController'
 			, controllerAs		: 'backofficeMediaGroupComponent'
 			, bindToController	: true
 			, templateUrl		: 'backofficeMediaGroupComponentTemplate.html'
@@ -29,7 +27,7 @@
 
 	} ] )
 
-	.controller( 'BackofficeMediaGroupComponentController', [ '$scope', '$rootScope', '$q', 'APIWrapperService', function( $scope, $rootScope, $q, APIWrapperService ) {
+	.controller( 'JBFormMediaGroupComponentController', [ '$scope', '$rootScope', '$q', 'APIWrapperService', function( $scope, $rootScope, $q, APIWrapperService ) {
 
 		var self = this
 			, _element
@@ -93,7 +91,7 @@
 				try {
 					self.media = media.sort( sortMedia );
 				} catch( err ) {
-					console.error( 'BackofficeMediaGroupComponentController: Properties mediumGroup_medium, it\'s items or sortOrder missing' );
+					console.error( 'JBFormMediaGroupComponentController: Properties mediumGroup_medium, it\'s items or sortOrder missing' );
 					self.media = media;
 				}
 
@@ -160,7 +158,7 @@
 					return item.id === mediumId;
 				} ).length > 0 
 			) {
-				console.error( 'BackofficeMediaGroupComponentController: Trying to add duplicate with id', mediumId );
+				console.error( 'JBFormMediaGroupComponentController: Trying to add duplicate with id', mediumId );
 				return;
 			}
 
@@ -177,7 +175,7 @@
 
 			}, function( err ) {
 
-				console.error( 'BackofficeMediaGroupComponentController: Could not get data for medium with id %o: %o', mediumId, err );
+				console.error( 'JBFormMediaGroupComponentController: Could not get data for medium with id %o: %o', mediumId, err );
 
 				$rootScope.$broadcast( 'notification', {
 					'type'		: 'error'

@@ -6,12 +6,12 @@
      *
      */
 
-    var AutoCheckboxInputController = function ($scope, $attrs, componentsService) {
+    var JBFormCheckboxInputController = function ($scope, $attrs, componentsService) {
 
         this.$attrs = $attrs;
         this.$scope = $scope;
-        this.name = $attrs['for'];
-        this.label = this.name;
+        this.name   = $attrs['for'];
+        this.label  = this.name;
 
         $attrs.$observe('label', function (value) {
             this.label = value;
@@ -20,17 +20,15 @@
         this.subcomponentsService = componentsService;
     };
 
-    AutoCheckboxInputController.prototype.constructor = AutoCheckboxInputController;
-
-    AutoCheckboxInputController.prototype.updateData = function (data) {
+    JBFormCheckboxInputController.prototype.updateData = function (data) {
         this.originalData = this.$scope.data.value = data[this.name];
     };
 
-    AutoCheckboxInputController.prototype.getSelectFields = function(){
+    JBFormCheckboxInputController.prototype.getSelectFields = function(){
         return this.name;
     };
 
-    AutoCheckboxInputController.prototype.getSaveCalls = function () {
+    JBFormCheckboxInputController.prototype.getSaveCalls = function () {
         if (this.originalData === this.$scope.data.value) return [];
 
         var data = {};
@@ -40,7 +38,7 @@
         }];
     };
 
-    AutoCheckboxInputController.prototype.preLink = function (scope, element, attrs) {
+    JBFormCheckboxInputController.prototype.preLink = function (scope, element, attrs) {
         scope.data = {
             value: undefined
             , name: this.name
@@ -48,32 +46,30 @@
         };
     };
 
-    AutoCheckboxInputController.prototype.isValid = function () {
+    JBFormCheckboxInputController.prototype.isValid = function () {
         return true;
     };
 
-    AutoCheckboxInputController.prototype.isRequired = function(){
+    JBFormCheckboxInputController.prototype.isRequired = function(){
         return false;
     };
 
-    AutoCheckboxInputController.prototype.registerAt = function (parent) {
+    JBFormCheckboxInputController.prototype.registerAt = function (parent) {
         parent.registerGetDataHandler(this.updateData.bind(this));
     };
 
-    AutoCheckboxInputController.prototype.init = function (scope, element, attrs) {
+    JBFormCheckboxInputController.prototype.init = function (scope, element, attrs) {
         this.subcomponentsService.registerComponent(scope, this);
     };
 
-    var _module;
-
-    _module = angular.module('jb.backofficeAutoFormElement');
-    _module.directive('autoCheckboxInput', [function () {
+    var _module = angular.module('jb.formComponents');
+    _module.directive('jbFormCheckboxInput', [function () {
 
         return {
-            scope: true
-            , controller: 'AutoCheckboxInputController'
-            , bindToController: true
-            , controllerAs: '$ctrl'
+              scope             : true
+            , controller        : 'JBFormCheckboxInputController'
+            , bindToController  : true
+            , controllerAs      : '$ctrl'
             , link: {
                 pre: function (scope, element, attrs, ctrl) {
                     ctrl.preLink(scope, element, attrs, ctrl);
@@ -83,7 +79,7 @@
                 }
             }
             , template: '<div class="form-group">' +
-            '<label data-backoffice-label data-label-identifier="{{$ctrl.label}}" data-is-valid="$ctrl.isValid()" data-is-required="$ctr.isRequired()"></label>' +
+            '<label jb-form-label-component data-label-identifier="{{$ctrl.label}}" data-is-valid="$ctrl.isValid()" data-is-required="$ctr.isRequired()"></label>' +
             '<div class="col-md-9">' +
             '<div class="checkbox">' +
             '<input type="checkbox" data-ng-model="data.value"/>' +
@@ -94,9 +90,9 @@
 
     }]);
 
-    _module.controller('AutoCheckboxInputController', [
+    _module.controller('JBFormCheckboxInputController', [
         '$scope',
         '$attrs',
-        'backofficeSubcomponentsService',
-        AutoCheckboxInputController]);
+        'JBFormComponentsService',
+        JBFormCheckboxInputController]);
 })();

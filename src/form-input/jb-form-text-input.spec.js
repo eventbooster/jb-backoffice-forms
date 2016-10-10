@@ -2,13 +2,13 @@
  * @todo: test directive
  * @todo: test controller
  */
-describe('jb.autoTextInput', function(){
+describe('jb.formTextInput', function(){
     var   $controller
         , inputController
         , $scope
         , formEvents;
 
-    beforeEach(module('jb.backofficeFormEvents'));
+    beforeEach(module('jb.formEvents'));
     beforeEach(module('jb.backofficeAutoFormElement'));
 
     beforeEach(inject(function(_$controller_, _$rootScope_, _backofficeFormEvents_){

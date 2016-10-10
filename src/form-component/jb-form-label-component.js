@@ -1,13 +1,13 @@
 (function (undefined) {
     "use strict";
 
-    var _module = angular.module('jb.backofficeAutoFormElement');
+    var _module = angular.module('jb.formComponents');
 
-    _module.controller('backofficeLabelController', ['$scope', function ($scope) {
+    _module.controller('jbFormLabelController', ['$scope', function ($scope) {
         this.$scope = $scope;
     }]);
 
-    _module.directive('backofficeLabel', ['$templateCache', '$compile', function ($templateCache, $compile) {
+    _module.directive('jbFormLabelComponent', ['$templateCache', '$compile', function ($templateCache, $compile) {
         return {
             link: function ($scope, element, attrs, ctrl) {
                 var tpl = angular.element($templateCache.get('backofficeLabelTemplate.html'));

@@ -5,7 +5,7 @@
 
 	angular
 
-	.module( 'jb.backofficeShared', [] )
+	.module( 'jb.formComponents')
 
 	.directive( 'dragDropList', [ function() {
 

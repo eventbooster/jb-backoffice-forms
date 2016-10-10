@@ -1,3 +1,5 @@
+(function(undefined){
+
 /**
  * Hidden input. Used to
  * - add select statements to detailView (use for attribute)
@@ -34,7 +36,7 @@ angular
     .controller('HiddenInputController', [
         '$scope'
         , '$attrs'
-        , 'backofficeSubcomponentsService'
+        , 'JBFormComponentsService'
         , function ($scope, $attrs, componentsService) {
 
             var self = this
@@ -116,3 +118,4 @@ angular
 
 
         }]);
+})();

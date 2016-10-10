@@ -3,31 +3,33 @@
     /**
      * @todo: This directive needs some refactoring!
      */
-    var _module = angular.module('jb.backofficeFormComponents');
+    var _module = angular.module('jb.formComponents');
 
-    _module.directive('entityLocale', function(){
+    _module.directive('jbFormLocaleComponent', function(){
         return {
-              controller: 'BackofficeEntityLocaleController'
-            , controllerAs: '$ctrl'
-            , bindToController: true
+              controller        : 'LocaleController'
+            , controllerAs      : '$ctrl'
+            , bindToController  : true
             , scope: {
-                // @todo: ignored fields
                   fieldsExclude : '<'
                 , entityName    : '@entity'
                 , relationName  : '@relation'
             }
-            , template: '<div class="locale-component row">' +
-                            '<div>' +
-                            '<ul class="nav nav-tabs">' +
-                                '<li ng-repeat="language in $ctrl.getSupportedLanguages()" ng-class="{active:$ctrl.isSelected(language)}">'+
-                                    '<a href="#" ng-click="$ctrl.toggleLanguage($event, language)">'+
-                                        '{{language.code|uppercase}}' +
-                                        '<span data-ng-if="$ctrl.checkForTranslation(language)" class="fa fa-check"></span>' +
-                                    '</a>'+
-                                '</li>'+
-                            '</ul>'+
+            , template: '<div class="locale-component container">' +
+                            '<!-- LOCALE-COMPONENT: way too many divs in here -->'+
+                            '<div class="row">' +
+                                '<div class="col-md-12">' +
+                                    '<ul class="nav nav-tabs col-md-12">' +
+                                        '<li ng-repeat="language in $ctrl.getSupportedLanguages()" ng-class="{active:$ctrl.isSelected(language)}">'+
+                                            '<a href="#" ng-click="$ctrl.toggleLanguage($event, language)">'+
+                                                '{{language.code|uppercase}}' +
+                                                '<span data-ng-if="$ctrl.checkForTranslation(language)" class="fa fa-check"></span>' +
+                                            '</a>'+
+                                        '</li>'+
+                                    '</ul>'+
+                                '</div>'+
                             '</div>' +
-                            '<div class="locale-content clearfix">' +
+                            '<div class="locale-content">' +
                                 '<div class="locale-col" ng-repeat="language in $ctrl.getSelectedLanguages()">' +
                                     '<p>{{ language.code | uppercase }}</p>' +
                                     '<ul>' +
@@ -60,6 +62,7 @@
     });
     /**
      * @todo: remove unnecessary fuzz
+     * @todo: remove the dependency to the session service and add a provider
      * @param $scope
      * @param $q
      * @param $timeout
@@ -68,7 +71,7 @@
      * @param sessionService
      * @constructor
      */
-    function BackofficeEntityLocaleController($scope, $q, $timeout, api, componentsService, sessionService, boAPIWrapper){
+    function LocaleController($scope, $q, $timeout, api, componentsService, sessionService, boAPIWrapper){
         this.$scope             = $scope;
         this.api                = api;
         this.$q                 = $q;
@@ -91,8 +94,8 @@
         this.element = null;
     }
 
-    BackofficeEntityLocaleController.prototype.preLink = function(){};
-    BackofficeEntityLocaleController.prototype.postLink = function(scope, element, attrs){
+    LocaleController.prototype.preLink = function(){};
+    LocaleController.prototype.postLink = function(scope, element, attrs){
         this.componentsService.registerComponent(scope, this);
         this.heightElement = angular.element('<div></div>');
         this.heightElement = this.heightElement.attr('id', 'locale-height-container');
@@ -103,12 +106,12 @@
         this.element.append(this.heightElement);
     };
 
-    BackofficeEntityLocaleController.prototype.registerAt = function(parent){
+    LocaleController.prototype.registerAt = function(parent){
         parent.registerOptionsDataHandler(this.handleOptionsData.bind(this));
         parent.registerGetDataHandler(this.handleGetData.bind(this));
     };
 
-    BackofficeEntityLocaleController.prototype.getSelectedLanguages = function(){
+    LocaleController.prototype.getSelectedLanguages = function(){
         var selected = [];
         for(var i=0; i<this.supportedLanguages.length; i++){
             var lang = this.supportedLanguages[i];
@@ -117,11 +120,11 @@
         return selected;
     };
 
-    BackofficeEntityLocaleController.prototype.getSupportedLanguages = function(){
+    LocaleController.prototype.getSupportedLanguages = function(){
         return this.supportedLanguages;
     };
 
-    BackofficeEntityLocaleController.prototype.fieldIsValid = function(locale, property){
+    LocaleController.prototype.fieldIsValid = function(locale, property){
 
         var   definition = this.fieldDefinitions[property];
         // fields of locales which do not yet exist are not validated
@@ -130,12 +133,12 @@
         return true;
     };
 
-    BackofficeEntityLocaleController.prototype.adjustHeight = function(event){
+    LocaleController.prototype.adjustHeight = function(event){
         var   element       = angular.element(event.currentTarget);
         this.adjustElementHeight(element);
     };
 
-    BackofficeEntityLocaleController.prototype.adjustElementHeight = function(element){
+    LocaleController.prototype.adjustElementHeight = function(element){
 
         var   scrollHeight  = element[0].scrollHeight
             , textValue     = element.val()
@@ -162,13 +165,13 @@
         element.height(this.heightElement.height());
     };
 
-    BackofficeEntityLocaleController.prototype.adjustAllHeights = function(){
+    LocaleController.prototype.adjustAllHeights = function(){
         this.element.find('textarea').each(function(index, element){
             this.adjustElementHeight(angular.element(element));
         }.bind(this));
     };
 
-    BackofficeEntityLocaleController.prototype.initializeHeightElement = function(element){
+    LocaleController.prototype.initializeHeightElement = function(element){
 
         [     'font-size'
             , 'font-family'
@@ -186,7 +189,7 @@
         this.heightElementInitialized = true;
     };
 
-    BackofficeEntityLocaleController.prototype.toggleLanguage = function(event, language){
+    LocaleController.prototype.toggleLanguage = function(event, language){
         if(event) event.preventDefault();
         var langs = this.getSelectedLanguages();
         if(language.selected && langs.length == 1) return;
@@ -194,15 +197,15 @@
         this.$timeout(this.adjustAllHeights.bind(this));
     };
 
-    BackofficeEntityLocaleController.prototype.isSelected = function(language){
+    LocaleController.prototype.isSelected = function(language){
         return language.selected === true;
     };
 
-    BackofficeEntityLocaleController.prototype.checkForTranslation = function(language){
+    LocaleController.prototype.checkForTranslation = function(language){
         return !!(this.locales && angular.isDefined( this.locales[language.id] ));
     };
 
-    BackofficeEntityLocaleController.prototype.translationIsEmpty = function(data){
+    LocaleController.prototype.translationIsEmpty = function(data){
         return this.fields.reduce(function(previous, field){
             return previous && !data[field] && data[field].trim() !== '';
         }, true);
@@ -215,7 +218,7 @@
      * @note: In the select call we need to set the related table name and select all fields plus the languages. Currently
      * we are not able to properly identify locales.
      */
-    BackofficeEntityLocaleController.prototype.handleOptionsData = function(data){
+    LocaleController.prototype.handleOptionsData = function(data){
         var spec;
 
         if(!data || !angular.isDefined(data[this.relationName])) return console.error('No OPTIONS data found in locale component.');
@@ -236,7 +239,7 @@
      * @todo: find a proper way to resolve the endpoint!!
      * @returns {*}
      */
-    BackofficeEntityLocaleController.prototype.loadFields = function(){
+    LocaleController.prototype.loadFields = function(){
         var url = '/' + this.options.tableName;
         if(this.fieldDefinitions) return this.$q.when(this.fieldDefinitions);
         return this.boAPI.getOptions(url).then(function(fields){
@@ -246,7 +249,7 @@
         });
     };
 
-    BackofficeEntityLocaleController.prototype.filterFields = function(fields){
+    LocaleController.prototype.filterFields = function(fields){
         return Object.keys(fields).reduce(function(sanitizedFields, fieldName){
             if(!this.fieldsExclude || this.fieldsExclude.indexOf(fieldName) == -1){
                 sanitizedFields[fieldName] = fields[fieldName];
@@ -255,17 +258,17 @@
         }.bind(this), {});
     };
 
-    BackofficeEntityLocaleController.prototype._localeIsEmpty = function(locale){
+    LocaleController.prototype._localeIsEmpty = function(locale){
         return this.fields.every(function(fieldName){
             return this._localePropertyIsEmpty(locale[fieldName]);
         }, this);
     };
 
-    BackofficeEntityLocaleController.prototype._localePropertyIsEmpty = function(value){
+    LocaleController.prototype._localePropertyIsEmpty = function(value){
         return angular.isUndefined(value) || value.trim() == '';
     };
 
-    BackofficeEntityLocaleController.prototype._localeGetChanges = function(locale, originalLocale){
+    LocaleController.prototype._localeGetChanges = function(locale, originalLocale){
         // the locale is new
         if(!angular.isDefined(originalLocale)){
             // the locale has no data, meaning that there are no changes
@@ -288,7 +291,7 @@
     /**
      * We could also adjust the _localeGetChanges method to be able to deal with locales that were not created.
      */
-    BackofficeEntityLocaleController.prototype.getSaveCalls = function(){
+    LocaleController.prototype.getSaveCalls = function(){
 
         var   calls     = [];
 
@@ -321,7 +324,7 @@
         return calls;
     };
 
-    BackofficeEntityLocaleController.prototype.handleGetData = function(data){
+    LocaleController.prototype.handleGetData = function(data){
         var locales             = data[this.options.tableName];
         if(locales){
             this.originalLocales    = this.normalizeModel(locales);
@@ -333,21 +336,21 @@
         this.$timeout(this.adjustAllHeights.bind(this));
     };
 
-    BackofficeEntityLocaleController.prototype.getFields = function(){
+    LocaleController.prototype.getFields = function(){
         if(!this.fieldDefinitions) return [];
-        return Object.keys(this.fieldDefinitions).map(function(fieldName){
+        return this.fields.map(function(fieldName){
             return this.fieldDefinitions[fieldName];
         }, this);
     };
 
-    BackofficeEntityLocaleController.prototype.normalizeModel = function(data){
+    LocaleController.prototype.normalizeModel = function(data){
         return data.reduce(function(map, item){
             map[item.language.id] = item;
             return map;
         }, []);
     };
 
-    BackofficeEntityLocaleController.prototype.getLocales = function(){
+    LocaleController.prototype.getLocales = function(){
         return this.locales;
     };
     /**
@@ -356,7 +359,7 @@
      *
      * @returns {*}
      */
-    BackofficeEntityLocaleController.prototype.getSelectFields = function(){
+    LocaleController.prototype.getSelectFields = function(){
 
         var   localeTableName   = this.options.tableName
             , languageSelector  = [localeTableName, 'language', '*'].join('.')
@@ -373,7 +376,7 @@
     /**
      * @todo: use the registration system to detect all the input fields and let them validate themselves?
      */
-    BackofficeEntityLocaleController.prototype.isValid = function(){
+    LocaleController.prototype.isValid = function(){
         return this.locales.reduce(function(localeValidity, locale, index){
             if(angular.isUndefined(locale)) return localeValidity;
             if(angular.isUndefined(this.originalLocales[index]) && this._localeIsEmpty(locale)) return localeValidity;
@@ -383,14 +386,14 @@
         }.bind(this), true);
     };
 
-    _module.controller('BackofficeEntityLocaleController', [
+    _module.controller('LocaleController', [
           '$scope'
         , '$q'
         , '$timeout'
         , 'APIWrapperService'
-        , 'backofficeSubcomponentsService'
+        , 'JBFormComponentsService'
         , 'SessionService'
         , 'BackofficeAPIWrapperService'
-        , BackofficeEntityLocaleController
+        , LocaleController
     ]);
 })();

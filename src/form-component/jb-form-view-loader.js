@@ -4,8 +4,8 @@
 * Loaded in $routeProvider
 */
 angular
-.module( 'jb.backofficeDetailView' )
-.controller( 'DetailViewLoaderController', [ '$scope', '$location', '$http', '$q', '$compile', function( $scope, $location, $http, $q, $compile ) {
+.module( 'jb.formComponents' )
+.controller( 'JBFormViewLoaderController', [ '$scope', '$location', '$http', '$q', '$compile', function( $scope, $location, $http, $q, $compile ) {
 
 
 	var self = this;

@@ -1,6 +1,6 @@
 (function(){
-    var mod = angular.module('jb.backofficeFormEvents', []);
-    mod.provider('backofficeFormEvents', function BackofficeFormEventProvider(){
+    var mod = angular.module('jb.formEvents', []);
+    mod.provider('jbFormEvents', function BackofficeFormEventProvider(){
         var eventKeys = {
             // used to register components, e.g. at the detail view
             registerComponent: 'jb.backoffice-form-event.registerComponent'
@@ -27,7 +27,7 @@
         }];
     });
 
-    function BackofficeSubcomponentsRegistry($q, formEvents, scope){
+    function JBFormComponentsRegistry($q, formEvents, scope){
         this.registeredComponents   = [];
         this.scope                  = scope;
         this.optionsDataHandlers    = [];
@@ -36,7 +36,7 @@
         this.formEvents             = formEvents;
     }
 
-    BackofficeSubcomponentsRegistry.prototype.listen = function(){
+    JBFormComponentsRegistry.prototype.listen = function(){
         this.scope.$on(this.formEvents.registerComponent, function(event, component){
             console.log('REGISTRATION OF:', component);
             // this check should not be necessary anymore, since we emit the registration event on the parent scope
@@ -47,12 +47,12 @@
         return this;
     };
 
-    BackofficeSubcomponentsRegistry.prototype.registerComponent = function(component){
+    JBFormComponentsRegistry.prototype.registerComponent = function(component){
         this.registeredComponents.push(component);
         component.registerAt(this);
     };
 
-    BackofficeSubcomponentsRegistry.prototype.getSaveCalls = function(){
+    JBFormComponentsRegistry.prototype.getSaveCalls = function(){
         return this.registeredComponents.reduce(function(calls, component){
             var subcalls = component.getSaveCalls();
             if(subcalls === false) debugger;
@@ -60,14 +60,14 @@
         }, []);
     };
 
-    BackofficeSubcomponentsRegistry.prototype.isValid = function(){
+    JBFormComponentsRegistry.prototype.isValid = function(){
         for(var i = 0; i < this.registeredComponents.length; i++){
             if(this.registeredComponents[i].isValid() === false) return false;
         }
         return true;
     };
 
-    BackofficeSubcomponentsRegistry.prototype.getAfterSaveTasks = function(entity){
+    JBFormComponentsRegistry.prototype.getAfterSaveTasks = function(entity){
         var calls = this.registeredComponents.reduce(function(subcalls, component){
             if(angular.isFunction(component.afterSaveTasks)){
                 return subcalls.concat(component.afterSaveTasks());
@@ -77,17 +77,17 @@
         return this.$q.all(calls);
     };
 
-    BackofficeSubcomponentsRegistry.prototype.getBeforeSaveTasks = function(initialPromise){
-        var calls = this.registeredComponents.reduce(function(basePromise, component){
-            if(angular.isFunction(component.getBeforeSaveTasks)){
-                return component.getBeforeSaveTasks(basePromise);
+    JBFormComponentsRegistry.prototype.getBeforeSaveTasks = function(){
+        var calls = this.registeredComponents.reduce(function(tasks, component){
+            if(angular.isFunction(component.beforeSaveTasks)){
+                tasks.push(component.beforeSaveTasks());
             }
-            return basePromise;
-        }, initialPromise);
-        return calls;
+            return tasks;
+        }, []);
+        return this.$q.all(calls);
     };
 
-    BackofficeSubcomponentsRegistry.prototype.getSelectFields = function () {
+    JBFormComponentsRegistry.prototype.getSelectFields = function () {
         return this.registeredComponents.reduce(function (selects, component) {
             if (angular.isFunction(component.getSelectFields)) return selects.concat(component.getSelectFields());
             if (angular.isDefined(component.select)) return selects.concat(component.select);
@@ -97,53 +97,53 @@
     /**
      * @param data
      */
-    BackofficeSubcomponentsRegistry.prototype.optionsDataHandler = function(data){
+    JBFormComponentsRegistry.prototype.optionsDataHandler = function(data){
         return this.$q.all(this.optionsDataHandlers.map(function(handler){
             return this.$q.when(handler(data));
         }, this));
     };
 
-    BackofficeSubcomponentsRegistry.prototype.registerOptionsDataHandler = function(handler){
+    JBFormComponentsRegistry.prototype.registerOptionsDataHandler = function(handler){
         if(!angular.isFunction(handler)) debugger;
         this.optionsDataHandlers.push(handler);
     };
 
-    BackofficeSubcomponentsRegistry.prototype.registerGetDataHandler = function(handler){
+    JBFormComponentsRegistry.prototype.registerGetDataHandler = function(handler){
         this.getDataHandlers.push(handler);
     };
 
-    BackofficeSubcomponentsRegistry.prototype.unregisterGetDataHandler = function(handler){
+    JBFormComponentsRegistry.prototype.unregisterGetDataHandler = function(handler){
         this.getDataHandlers.splice(this.getDataHandlers.indexOf(handler), 1);
     };
 
-    BackofficeSubcomponentsRegistry.prototype.unregisterOptionsDataHandler = function(handler){
+    JBFormComponentsRegistry.prototype.unregisterOptionsDataHandler = function(handler){
         this.optionsDataHandlers.splice(this.optionsDataHandlers.indexOf(handler), 1);
     };
 
-    BackofficeSubcomponentsRegistry.prototype.getDataHandler = function(data){
+    JBFormComponentsRegistry.prototype.getDataHandler = function(data){
         this.getDataHandlers.forEach(function(handler){
             handler(data);
         });
     };
 
-    BackofficeSubcomponentsRegistry.prototype.registerYourself = function(scope){
+    JBFormComponentsRegistry.prototype.registerYourself = function(scope){
         (scope || this.scope).$parent.$emit(this.formEvents.registerComponent, this);
     };
 
-    BackofficeSubcomponentsRegistry.prototype.registerAt = function(parent){
+    JBFormComponentsRegistry.prototype.registerAt = function(parent){
         parent.registerOptionsDataHandler(this.optionsDataHandler.bind(this));
         parent.registerGetDataHandler(this.getDataHandler.bind(this));
     };
 
     mod.factory(
-        'backofficeSubcomponentsService' ,
+        'JBFormComponentsService' ,
         [
             '$q' ,
-            'backofficeFormEvents' ,
+            'jbFormEvents' ,
             function($q, formEvents){
                 return {
                     registryFor   : function(scope){
-                        var registry = new BackofficeSubcomponentsRegistry($q, formEvents, scope);
+                        var registry = new JBFormComponentsRegistry($q, formEvents, scope);
                         return registry;
                     }
                     , registerComponent : function(scope, component){

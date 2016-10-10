@@ -83,8 +83,8 @@
     };
 
 
-    var _module = angular.module('jb.dateTime', []);
-    _module.directive('autoDateTimeInput', [function () {
+    var _module = angular.module('jb.formComponents');
+    _module.directive('jbFormDateTimeInput', [function () {
 
         return {
               scope : {
@@ -98,7 +98,7 @@
                 ctrl.init(scope, element, attrs);
             }
             , template: '<div class="form-group form-group-sm">' +
-            '<label data-backoffice-label data-label-identifier="{{$ctrl.label}}" data-is-required="$ctrl.isRequired()" data-is-valid="$ctrl.isValid()"></label>' +
+            '<label jb-form-label-component data-label-identifier="{{$ctrl.label}}" data-is-required="$ctrl.isRequired()" data-is-valid="$ctrl.isValid()"></label>' +
             '<div data-ng-class="{ \'col-md-9\': !$ctrl.showTime(), \'col-md-5\': $ctrl.showTime() }">' +
             '<input type="date" class="form-control input-sm input-date" data-ng-model="$ctrl.date">' +
             '</div>' +
@@ -113,7 +113,7 @@
     _module.controller('AutoDateTimeInputController', [
         '$scope',
         '$attrs',
-        'backofficeSubcomponentsService',
+        'JBFormComponentsService',
         AutoDateTimeInputController]);
 
 })();

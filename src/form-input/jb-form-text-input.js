@@ -4,7 +4,7 @@
     /**
      *
      */
-    var AutoTextInputController = function ($scope, $attrs, $q, componentsService) {
+    var JBFormTextInputController = function ($scope, $attrs, $q, componentsService) {
 
         this.$scope = $scope;
         this.$attrs = $attrs;
@@ -17,40 +17,40 @@
         this.required = true;
     };
 
-    AutoTextInputController.prototype.isRequired = function(){
+    JBFormTextInputController.prototype.isRequired = function(){
         return this.required === true;
     };
 
-    AutoTextInputController.prototype.isValid = function () {
+    JBFormTextInputController.prototype.isValid = function () {
         if(this.isRequired()) return !!this.$scope.data.value;
         return true;
     };
 
-    AutoTextInputController.prototype.registerAt = function(parent){
+    JBFormTextInputController.prototype.registerAt = function(parent){
         parent.registerGetDataHandler(this.updateData.bind(this));
         parent.registerOptionsDataHandler(this.handleOptionsData.bind(this));
     };
 
-    AutoTextInputController.prototype.getBeforeSaveTasks = function(initialPromise){
+    /*AutoJBFormTextInputController.prototype.getBeforeSaveTasks = function(initialPromise){
         return initialPromise.then(function(entity){
             if (this.originalData !== this.$scope.data.value){
                 entity[this.name] = this.$scope.data.value;
             }
             return entity;
         }.bind(this));
-    };
+    };*/
 
-    AutoTextInputController.prototype.handleOptionsData = function(data){
+    JBFormTextInputController.prototype.handleOptionsData = function(data){
         var spec = data[this.name];
         if(!angular.isDefined(spec)) return console.error('No options data available for text-field %o', this.name);
         this.required = spec.required === true;
     };
 
-    AutoTextInputController.prototype.init = function (scope) {
+    JBFormTextInputController.prototype.init = function (scope) {
         this.componentsService.registerComponent(scope, this);
     };
 
-    AutoTextInputController.prototype.preLink = function (scope) {
+    JBFormTextInputController.prototype.preLink = function (scope) {
         scope.data = {
               name: this.name
             , value: undefined
@@ -58,11 +58,11 @@
         };
     };
 
-    AutoTextInputController.prototype.updateData = function (data) {
+    JBFormTextInputController.prototype.updateData = function (data) {
         this.originalData = this.$scope.data.value = data[this.name];
     };
 
-    AutoTextInputController.prototype.getSaveCalls = function () {
+    JBFormTextInputController.prototype.getSaveCalls = function () {
 
         if (this.originalData === this.$scope.data.value) return [];
 
@@ -74,18 +74,18 @@
         }];
     };
 
-    var _module = angular.module('jb.backofficeAutoFormElement');
-        _module.controller('AutoTextInputController', [
+    var _module = angular.module('jb.formComponents');
+        _module.controller('JBFormTextInputController', [
             '$scope' ,
             '$attrs' ,
             '$q' ,
-            'backofficeSubcomponentsService' ,
-            AutoTextInputController]);
+            'JBFormComponentsService' ,
+            JBFormTextInputController]);
 
     /**
      * Directive for an autoFormElement of type 'text'
      */
-        _module.directive('autoTextInput', [function () {
+        _module.directive('jbFormTextInput', [function () {
 
             return {
                   scope : {
@@ -102,9 +102,9 @@
                         ctrl.preLink(scope, element, attrs);
                     }
                 }
-                , controller: 'AutoTextInputController'
+                , controller: 'JBFormTextInputController'
                 , template: '<div class=\'form-group form-group-sm\'>' +
-                                '<label data-backoffice-label data-label-identifier="{{$ctrl.label}}" data-is-valid="$ctrl.isValid()" data-is-required="$ctrl.isRequired()"></label>' +
+                                '<label jb-form-label-component data-label-identifier="{{$ctrl.label}}" data-is-valid="$ctrl.isValid()" data-is-required="$ctrl.isRequired()"></label>' +
                                 '<div class="col-md-9">' +
                                     '<input type="text" data-ng-attr-id="data.name" class="form-control input-sm" data-ng-attrs-required="$ctrl.isRequired()" data-ng-model="data.value"/>' +
                                 '</div>' +

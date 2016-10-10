@@ -3,12 +3,12 @@
 * that is not initialized through auto-form
 */
 angular
-.module( 'jb.backofficeFormComponents' )
-.directive( 'backofficeTreeComponent', [ function() {
+.module( 'jb.formComponents' )
+.directive( 'jbFormTreeComponent', [ function() {
 
 	return {
 		require				: [ '^detailView', 'backofficeTreeComponent' ]
-		, controller		: 'TreeComponentController'
+		, controller		: 'JBFormJBFormTreeComponentController'
 		, link				: function( scope, element, attrs, ctrl ) {
 			
 			ctrl[ 1 ].init( element, ctrl[ 0 ] );
@@ -32,7 +32,7 @@ angular
 } ] )
 
 
-.controller( 'TreeComponentController', [ '$scope', '$rootScope', '$attrs', '$location', '$q', 'APIWrapperService', function( $scope, $rootScope, $attrs, $location, $q, APIWrapperService ) {
+.controller( 'JBFormTreeComponentController', [ '$scope', '$rootScope', '$attrs', '$location', '$q', 'APIWrapperService', function( $scope, $rootScope, $attrs, $location, $q, APIWrapperService ) {
 
 	var self			= this
 		, element
@@ -43,7 +43,7 @@ angular
 
 	
 	if( !self.labelName || !self.entityName ) {
-		console.warn( 'TreeComponentController: labelName or entityName (for) attribute missing' );
+		console.warn( 'JBFormTreeComponentController: labelName or entityName (for) attribute missing' );
 	}
 
 
@@ -124,7 +124,7 @@ angular
 	self.updateData = function( data ) {
 
 		self.dataTree = getTree( data );
-		console.log( 'TreeComponentController: dataTree is %o', self.dataTree );
+		console.log( 'JBFormTreeComponentController: dataTree is %o', self.dataTree );
 
 		// Wait for template to be rendered
 		setTimeout( function() {
@@ -154,10 +154,10 @@ angular
 	self.getSaveCalls = function() {
 		
 		var treeData = element.nestable( 'serialize' );
-		console.log( 'TreeComponentController: Store data %o', treeData );
+		console.log( 'JBFormTreeComponentController: Store data %o', treeData );
 
 		var cleanedTreeData = self.cleanTreeData( treeData );
-		console.log( 'TreeComponentController: Cleaned data %o, got %o', treeData, cleanedTreeData );
+		console.log( 'JBFormTreeComponentController: Cleaned data %o, got %o', treeData, cleanedTreeData );
 
 		return {
 			method				: 'POST'

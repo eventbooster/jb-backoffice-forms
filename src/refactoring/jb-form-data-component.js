@@ -7,13 +7,13 @@
 
 	angular
 
-	.module( 'jb.backofficeFormComponents' )
+	.module( 'jb.formComponents' )
 
-	.directive( 'backofficeDataComponent', [ function() {
+	.directive( 'jbFormDataComponent', [ function() {
 
 		return {
 			require				: [ 'backofficeDataComponent', '^detailView' ]
-			, controller		: 'BackofficeDataComponentController'
+			, controller		: 'JBFormDataComponentController'
 			, controllerAs		: 'backofficeDataComponent'
 			, bindToController	: true
 			, templateUrl		: 'backofficeDataComponentTemplate.html'
@@ -29,7 +29,7 @@
 
 	} ] )
 
-	.controller( 'BackofficeDataComponentController', [ '$scope', '$rootScope', '$q', 'APIWrapperService', function( $scope, $rootScope, $q, APIWrapperService ) {
+	.controller( 'JBFormDataComponentController', [ '$scope', '$rootScope', '$q', 'APIWrapperService', function( $scope, $rootScope, $q, APIWrapperService ) {
 
 		var self = this
 			, _element
@@ -55,18 +55,18 @@
 		self.checkFields = function() {
 
 			if( !angular.isArray( self.fields ) ) {
-				throw new Error( 'BackofficeDataComponentController: fields passed is not an array: ' + JSON.stringify( self.fields ) );
+				throw new Error( 'JBFormDataComponentController: fields passed is not an array: ' + JSON.stringify( self.fields ) );
 			}
 
 
 			self.fields.forEach( function( field ) {
 
 				if( !angular.isObject( field ) ) {
-					throw new Error( 'BackofficeDataComponentController: field passed is not an object: ' + JSON.stringify( field ) );
+					throw new Error( 'JBFormDataComponentController: field passed is not an object: ' + JSON.stringify( field ) );
 				}
 
 				if( !field.name ) {
-					throw new Error( 'BackofficeDataComponentController: field is missing name property: ' + JSON.stringify( field ) );
+					throw new Error( 'JBFormDataComponentController: field is missing name property: ' + JSON.stringify( field ) );
 				}
 
 			} );
@@ -105,7 +105,7 @@
 					}
 
 				} catch( err ) {
-					console.error( 'BackofficeDataComponentController: Could not parse data ' + data[ self.propertyName ] );					
+					console.error( 'JBFormDataComponentController: Could not parse data ' + data[ self.propertyName ] );					
 				}
 
 			}
@@ -137,7 +137,7 @@
 		self.updateOptionsData = function( data ) {
 
 			if( !data[ self.propertyName ] ) {
-				console.error( 'BackofficeDataComponentController: Missing OPTIONS data for %o in %o', self.propertyName, data );
+				console.error( 'JBFormDataComponentController: Missing OPTIONS data for %o in %o', self.propertyName, data );
 				return;
 			}
 
@@ -174,7 +174,7 @@
 			} );
 
 			if( !changed ) {
-				console.log( 'BackofficeDataComponentController: No changes made.' );
+				console.log( 'JBFormDataComponentController: No changes made.' );
 				return false;
 			}
 
@@ -201,7 +201,7 @@
 
 			} );
 
-			console.log( 'BackofficeDataComponentController: Store changes %o', ret );
+			console.log( 'JBFormDataComponentController: Store changes %o', ret );
 
 			return {
 				data	: {
