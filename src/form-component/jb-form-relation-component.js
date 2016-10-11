@@ -279,7 +279,8 @@
 		return data[this.entityName];
 	};
 	/**
-	 * @todo: this might be implemented as a post-save call to ensure that
+	 * @todo: this might be implemented as a post-save call to ensure that the original entity was saved
+     * @todo: remove the workaround for content data on delete requests
 	 * @returns {*}
 	 */
 	JBFormRelationController.prototype.getSaveCalls = function(){
@@ -298,7 +299,7 @@
 				removeCalls.push({
 					method    : 'DELETE'
 					, url       : {
-						path       : [ this.relationName, value].join('/')
+						  path       : [ this.relationName, value].join('/')
 						, mainEntity : 'append'
 					}
 				});

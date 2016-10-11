@@ -196,7 +196,7 @@
                     , 'label'           : '@'
                 }
                 , template: '<div class="row">' +
-                '<label data-backoffice-label data-label-identifier="{{backofficeImageComponent.label}}" data-is-required="false" data-is-valid="true"></label>' +
+                '<label jb-form-label-component data-label-identifier="{{backofficeImageComponent.label}}" data-is-required="false" data-is-valid="true"></label>' +
                 '<div class="col-md-9 backoffice-image-component" >' +
                 '<div data-file-drop-component data-supported-file-types="[\'image/jpeg\']" data-model="backofficeImageComponent.images" data-error-handler="backofficeImageComponent.handleDropError(error)">' +
                 '<ol class="clearfix">' +
@@ -390,51 +390,33 @@
                 self.getSaveCalls = function () {
 
                     // Store a signle relation (pretty easy)
-                    if (_singleRelation) {
-
-                        return _saveSingleRelation();
-
-                    }
-
-                    else {
-
-                        return _saveMultiRelation();
-
-                    }
-
-
+                    if (_singleRelation) return _saveSingleRelation();
+                    return _saveMultiRelation();
                 };
 
-
+                /**
+                 * Saves a single image relation.
+                 *
+                 * We removed the check involving the the detail view controller to test for the method to choose.
+                 * @returns {*}
+                 * @private
+                 */
                 function _saveSingleRelation() {
-
 
                     // Removed
                     if (_originalData && _originalData.length && ( !self.images || !self.images.length )) {
 
                         var data = {};
                         data[_relationKey] = null;
-
-                        return {
-                            // We can savely use PATCH as _originalData existed and
-                            // therefore entity is present.
-                            method: 'PATCH'
-                            , data: data
-                        };
-
+                        return [{ data: data }];
                     }
 
                     // Added
-                    else if (!_originalData && self.images && self.images.length) {
+                    else if ((!_originalData || !_originalData.length) && self.images && self.images.length) {
 
                         var addData = {};
                         addData[_relationKey] = self.images[0].id;
-
-                        return {
-                            method: _detailViewController.getEntityId() ? 'PATCH' : 'POST'
-                            , data: addData
-                        };
-
+                        return [{ data: addData }];
                     }
 
                     // Change: Take the last image. This functionality might (SHOULD!) be improved.
@@ -442,13 +424,7 @@
 
                         var changeData = {};
                         changeData[_relationKey] = self.images[self.images.length - 1].id;
-
-                        return {
-                            // Patch can be savely used as _originalData exists
-                            method: 'PATCH'
-                            , data: changeData
-                        };
-
+                        return [{ data: changeData }];
                     }
 
                     else {
@@ -1058,6 +1034,7 @@
             , 'border'].forEach(function(property){
                 this.heightElement.css(property, element.css(property));
             }, this);
+        this.heightElement.css('word-wrap', 'break-word');
         this.heightElementInitialized = true;
     };
 
@@ -1550,7 +1527,8 @@
 		return data[this.entityName];
 	};
 	/**
-	 * @todo: this might be implemented as a post-save call to ensure that
+	 * @todo: this might be implemented as a post-save call to ensure that the original entity was saved
+     * @todo: remove the workaround for content data on delete requests
 	 * @returns {*}
 	 */
 	JBFormRelationController.prototype.getSaveCalls = function(){
@@ -1569,7 +1547,7 @@
 				removeCalls.push({
 					method    : 'DELETE'
 					, url       : {
-						path       : [ this.relationName, value].join('/')
+						  path       : [ this.relationName, value].join('/')
 						, mainEntity : 'append'
 					}
 				});
@@ -1812,6 +1790,7 @@ angular
                     }
                 }
                 , post: function (scope, element, attrs, ctrl) {
+                    element.addClass('jb-form-view');
                     ctrl.init(scope, element, attrs);
                 }
 

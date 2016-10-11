@@ -186,6 +186,7 @@
             , 'border'].forEach(function(property){
                 this.heightElement.css(property, element.css(property));
             }, this);
+        this.heightElement.css('word-wrap', 'break-word');
         this.heightElementInitialized = true;
     };
 

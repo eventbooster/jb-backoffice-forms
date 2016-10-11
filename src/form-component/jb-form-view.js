@@ -29,6 +29,7 @@
                     }
                 }
                 , post: function (scope, element, attrs, ctrl) {
+                    element.addClass('jb-form-view');
                     ctrl.init(scope, element, attrs);
                 }
 
