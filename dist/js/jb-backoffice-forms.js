@@ -2365,7 +2365,6 @@ angular
                     }
 
                 }
-                debugger;
                 // entityId not yet set: New element – but has no fields or no required fields,
                 // therefore no information might be provided, except for some relations.
                 // If entity is not generated (what would happen as there's no data to store),
@@ -2390,7 +2389,6 @@ angular
                         mainCallData = mainCallResult;
 
                         console.log('DetailView: Made main save call; got back %o', mainCallData);
-                        debugger;
                         // Pass id of newly created object back to the Controller
                         // so that user can be redirected to new entity
                         id = self.getOwnId(mainCallData);
