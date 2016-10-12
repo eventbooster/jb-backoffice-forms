@@ -812,10 +812,7 @@
 
                 }
 
-
-
-                // Absolute call!
-
+                // absolute
                 else if (call.url && call.url.indexOf('/') === 0) {
 
                     url = call.url;
