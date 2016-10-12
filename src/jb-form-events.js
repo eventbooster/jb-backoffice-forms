@@ -55,7 +55,6 @@
     JBFormComponentsRegistry.prototype.getSaveCalls = function(){
         return this.registeredComponents.reduce(function(calls, component){
             var subcalls = component.getSaveCalls();
-            if(subcalls === false) debugger;
             return calls.concat(component.getSaveCalls());
         }, []);
     };
@@ -77,10 +76,10 @@
         return this.$q.all(calls);
     };
 
-    JBFormComponentsRegistry.prototype.getBeforeSaveTasks = function(){
+    JBFormComponentsRegistry.prototype.getBeforeSaveTasks = function(entity){
         var calls = this.registeredComponents.reduce(function(tasks, component){
             if(angular.isFunction(component.beforeSaveTasks)){
-                tasks.push(component.beforeSaveTasks());
+                tasks.push(component.beforeSaveTasks(entity));
             }
             return tasks;
         }, []);
@@ -104,7 +103,6 @@
     };
 
     JBFormComponentsRegistry.prototype.registerOptionsDataHandler = function(handler){
-        if(!angular.isFunction(handler)) debugger;
         this.optionsDataHandlers.push(handler);
     };
 

@@ -1,5 +1,5 @@
 {
-	"name"			: "jb-backoffice-forms"
+	  "name"		: "jb-backoffice-forms"
 	, "main"		: "dist/js/jb-backoffice-forms.js"
 	, "dependencies": {
 		  "angular"	: ">=1.3.0"

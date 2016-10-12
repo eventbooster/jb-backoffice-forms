@@ -59,6 +59,7 @@
     };
 
     JBFormTextInputController.prototype.updateData = function (data) {
+        if(!data) return;
         this.originalData = this.$scope.data.value = data[this.name];
     };
 

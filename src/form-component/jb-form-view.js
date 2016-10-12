@@ -93,8 +93,16 @@
             var self = this
                 , element;
 
-            self.componentsService = subcomponentsService;
+            self.componentsService  = subcomponentsService;
             self.componentsRegistry = null;
+            /**
+             * Data we loaded ourselves.
+             */
+            self.optionData         = null;
+            /**
+             * Data we got by distribution.
+             */
+            self.parentOptionData   = null;
 
             $scope.$watchGroup(['$ctrl.entityName', '$ctrl.entityId'], function () {
                 self.setTitle();
@@ -182,26 +190,28 @@
                  *
                  * @todo: can we detect if we are root by checking if 'registerAt' was called?
                  */
-                self.isRoot = attrs.hasOwnProperty('isRoot');
-                self.hasEntityName = attrs.hasOwnProperty('entityName');
-                self.hasEntityId = attrs.hasOwnProperty('entityId');
+                self.isRoot         = attrs.hasOwnProperty('isRoot');
+                self.hasEntityName  = attrs.hasOwnProperty('entityName');
+                self.hasEntityId    = attrs.hasOwnProperty('entityId');
 
                 if (self.hasEntityName) {
                     var nameDeferred = $q.defer();
-                    $attrs.$observe('entityName', function (value) {
+                    promises.push(nameDeferred.promise);
+                    scope.$watch(function(){ return attrs.entityName; } , function (value) {
+                        console.info(value);
+                        if(!value) return;
                         self.setEntityName(value);
                         nameDeferred.resolve();
                     });
-                    promises.push(nameDeferred.promise);
                 }
 
                 if (self.hasEntityId) {
                     var idDeferred = $q.defer();
-                    $attrs.$observe('entityId', function (value) {
+                    promises.push(idDeferred.promise);
+                    scope.$watch(function(){ return attrs.entityId; }, function (value) {
                         self.setEntityId(value);
                         idDeferred.resolve();
                     });
-                    promises.push(idDeferred.promise);
                 }
 
                 if (!self.hasEntityName && !self.hasEntityId) {
@@ -214,12 +224,9 @@
 
                 $q.all(promises).then(function () {
                     // load option data if we are root
-                    if (self.isRoot) self.getOptionData().then(
-                        self.getData
-                        , function (error) {
-                            console.error(error);
-                        }
-                    )
+                    if (self.isRoot) self.getOptionData().then(self.getData).catch(function(err){
+                        console.error(err);
+                    });
                 });
             };
 
@@ -237,6 +244,7 @@
                 parent.registerOptionsDataHandler(self.handleOptionsData);
                 parent.registerGetDataHandler(self.handleGetData);
             };
+
             /**
              * Also, we have to differ between:
              *
@@ -247,27 +255,32 @@
              */
             self.handleGetData = function (data) {
                 var ownData = data[self.entityName];
-                if (!angular.isDefined(ownData)) return console.error('No data available for related %o', self.entityName);
-                // ugh we might get the entityId through the scope!!
-                if (!self.entityId) {
-                    var pKey = self.optionData.relatedKey;
+                if (!angular.isDefined(ownData)) console.error('No data available for related %o', self.entityName);
+                // ugh we might get the entityId through the scope!! yes we do!
+                if (!self.entityId && ownData) {
+                    var pKey = self.parentOptionData.relatedKey;
                     self.setEntityId(ownData[pKey]);
+                }
+                if(!self.entityId && !ownData){
+                    self.setEntityId(undefined);
                 }
                 self.distributeData(ownData);
             };
 
             self.getSaveCalls = function () {
-                var calls = self.generateSaveCalls();
-                return calls;
+                var call = {};
+                call.data = {};
+                call.data[self.parentOptionData.relationKey] = self.getEntityId();
+                return [call];
             };
             /**
              * This is shitty! We need to load more options data as soon as we receive the options to to be able to
              * distribute options to the nested fields.
              * @param fields
              */
-            self.internallyHandleOptionsData = function (fields) {
-                self.fields = fields;
-                return self.componentsRegistry.optionsDataHandler(fields);
+            self.internallyHandleOptionsData = function (data) {
+                self.optionData = data;
+                return self.componentsRegistry.optionsDataHandler(data);
             };
             /**
              * These are passed in from outside (nested detail view).
@@ -281,7 +294,7 @@
              */
             self.handleOptionsData = function (data) {
                 var optionData = data[self.entityName];
-                self.optionData = optionData;
+                self.parentOptionData = optionData;
                 return self.getOptionData();
             };
 
@@ -311,15 +324,7 @@
              * @todo: check if the fields are used somewhere
              */
             self.makeOptionRequest = function (url) {
-                return boAPIWrapper
-                    .getOptions(url)
-                    .then(function (data) {
-                        console.log('DetailView: Got OPTIONS data for %o %o', url, data);
-                        self.fields = data;
-                        return self.fields;
-                    }, function (err) {
-                        return $q.reject(err);
-                    });
+                return boAPIWrapper.getOptions(url);
             };
 
             /**
@@ -461,7 +466,6 @@
                         if (self.parseUrl().isNew && !dontNotifyOrRedirect) {
                             $state.go('app.detail', {entityName: self.getEntityName(), entityId: self.getEntityId()});
                         }
-
                         // Do notify and redirect
                         if (!dontNotifyOrRedirect) {
                             console.log('DetailViewController: Show success message on %o', $rootScope);
@@ -518,7 +522,6 @@
 
             };
 
-
             /**
              * Executes tasks that must be done before the current entity is saved, i.e.
              * create all entities that will be linked to this entity afterwards, like e.g.
@@ -528,9 +531,16 @@
             self.executePreSaveTasks = function () {
                 var entity  = {};
                 entity.meta = {};
-                return self.componentsRegistry.getBeforeSaveTasks();
+                return self.componentsRegistry.getBeforeSaveTasks(entity);
             };
-
+            /**
+             * This is the external api!
+             * @param entity
+             */
+            self.beforeSaveTasks = function(entity){
+                var task = self.makeSaveRequest();
+                return task;
+            };
 
             /**
              * Executes save tasks that must be executed after the main entity was created,
@@ -543,7 +553,15 @@
                 return self.componentsRegistry.getAfterSaveTasks();
             };
 
-
+            self.getOwnId = function(data) {
+                if(!data) return null;
+                var keys = Object.keys(this.optionData.internalFields);
+                for(var i=0; i<keys.length; i++){
+                    var field = this.optionData.internalFields[keys[i]];
+                    if(field.isPrimary === true) return data[keys[i]];
+                }
+                return null;
+            };
             /**
              * Saves:
              * - first, the data on the entity (creates entity, if not yet done)
@@ -558,7 +576,6 @@
              */
             self.makeMainSaveCall = function () {
                 var calls = self.generateSaveCalls();
-
                 console.log('DetailView: Save calls are %o', calls);
 
                 var mainCall
@@ -603,7 +620,7 @@
                 }
 
                 console.log('DetailView: Main save call is %o, other calls are %o', mainCall, relationCalls);
-
+                var id = null;
                 // Make main call
                 return self.executeSaveRequest(mainCall)
 
@@ -617,9 +634,8 @@
 
                         // Pass id of newly created object back to the Controller
                         // so that user can be redirected to new entity
-                        if (mainCallData && mainCallData.id) {
-                            $scope.entityId = mainCallData.id;
-                        }
+                        id = self.getOwnId(mainCallData);
+                        self.setEntityId(id);
 
                         var callRequests = [];
                         relationCalls.forEach(function (call) {
@@ -632,11 +648,8 @@
 
                     // Make sure we pass back the id.
                     .then(function () {
-                        if (mainCallData && mainCallData.id) {
-                            console.log('DetailView: Made call to the main entity; return it\'s id %o', mainCallData.id);
-                            return mainCallData.id;
-                        }
-                        return null;
+                        console.log('DetailView: Made call to the main entity; return it\'s id %o', id);
+                        return id;
                     });
 
 
@@ -865,10 +878,11 @@
              * - a Promise
              */
             self.generateSaveCalls = function () {
-                return self.componentsRegistry.getSaveCalls().reduce(function (calls, componentCalls) {
+                var saveCalls = self.componentsRegistry.getSaveCalls().reduce(function (calls, componentCalls) {
                     self.addCall(componentCalls, calls);
                     return calls;
                 }, []);
+                return saveCalls;
             };
 
 
