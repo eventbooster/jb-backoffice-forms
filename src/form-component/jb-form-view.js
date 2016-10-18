@@ -83,7 +83,8 @@
             , 'APIWrapperService'
             , 'JBFormComponentsService'
             , 'BackofficeAPIWrapperService'
-            , function ($scope, $rootScope, $q, $attrs, $filter, $state, APIWrapperService, subcomponentsService, boAPIWrapper) {
+            , 'JBFormViewAdapterService'
+            , function ($scope, $rootScope, $q, $attrs, $filter, $state, APIWrapperService, subcomponentsService, boAPIWrapper, adapterService) {
 
 
             /**
@@ -95,14 +96,11 @@
 
             self.componentsService  = subcomponentsService;
             self.componentsRegistry = null;
+            self.adapterService     = adapterService;
             /**
              * Data we loaded ourselves.
              */
             self.optionData         = null;
-            /**
-             * Data we got by distribution.
-             */
-            self.parentOptionData   = null;
 
             $scope.$watchGroup(['$ctrl.entityName', '$ctrl.entityId'], function () {
                 self.setTitle();
@@ -190,6 +188,11 @@
                  *
                  * @todo: can we detect if we are root by checking if 'registerAt' was called?
                  */
+
+                // reset the entity id passed through the scope
+                // @todo: bind this shit to the controller
+                self.setEntityId(undefined);
+
                 self.isRoot         = attrs.hasOwnProperty('isRoot');
                 self.hasEntityName  = attrs.hasOwnProperty('entityName');
                 self.hasEntityId    = attrs.hasOwnProperty('entityId');
@@ -220,8 +223,8 @@
                     self.setEntityId(stateParams.id);
                 }
                 // register myself as a component to possible parents
-                self.componentsService.registerComponent(scope, this);
-
+                self.componentsService.registerComponent(scope, self.adapterService.getAdapter(this));
+                // @todo: store the promises otherwise and chain them as soon as the option handler is invoked (to make shure all data is available)
                 $q.all(promises).then(function () {
                     // load option data if we are root
                     if (self.isRoot) self.getOptionData().then(self.getData).catch(function(err){
@@ -240,39 +243,6 @@
                 $scope.entityId = id;
             };
 
-            self.registerAt = function (parent) {
-                parent.registerOptionsDataHandler(self.handleOptionsData);
-                parent.registerGetDataHandler(self.handleGetData);
-            };
-
-            /**
-             * Also, we have to differ between:
-             *
-             *  1. hasOne       : just take the value
-             *  2. belongsTo    : take the first of the values
-             *
-             * @param data
-             */
-            self.handleGetData = function (data) {
-                var ownData = data[self.entityName];
-                if (!angular.isDefined(ownData)) console.error('No data available for related %o', self.entityName);
-                // ugh we might get the entityId through the scope!! yes we do!
-                if (!self.entityId && ownData) {
-                    var pKey = self.parentOptionData.relatedKey;
-                    self.setEntityId(ownData[pKey]);
-                }
-                if(!self.entityId && !ownData){
-                    self.setEntityId(undefined);
-                }
-                self.distributeData(ownData);
-            };
-
-            self.getSaveCalls = function () {
-                var call = {};
-                call.data = {};
-                call.data[self.parentOptionData.relationKey] = self.getEntityId();
-                return [call];
-            };
             /**
              * This is shitty! We need to load more options data as soon as we receive the options to to be able to
              * distribute options to the nested fields.
@@ -282,27 +252,19 @@
                 self.optionData = data;
                 return self.componentsRegistry.optionsDataHandler(data);
             };
-            /**
-             * These are passed in from outside (nested detail view).
-             * @param data
-             * We need to differ between:
-             *
-             *  1. hasOne:      set the foreign key on the original entity (pre save task)
-             *  2. belongsTo:   set the foreign key of the referenced entity (post save task)
-             *
-             * @todo: make adjustments to the optionData
-             */
-            self.handleOptionsData = function (data) {
-                var optionData = data[self.entityName];
-                self.parentOptionData = optionData;
+
+            self.getOptionsData = function(){
                 return self.getOptionData();
+            };
+
+            self.getSpecFromOptionsData = function(data){
+                return data[self.entityName];
             };
 
             /**
              * OPTION data
              */
             self.getOptionData = function () {
-
                 console.log('DetailView: Make OPTIONS call for %o', self.getEntityName());
                 return self
                     .makeOptionRequest('/' + self.getEntityName())
@@ -334,11 +296,31 @@
                 throw new Error('DEPRECATED');
             };
 
+            self.registerComponent = function(component){
+                this.componentsRegistry.registerComponent(component);
+            };
+
+            /**
+             * Collects the select fields of all the registered subcomponents. This is the internal API.
+             * @returns {Array}
+             */
+            self.getSelectParameters = function () {
+                return [this.getOwnIdField()].concat(self.componentsRegistry.getSelectFields());
+            };
+
+            /**
+             * Distributes the entity data (from the GET call) to the registered subcomponents by delegating
+             * to the getDataHandler of the registry.
+             */
+            self.distributeData = function (data) {
+                self.componentsRegistry.getDataHandler(data);
+            };
+
             /**
              * Make a GET request to the API, selecting all the fields the subcomponents request.
              */
             self.getData = function () {
-                self
+                return self
                     .makeGetRequest()
                     .then(
                     self.distributeData
@@ -355,54 +337,10 @@
             };
 
             /**
-             * Collects the select fields of all the registered subcomponents. This is the internal API.
-             * @returns {Array}
-             */
-            self.getSelectParameters = function () {
-                return self.componentsRegistry.getSelectFields();
-            };
-
-            /**
-             * Collects the select fields if the detail view is nested. This is the external API.
-             * @returns {Array}
-             */
-            self.getSelectFields = function () {
-                return self.getSelectParameters().map(function (select) {
-                    return [this.getEntityName(), select].join('.');
-                }.bind(this));
-            };
-
-            /**
-             * Distributes the entity data (from the GET call) to the registered subcomponents by delegating
-             * to the getDataHandler of the registry.
-             */
-            self.distributeData = function (data) {
-                self.componentsRegistry.getDataHandler(data);
-            };
-
-
-            /**
              * Get data for current entity from server, fire dateUpdate. Done after changes were saved.
              */
             self.updateData = function () {
-
-                return self
-                    .makeGetRequest()
-                    .then(function (data) {
-
-                        self.distributeData(data);
-                        return data;
-
-                    }, function (err) {
-                        $rootScope.$broadcast('notification', {
-                            type: 'error'
-                            , message: 'web.backoffice.detail.saveError'
-                            , variables: {
-                                errorMessage: err
-                            }
-                        });
-                        return $q.reject(err);
-                    });
+                return self.getData();
             };
 
 
@@ -499,7 +437,7 @@
             };
 
             self.isValid = function () {
-                return self.componentsRegistry.isValid()
+                return self.componentsRegistry && self.componentsRegistry.isValid()
             };
             /**
              * Stores all component's data on server
@@ -516,8 +454,8 @@
                         // current entity state
                         return self.makeMainSaveCall();
                     })
-                    .then(function () {
-                        return self.executePostSaveTasks();
+                    .then(function (id) {
+                        return self.executePostSaveTasks(id);
                     });
 
             };
@@ -535,7 +473,7 @@
             };
             /**
              * This is the external api!
-             * @param entity
+             * @todo: move this to the relation strategy
              */
             self.beforeSaveTasks = function(entity){
                 var task = self.makeSaveRequest();
@@ -549,18 +487,28 @@
              * 2. Update media links (/mediumGroup/id/medium/id) (done through regular save call)
              * 3. Update order (GET all media from /mediumGroup, then set order on every single relation)
              */
-            self.executePostSaveTasks = function () {
-                return self.componentsRegistry.getAfterSaveTasks();
+            self.executePostSaveTasks = function (id) {
+                return self.componentsRegistry.getAfterSaveTasks(id);
+            };
+
+            self.getIdFieldFrom = function(optionsData){
+                var keys = Object.keys(optionsData.internalFields);
+                for(var i=0; i<keys.length; i++){
+                    var field = optionsData.internalFields[keys[i]];
+                    if(field.isPrimary === true) return field.name;
+                }
+                return null;
+            };
+
+            self.getOwnIdField = function(){
+                return this.getIdFieldFrom(this.optionData);
             };
 
             self.getOwnId = function(data) {
+                var primaryKey;
                 if(!data) return null;
-                var keys = Object.keys(this.optionData.internalFields);
-                for(var i=0; i<keys.length; i++){
-                    var field = this.optionData.internalFields[keys[i]];
-                    if(field.isPrimary === true) return data[keys[i]];
-                }
-                return null;
+                primaryKey = this.getOwnIdField();
+                return primaryKey ? data[primaryKey] : null;
             };
             /**
              * Saves:

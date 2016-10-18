@@ -84,13 +84,13 @@
         return true;
     };
 
-    JBFormComponentsRegistry.prototype.getAfterSaveTasks = function(entity){
+    JBFormComponentsRegistry.prototype.getAfterSaveTasks = function(id){
         var calls = this.registeredComponents.reduce(function(subcalls, component){
             if(angular.isFunction(component.afterSaveTasks)){
-                return subcalls.concat(component.afterSaveTasks());
+                return subcalls.concat(component.afterSaveTasks(id));
             }
             return subcalls;
-        }, [this.$q.when(entity)]);
+        }, []);
         return this.$q.all(calls);
     };
 
@@ -853,7 +853,7 @@
 
     _module.directive('jbFormLocaleComponent', function(){
         return {
-              controller        : 'LocaleController'
+              controller        : 'JBFormLocaleComponentController'
             , controllerAs      : '$ctrl'
             , bindToController  : true
             , scope: {
@@ -917,7 +917,7 @@
      * @param sessionService
      * @constructor
      */
-    function LocaleController($scope, $q, $timeout, api, componentsService, sessionService, boAPIWrapper){
+    function JBFormLocaleComponentController($scope, $q, $timeout, api, componentsService, sessionService, boAPIWrapper){
         this.$scope             = $scope;
         this.api                = api;
         this.$q                 = $q;
@@ -940,8 +940,8 @@
         this.element = null;
     }
 
-    LocaleController.prototype.preLink = function(){};
-    LocaleController.prototype.postLink = function(scope, element, attrs){
+    JBFormLocaleComponentController.prototype.preLink = function(){};
+    JBFormLocaleComponentController.prototype.postLink = function(scope, element, attrs){
         this.componentsService.registerComponent(scope, this);
         this.heightElement = angular.element('<div></div>');
         this.heightElement = this.heightElement.attr('id', 'locale-height-container');
@@ -952,12 +952,12 @@
         this.element.append(this.heightElement);
     };
 
-    LocaleController.prototype.registerAt = function(parent){
+    JBFormLocaleComponentController.prototype.registerAt = function(parent){
         parent.registerOptionsDataHandler(this.handleOptionsData.bind(this));
         parent.registerGetDataHandler(this.handleGetData.bind(this));
     };
 
-    LocaleController.prototype.getSelectedLanguages = function(){
+    JBFormLocaleComponentController.prototype.getSelectedLanguages = function(){
         var selected = [];
         for(var i=0; i<this.supportedLanguages.length; i++){
             var lang = this.supportedLanguages[i];
@@ -966,11 +966,11 @@
         return selected;
     };
 
-    LocaleController.prototype.getSupportedLanguages = function(){
+    JBFormLocaleComponentController.prototype.getSupportedLanguages = function(){
         return this.supportedLanguages;
     };
 
-    LocaleController.prototype.fieldIsValid = function(locale, property){
+    JBFormLocaleComponentController.prototype.fieldIsValid = function(locale, property){
 
         var   definition = this.fieldDefinitions[property];
         // fields of locales which do not yet exist are not validated
@@ -979,12 +979,12 @@
         return true;
     };
 
-    LocaleController.prototype.adjustHeight = function(event){
+    JBFormLocaleComponentController.prototype.adjustHeight = function(event){
         var   element       = angular.element(event.currentTarget);
         this.adjustElementHeight(element);
     };
 
-    LocaleController.prototype.adjustElementHeight = function(element){
+    JBFormLocaleComponentController.prototype.adjustElementHeight = function(element){
 
         var   scrollHeight  = element[0].scrollHeight
             , textValue     = element.val()
@@ -1011,13 +1011,13 @@
         element.height(this.heightElement.height());
     };
 
-    LocaleController.prototype.adjustAllHeights = function(){
+    JBFormLocaleComponentController.prototype.adjustAllHeights = function(){
         this.element.find('textarea').each(function(index, element){
             this.adjustElementHeight(angular.element(element));
         }.bind(this));
     };
 
-    LocaleController.prototype.initializeHeightElement = function(element){
+    JBFormLocaleComponentController.prototype.initializeHeightElement = function(element){
 
         [     'font-size'
             , 'font-family'
@@ -1036,7 +1036,7 @@
         this.heightElementInitialized = true;
     };
 
-    LocaleController.prototype.toggleLanguage = function(event, language){
+    JBFormLocaleComponentController.prototype.toggleLanguage = function(event, language){
         if(event) event.preventDefault();
         var langs = this.getSelectedLanguages();
         if(language.selected && langs.length == 1) return;
@@ -1044,15 +1044,15 @@
         this.$timeout(this.adjustAllHeights.bind(this));
     };
 
-    LocaleController.prototype.isSelected = function(language){
+    JBFormLocaleComponentController.prototype.isSelected = function(language){
         return language.selected === true;
     };
 
-    LocaleController.prototype.checkForTranslation = function(language){
+    JBFormLocaleComponentController.prototype.checkForTranslation = function(language){
         return !!(this.locales && angular.isDefined( this.locales[language.id] ));
     };
 
-    LocaleController.prototype.translationIsEmpty = function(data){
+    JBFormLocaleComponentController.prototype.translationIsEmpty = function(data){
         return this.fields.reduce(function(previous, field){
             return previous && !data[field] && data[field].trim() !== '';
         }, true);
@@ -1065,7 +1065,7 @@
      * @note: In the select call we need to set the related table name and select all fields plus the languages. Currently
      * we are not able to properly identify locales.
      */
-    LocaleController.prototype.handleOptionsData = function(data){
+    JBFormLocaleComponentController.prototype.handleOptionsData = function(data){
         var spec;
 
         if(!data || !angular.isDefined(data[this.relationName])) return console.error('No OPTIONS data found in locale component.');
@@ -1086,7 +1086,7 @@
      * @todo: find a proper way to resolve the endpoint!!
      * @returns {*}
      */
-    LocaleController.prototype.loadFields = function(){
+    JBFormLocaleComponentController.prototype.loadFields = function(){
         var url = '/' + this.options.tableName;
         if(this.fieldDefinitions) return this.$q.when(this.fieldDefinitions);
         return this.boAPI.getOptions(url).then(function(fields){
@@ -1096,26 +1096,27 @@
         });
     };
 
-    LocaleController.prototype.filterFields = function(fields){
+    JBFormLocaleComponentController.prototype.filterFields = function(fields){
         return Object.keys(fields).reduce(function(sanitizedFields, fieldName){
-            if(!this.fieldsExclude || this.fieldsExclude.indexOf(fieldName) == -1){
-                sanitizedFields[fieldName] = fields[fieldName];
+            var field = fields[fieldName];
+            if((!this.fieldsExclude || this.fieldsExclude.indexOf(field.name) == -1) && field.isPrimary !== true){
+                sanitizedFields[fieldName] = field;
             }
             return sanitizedFields;
         }.bind(this), {});
     };
 
-    LocaleController.prototype._localeIsEmpty = function(locale){
+    JBFormLocaleComponentController.prototype._localeIsEmpty = function(locale){
         return this.fields.every(function(fieldName){
             return this._localePropertyIsEmpty(locale[fieldName]);
         }, this);
     };
 
-    LocaleController.prototype._localePropertyIsEmpty = function(value){
+    JBFormLocaleComponentController.prototype._localePropertyIsEmpty = function(value){
         return angular.isUndefined(value) || value.trim() == '';
     };
 
-    LocaleController.prototype._localeGetChanges = function(locale, originalLocale){
+    JBFormLocaleComponentController.prototype._localeGetChanges = function(locale, originalLocale){
         // the locale is new
         if(!angular.isDefined(originalLocale)){
             // the locale has no data, meaning that there are no changes
@@ -1138,7 +1139,7 @@
     /**
      * We could also adjust the _localeGetChanges method to be able to deal with locales that were not created.
      */
-    LocaleController.prototype.getSaveCalls = function(){
+    JBFormLocaleComponentController.prototype.getSaveCalls = function(){
 
         var   calls     = [];
 
@@ -1171,7 +1172,7 @@
         return calls;
     };
 
-    LocaleController.prototype.handleGetData = function(data){
+    JBFormLocaleComponentController.prototype.handleGetData = function(data){
         var locales             = data[this.options.tableName];
         if(locales){
             this.originalLocales    = this.normalizeModel(locales);
@@ -1183,21 +1184,21 @@
         this.$timeout(this.adjustAllHeights.bind(this));
     };
 
-    LocaleController.prototype.getFields = function(){
+    JBFormLocaleComponentController.prototype.getFields = function(){
         if(!this.fieldDefinitions) return [];
         return this.fields.map(function(fieldName){
             return this.fieldDefinitions[fieldName];
         }, this);
     };
 
-    LocaleController.prototype.normalizeModel = function(data){
+    JBFormLocaleComponentController.prototype.normalizeModel = function(data){
         return data.reduce(function(map, item){
             map[item.language.id] = item;
             return map;
         }, []);
     };
 
-    LocaleController.prototype.getLocales = function(){
+    JBFormLocaleComponentController.prototype.getLocales = function(){
         return this.locales;
     };
     /**
@@ -1206,7 +1207,7 @@
      *
      * @returns {*}
      */
-    LocaleController.prototype.getSelectFields = function(){
+    JBFormLocaleComponentController.prototype.getSelectFields = function(){
 
         var   localeTableName   = this.options.tableName
             , languageSelector  = [localeTableName, 'language', '*'].join('.')
@@ -1223,7 +1224,7 @@
     /**
      * @todo: use the registration system to detect all the input fields and let them validate themselves?
      */
-    LocaleController.prototype.isValid = function(){
+    JBFormLocaleComponentController.prototype.isValid = function(){
         return this.locales.reduce(function(localeValidity, locale, index){
             if(angular.isUndefined(locale)) return localeValidity;
             if(angular.isUndefined(this.originalLocales[index]) && this._localeIsEmpty(locale)) return localeValidity;
@@ -1233,7 +1234,7 @@
         }.bind(this), true);
     };
 
-    _module.controller('LocaleController', [
+    _module.controller('JBFormLocaleComponentController', [
           '$scope'
         , '$q'
         , '$timeout'
@@ -1241,7 +1242,7 @@
         , 'JBFormComponentsService'
         , 'SessionService'
         , 'BackofficeAPIWrapperService'
-        , LocaleController
+        , JBFormLocaleComponentController
     ]);
 })();
 /**
@@ -1442,11 +1443,13 @@
 
 	JBFormReferenceController.prototype.getSelectFields = function () {
 		var   selectFields   = this.relationService.extractSelectFields(this.getSuggestionTemplate())
-			, prefixedFields = selectFields.map(function (field) {
-				return [this.relationName, field].join('.');
-			}, this);
+			, prefixedFields;
 
-		if(this.propertyName) prefixedFields.unshift(this.propertyName);
+		prefixedFields = selectFields.map(function (field) {
+			return [this.relationName, field].join('.');
+		}, this);
+
+        if(this.propertyName) selectFields.unshift(this.propertyName);
 
 		return prefixedFields;
 	};
@@ -1565,6 +1568,17 @@
 
 		return calls;
 	};
+
+    JBFormRelationController.prototype.getSelectFields = function () {
+        var   selectFields   = this.relationService.extractSelectFields(this.getSuggestionTemplate())
+            , prefixedFields;
+
+        prefixedFields = selectFields.map(function (field) {
+            return [this.relationName, field].join('.');
+        }, this);
+
+        return prefixedFields;
+    };
 	/**
 	 * Creates a map between the value of a specific property and the item within a collection of items (assuming that
 	 * the properties are unique).
@@ -1607,6 +1621,251 @@
 			'<div relation-input class="relation-select col-md-9"></div>' +
 			'</div>');
 	}]);
+})();
+(function (undefined) {
+
+    'use strict';
+
+    var _module = angular.module('jb.formComponents');
+
+    function JBFormViewAdapterReferenceStrategy(formView){
+        this.formView    = formView;
+        this.optionsData = null;
+        this.initialId   = null;
+        this.parentOptionsData = null;
+    }
+
+    JBFormViewAdapterReferenceStrategy.prototype.handleOptionsData = function(data){
+        this.optionsData        = this.formView.getSpecFromOptionsData(data);
+        return this.formView.getOptionsData();
+    };
+
+    JBFormViewAdapterReferenceStrategy.prototype.beforeSaveTasks = function(){
+        return this.formView.makeSaveRequest();
+    };
+
+    JBFormViewAdapterReferenceStrategy.prototype.getReferencingFieldName = function(){
+        return this.optionsData.relationKey;
+    };
+    /**
+     * Extracts the id of the nested object and extracts the data the form view has to distribute.
+     * @param data
+     */
+    JBFormViewAdapterReferenceStrategy.prototype.handleGetData = function(data){
+        var   id      = data[this.getReferencingFieldName()]
+            , content = data[this.formView.getEntityName()];
+
+        this.initialId = id;
+        this.formView.setEntityId(id);
+        return this.formView.distributeData(content);
+    };
+
+    JBFormViewAdapterReferenceStrategy.prototype.getSelectFields = function(){
+        var selects = this.formView.getSelectParameters().map(function (select) {
+                return [this.formView.getEntityName(), select].join('.');
+            }.bind(this));
+        // add the referenced property name to the selects
+        return [this.getReferencingFieldName()].concat(selects);
+    };
+
+    JBFormViewAdapterReferenceStrategy.prototype.isValid = function(){
+        // add the referenced property name to the selects
+        return this.formView.isValid();
+    };
+
+    JBFormViewAdapterReferenceStrategy.prototype.getSaveCalls = function(){
+
+        var   calls    = this.formView.generateSaveCalls()
+            , call     = {};
+
+        if(this.initialId == this.formView.getEntityId()) return calls;
+        // id has changed
+        call.data   = {};
+        call.data[this.getReferencingFieldName()] = this.formView.getEntityId();
+        return [call].concat(calls);
+    };
+    /**
+     * Inverse Reference (belongs to) handling for nested form views.
+     * @param formView
+     * @constructor
+     */
+
+    function JBFormViewAdapterInverseReferenceStrategy(formView){
+        this.formView           = formView;
+        this.optionsData        = null;
+        this.initialParentId    = null;
+        this.parentId           = null;
+        this.parentOptionsData  = null;
+        this.initialize(formView);
+    }
+
+    /**
+     * This one should add the save call at the form-view.
+     * @todo: add a validator which checks if the reference to the parent form-view is required!
+     * @param formView
+     */
+    JBFormViewAdapterInverseReferenceStrategy.prototype.initialize = function(formView){
+        var self = this;
+        formView.registerComponent({
+              registerAt:   function(parent){}
+            , isValid:      function(){
+
+            }
+            /**
+             * @todo: set the parent id in the emitted post save task
+             */
+            , getSaveCalls: function(){
+                var call = { data: {} };
+                if(self.initialParentId == self.parentId) return [];
+                call[self.getReferencingFieldName()] = this.parentId;
+                return [call];
+            }
+        });
+    };
+
+    JBFormViewAdapterInverseReferenceStrategy.prototype.handleOptionsData = function(data){
+        this.optionsData = this.formView.getSpecFromOptionsData(data);
+        this.parentOptionsData  = data;
+        return this.formView.getOptionsData();
+    };
+
+    /**
+     * @todo: move this to the `afterSaveTasks`
+     * @todo: set the entity id on the current detail view (is this possible?)
+     */
+    JBFormViewAdapterInverseReferenceStrategy.prototype.afterSaveTasks = function(id){
+        this.parentId = id;
+        return this.formView.makeSaveRequest();
+    };
+
+    JBFormViewAdapterInverseReferenceStrategy.prototype.beforeSaveTasks = function(){};
+
+    JBFormViewAdapterInverseReferenceStrategy.prototype.getReferencingFieldName = function(){
+        return this.optionsData.relationKey;
+    };
+    /**
+     * Extracts the id of the nested object and extracts the data the form view has to distribute.
+     * @todo: how should this work if there is no entity!! check that
+     * @param data
+     */
+    JBFormViewAdapterInverseReferenceStrategy.prototype.handleGetData = function(data){
+
+        var   content = (data) ? data[this.formView.getEntityName()] : data
+            , id
+            , parentId;
+
+        if(content){
+            if(content.length) content = content[0];
+            var parentIdKey = this.formView.getIdFieldFrom(this.parentOptionsData);
+            id       = this.formView.getOwnId(content);
+            parentId = data[parentIdKey];
+        }
+
+        this.initialParentId = parentId;
+        this.formView.setEntityId(id);
+        return this.formView.distributeData(content);
+    };
+    // @todo: check for aliases
+    JBFormViewAdapterInverseReferenceStrategy.prototype.getSelectFields = function(){
+        var   selects = this.formView.getSelectParameters().map(function (select) {
+            return [this.formView.getEntityName(), select].join('.');
+        }.bind(this));
+        return selects;
+    };
+
+    JBFormViewAdapterInverseReferenceStrategy.prototype.isValid = function(){
+        // add the referenced property name to the selects
+        return this.formView.isValid();
+    };
+
+    JBFormViewAdapterInverseReferenceStrategy.prototype.getSaveCalls = function(){
+        return [];
+    };
+
+    function JBFormViewAdapter($q, formView){
+        this.optionsData    = null;
+        this.$q             = $q;
+        this.formView       = formView;
+        this.strategy       = null;
+    }
+
+    JBFormViewAdapter.prototype.getSaveCalls = function(){
+        return this.strategy.getSaveCalls();
+    };
+
+    JBFormViewAdapter.prototype.registerAt = function(parent){
+        parent.registerOptionsDataHandler(this.handleOptionsData.bind(this));
+        parent.registerGetDataHandler(this.handleGetData.bind(this));
+    };
+
+    /**
+     * 1. reference:    instantiate a reference strategy
+     * 2. belongsTo:    instantiate an inverse reference strategy
+     * @todo: properly extract the options data by taking aliases into account
+     * @todo: switch into an error state if there are no options data
+     */
+    JBFormViewAdapter.prototype.handleOptionsData = function(data){
+        // the extraction of the options data works as long as there is no alias!
+
+        var spec = this.formView.getSpecFromOptionsData(data);
+        if(!spec) return console.error('No options data found for form-viwe %o', this.formView);
+
+        this.strategy = this.createViewAdapterStrategy(spec);
+        return this.strategy.handleOptionsData(data);
+    };
+
+    JBFormViewAdapter.prototype.createViewAdapterStrategy = function(options){
+
+        switch(options.originalRelation){
+            case 'belongsTo':
+                return new JBFormViewAdapterInverseReferenceStrategy(this.formView);
+            case 'hasOne':
+            default:
+                return new JBFormViewAdapterReferenceStrategy(this.formView);
+        }
+    };
+
+    /**
+     * 1. reference:    pass the data
+     * 2. belongsTo:    pass the first object
+     */
+    JBFormViewAdapter.prototype.handleGetData = function(data){
+        return this.strategy.handleGetData(data);
+    };
+
+    /**
+     * 1. reference:    initialize the saving
+     * 2. belongsTo:    do nothing
+     */
+    JBFormViewAdapter.prototype.beforeSaveTasks = function(){
+        return this.strategy.beforeSaveTasks();
+    };
+
+    /**
+     * 1. reference:    do nothing (id is set in the save calls)
+     * 2. belongsTo:    initialize the saving but add a save call which sets the related id
+     */
+    JBFormViewAdapter.prototype.afterSaveTasks = function(id){
+        return this.strategy.afterSaveTasks(id);
+    };
+
+    JBFormViewAdapter.prototype.getSelectFields = function(){
+        return this.strategy.getSelectFields();
+    };
+
+    JBFormViewAdapter.prototype.isValid = function(){
+        return this.strategy && this.strategy.isValid();
+    };
+
+    _module.factory('JBFormViewAdapterService', [
+          '$q'
+        , function($q){
+            return {
+                getAdapter : function(formView){
+                    return new JBFormViewAdapter($q, formView);
+                }
+            }
+        }]);
 })();
 /**
 * Loads detail view template and controller that correspond to the current URL
@@ -1842,7 +2101,8 @@ angular
             , 'APIWrapperService'
             , 'JBFormComponentsService'
             , 'BackofficeAPIWrapperService'
-            , function ($scope, $rootScope, $q, $attrs, $filter, $state, APIWrapperService, subcomponentsService, boAPIWrapper) {
+            , 'JBFormViewAdapterService'
+            , function ($scope, $rootScope, $q, $attrs, $filter, $state, APIWrapperService, subcomponentsService, boAPIWrapper, adapterService) {
 
 
             /**
@@ -1854,14 +2114,11 @@ angular
 
             self.componentsService  = subcomponentsService;
             self.componentsRegistry = null;
+            self.adapterService     = adapterService;
             /**
              * Data we loaded ourselves.
              */
             self.optionData         = null;
-            /**
-             * Data we got by distribution.
-             */
-            self.parentOptionData   = null;
 
             $scope.$watchGroup(['$ctrl.entityName', '$ctrl.entityId'], function () {
                 self.setTitle();
@@ -1949,6 +2206,11 @@ angular
                  *
                  * @todo: can we detect if we are root by checking if 'registerAt' was called?
                  */
+
+                // reset the entity id passed through the scope
+                // @todo: bind this shit to the controller
+                self.setEntityId(undefined);
+
                 self.isRoot         = attrs.hasOwnProperty('isRoot');
                 self.hasEntityName  = attrs.hasOwnProperty('entityName');
                 self.hasEntityId    = attrs.hasOwnProperty('entityId');
@@ -1979,8 +2241,8 @@ angular
                     self.setEntityId(stateParams.id);
                 }
                 // register myself as a component to possible parents
-                self.componentsService.registerComponent(scope, this);
-
+                self.componentsService.registerComponent(scope, self.adapterService.getAdapter(this));
+                // @todo: store the promises otherwise and chain them as soon as the option handler is invoked (to make shure all data is available)
                 $q.all(promises).then(function () {
                     // load option data if we are root
                     if (self.isRoot) self.getOptionData().then(self.getData).catch(function(err){
@@ -1999,39 +2261,6 @@ angular
                 $scope.entityId = id;
             };
 
-            self.registerAt = function (parent) {
-                parent.registerOptionsDataHandler(self.handleOptionsData);
-                parent.registerGetDataHandler(self.handleGetData);
-            };
-
-            /**
-             * Also, we have to differ between:
-             *
-             *  1. hasOne       : just take the value
-             *  2. belongsTo    : take the first of the values
-             *
-             * @param data
-             */
-            self.handleGetData = function (data) {
-                var ownData = data[self.entityName];
-                if (!angular.isDefined(ownData)) console.error('No data available for related %o', self.entityName);
-                // ugh we might get the entityId through the scope!! yes we do!
-                if (!self.entityId && ownData) {
-                    var pKey = self.parentOptionData.relatedKey;
-                    self.setEntityId(ownData[pKey]);
-                }
-                if(!self.entityId && !ownData){
-                    self.setEntityId(undefined);
-                }
-                self.distributeData(ownData);
-            };
-
-            self.getSaveCalls = function () {
-                var call = {};
-                call.data = {};
-                call.data[self.parentOptionData.relationKey] = self.getEntityId();
-                return [call];
-            };
             /**
              * This is shitty! We need to load more options data as soon as we receive the options to to be able to
              * distribute options to the nested fields.
@@ -2041,27 +2270,19 @@ angular
                 self.optionData = data;
                 return self.componentsRegistry.optionsDataHandler(data);
             };
-            /**
-             * These are passed in from outside (nested detail view).
-             * @param data
-             * We need to differ between:
-             *
-             *  1. hasOne:      set the foreign key on the original entity (pre save task)
-             *  2. belongsTo:   set the foreign key of the referenced entity (post save task)
-             *
-             * @todo: make adjustments to the optionData
-             */
-            self.handleOptionsData = function (data) {
-                var optionData = data[self.entityName];
-                self.parentOptionData = optionData;
+
+            self.getOptionsData = function(){
                 return self.getOptionData();
+            };
+
+            self.getSpecFromOptionsData = function(data){
+                return data[self.entityName];
             };
 
             /**
              * OPTION data
              */
             self.getOptionData = function () {
-
                 console.log('DetailView: Make OPTIONS call for %o', self.getEntityName());
                 return self
                     .makeOptionRequest('/' + self.getEntityName())
@@ -2093,11 +2314,31 @@ angular
                 throw new Error('DEPRECATED');
             };
 
+            self.registerComponent = function(component){
+                this.componentsRegistry.registerComponent(component);
+            };
+
+            /**
+             * Collects the select fields of all the registered subcomponents. This is the internal API.
+             * @returns {Array}
+             */
+            self.getSelectParameters = function () {
+                return [this.getOwnIdField()].concat(self.componentsRegistry.getSelectFields());
+            };
+
+            /**
+             * Distributes the entity data (from the GET call) to the registered subcomponents by delegating
+             * to the getDataHandler of the registry.
+             */
+            self.distributeData = function (data) {
+                self.componentsRegistry.getDataHandler(data);
+            };
+
             /**
              * Make a GET request to the API, selecting all the fields the subcomponents request.
              */
             self.getData = function () {
-                self
+                return self
                     .makeGetRequest()
                     .then(
                     self.distributeData
@@ -2114,54 +2355,10 @@ angular
             };
 
             /**
-             * Collects the select fields of all the registered subcomponents. This is the internal API.
-             * @returns {Array}
-             */
-            self.getSelectParameters = function () {
-                return self.componentsRegistry.getSelectFields();
-            };
-
-            /**
-             * Collects the select fields if the detail view is nested. This is the external API.
-             * @returns {Array}
-             */
-            self.getSelectFields = function () {
-                return self.getSelectParameters().map(function (select) {
-                    return [this.getEntityName(), select].join('.');
-                }.bind(this));
-            };
-
-            /**
-             * Distributes the entity data (from the GET call) to the registered subcomponents by delegating
-             * to the getDataHandler of the registry.
-             */
-            self.distributeData = function (data) {
-                self.componentsRegistry.getDataHandler(data);
-            };
-
-
-            /**
              * Get data for current entity from server, fire dateUpdate. Done after changes were saved.
              */
             self.updateData = function () {
-
-                return self
-                    .makeGetRequest()
-                    .then(function (data) {
-
-                        self.distributeData(data);
-                        return data;
-
-                    }, function (err) {
-                        $rootScope.$broadcast('notification', {
-                            type: 'error'
-                            , message: 'web.backoffice.detail.saveError'
-                            , variables: {
-                                errorMessage: err
-                            }
-                        });
-                        return $q.reject(err);
-                    });
+                return self.getData();
             };
 
 
@@ -2258,7 +2455,7 @@ angular
             };
 
             self.isValid = function () {
-                return self.componentsRegistry.isValid()
+                return self.componentsRegistry && self.componentsRegistry.isValid()
             };
             /**
              * Stores all component's data on server
@@ -2275,8 +2472,8 @@ angular
                         // current entity state
                         return self.makeMainSaveCall();
                     })
-                    .then(function () {
-                        return self.executePostSaveTasks();
+                    .then(function (id) {
+                        return self.executePostSaveTasks(id);
                     });
 
             };
@@ -2294,7 +2491,7 @@ angular
             };
             /**
              * This is the external api!
-             * @param entity
+             * @todo: move this to the relation strategy
              */
             self.beforeSaveTasks = function(entity){
                 var task = self.makeSaveRequest();
@@ -2308,18 +2505,28 @@ angular
              * 2. Update media links (/mediumGroup/id/medium/id) (done through regular save call)
              * 3. Update order (GET all media from /mediumGroup, then set order on every single relation)
              */
-            self.executePostSaveTasks = function () {
-                return self.componentsRegistry.getAfterSaveTasks();
+            self.executePostSaveTasks = function (id) {
+                return self.componentsRegistry.getAfterSaveTasks(id);
+            };
+
+            self.getIdFieldFrom = function(optionsData){
+                var keys = Object.keys(optionsData.internalFields);
+                for(var i=0; i<keys.length; i++){
+                    var field = optionsData.internalFields[keys[i]];
+                    if(field.isPrimary === true) return field.name;
+                }
+                return null;
+            };
+
+            self.getOwnIdField = function(){
+                return this.getIdFieldFrom(this.optionData);
             };
 
             self.getOwnId = function(data) {
+                var primaryKey;
                 if(!data) return null;
-                var keys = Object.keys(this.optionData.internalFields);
-                for(var i=0; i<keys.length; i++){
-                    var field = this.optionData.internalFields[keys[i]];
-                    if(field.isPrimary === true) return data[keys[i]];
-                }
-                return null;
+                primaryKey = this.getOwnIdField();
+                return primaryKey ? data[primaryKey] : null;
             };
             /**
              * Saves:
@@ -2967,7 +3174,7 @@ angular
     };
 
     AutoDateTimeInputController.prototype.updateData = function (data) {
-        var value = data[this.name];
+        var value = (data) ? data[this.name] : data;
         this.date = (value) ? new Date(value) : undefined;
         this.originalData = this.date;
     };
@@ -4632,6 +4839,7 @@ angular
                 , entity        : fieldSpec.modelName
                 , relation      : fieldSpec.hasAlias ? fieldSpec.name : fieldSpec.modelName
                 , relatedKey    : fieldSpec.referencedColumn
+                , relationKey   : fieldSpec.targetColumn
                 , alias         : fieldSpec.hasAlias ? fieldSpec.name : false
                 , relationType  : 'multiple'
                 , required      : false //!singleFieldData[ p ].nullable won't work, as nullable ain't set
@@ -4664,6 +4872,15 @@ angular
                 }
             }
         }, this);
+        // we did not yet find a primary key field
+        if(angular.isUndefined(options.internalFields[fields.primaryKey])){
+            options.internalFields[fields.primaryKey] = {
+                type      : ''
+                , required  : true
+                , isPrimary : true
+                , name      : fields.primaryKey
+            };
+        }
     };
 
     BackofficeAPIWrapperService.prototype.normalizeOptions = function(optionCallData) {

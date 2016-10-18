@@ -29,7 +29,7 @@
     };
 
     AutoDateTimeInputController.prototype.updateData = function (data) {
-        var value = data[this.name];
+        var value = (data) ? data[this.name] : data;
         this.date = (value) ? new Date(value) : undefined;
         this.originalData = this.date;
     };

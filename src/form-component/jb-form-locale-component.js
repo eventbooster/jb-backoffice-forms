@@ -7,7 +7,7 @@
 
     _module.directive('jbFormLocaleComponent', function(){
         return {
-              controller        : 'LocaleController'
+              controller        : 'JBFormLocaleComponentController'
             , controllerAs      : '$ctrl'
             , bindToController  : true
             , scope: {
@@ -71,7 +71,7 @@
      * @param sessionService
      * @constructor
      */
-    function LocaleController($scope, $q, $timeout, api, componentsService, sessionService, boAPIWrapper){
+    function JBFormLocaleComponentController($scope, $q, $timeout, api, componentsService, sessionService, boAPIWrapper){
         this.$scope             = $scope;
         this.api                = api;
         this.$q                 = $q;
@@ -94,8 +94,8 @@
         this.element = null;
     }
 
-    LocaleController.prototype.preLink = function(){};
-    LocaleController.prototype.postLink = function(scope, element, attrs){
+    JBFormLocaleComponentController.prototype.preLink = function(){};
+    JBFormLocaleComponentController.prototype.postLink = function(scope, element, attrs){
         this.componentsService.registerComponent(scope, this);
         this.heightElement = angular.element('<div></div>');
         this.heightElement = this.heightElement.attr('id', 'locale-height-container');
@@ -106,12 +106,12 @@
         this.element.append(this.heightElement);
     };
 
-    LocaleController.prototype.registerAt = function(parent){
+    JBFormLocaleComponentController.prototype.registerAt = function(parent){
         parent.registerOptionsDataHandler(this.handleOptionsData.bind(this));
         parent.registerGetDataHandler(this.handleGetData.bind(this));
     };
 
-    LocaleController.prototype.getSelectedLanguages = function(){
+    JBFormLocaleComponentController.prototype.getSelectedLanguages = function(){
         var selected = [];
         for(var i=0; i<this.supportedLanguages.length; i++){
             var lang = this.supportedLanguages[i];
@@ -120,11 +120,11 @@
         return selected;
     };
 
-    LocaleController.prototype.getSupportedLanguages = function(){
+    JBFormLocaleComponentController.prototype.getSupportedLanguages = function(){
         return this.supportedLanguages;
     };
 
-    LocaleController.prototype.fieldIsValid = function(locale, property){
+    JBFormLocaleComponentController.prototype.fieldIsValid = function(locale, property){
 
         var   definition = this.fieldDefinitions[property];
         // fields of locales which do not yet exist are not validated
@@ -133,12 +133,12 @@
         return true;
     };
 
-    LocaleController.prototype.adjustHeight = function(event){
+    JBFormLocaleComponentController.prototype.adjustHeight = function(event){
         var   element       = angular.element(event.currentTarget);
         this.adjustElementHeight(element);
     };
 
-    LocaleController.prototype.adjustElementHeight = function(element){
+    JBFormLocaleComponentController.prototype.adjustElementHeight = function(element){
 
         var   scrollHeight  = element[0].scrollHeight
             , textValue     = element.val()
@@ -165,13 +165,13 @@
         element.height(this.heightElement.height());
     };
 
-    LocaleController.prototype.adjustAllHeights = function(){
+    JBFormLocaleComponentController.prototype.adjustAllHeights = function(){
         this.element.find('textarea').each(function(index, element){
             this.adjustElementHeight(angular.element(element));
         }.bind(this));
     };
 
-    LocaleController.prototype.initializeHeightElement = function(element){
+    JBFormLocaleComponentController.prototype.initializeHeightElement = function(element){
 
         [     'font-size'
             , 'font-family'
@@ -190,7 +190,7 @@
         this.heightElementInitialized = true;
     };
 
-    LocaleController.prototype.toggleLanguage = function(event, language){
+    JBFormLocaleComponentController.prototype.toggleLanguage = function(event, language){
         if(event) event.preventDefault();
         var langs = this.getSelectedLanguages();
         if(language.selected && langs.length == 1) return;
@@ -198,15 +198,15 @@
         this.$timeout(this.adjustAllHeights.bind(this));
     };
 
-    LocaleController.prototype.isSelected = function(language){
+    JBFormLocaleComponentController.prototype.isSelected = function(language){
         return language.selected === true;
     };
 
-    LocaleController.prototype.checkForTranslation = function(language){
+    JBFormLocaleComponentController.prototype.checkForTranslation = function(language){
         return !!(this.locales && angular.isDefined( this.locales[language.id] ));
     };
 
-    LocaleController.prototype.translationIsEmpty = function(data){
+    JBFormLocaleComponentController.prototype.translationIsEmpty = function(data){
         return this.fields.reduce(function(previous, field){
             return previous && !data[field] && data[field].trim() !== '';
         }, true);
@@ -219,7 +219,7 @@
      * @note: In the select call we need to set the related table name and select all fields plus the languages. Currently
      * we are not able to properly identify locales.
      */
-    LocaleController.prototype.handleOptionsData = function(data){
+    JBFormLocaleComponentController.prototype.handleOptionsData = function(data){
         var spec;
 
         if(!data || !angular.isDefined(data[this.relationName])) return console.error('No OPTIONS data found in locale component.');
@@ -240,7 +240,7 @@
      * @todo: find a proper way to resolve the endpoint!!
      * @returns {*}
      */
-    LocaleController.prototype.loadFields = function(){
+    JBFormLocaleComponentController.prototype.loadFields = function(){
         var url = '/' + this.options.tableName;
         if(this.fieldDefinitions) return this.$q.when(this.fieldDefinitions);
         return this.boAPI.getOptions(url).then(function(fields){
@@ -250,26 +250,27 @@
         });
     };
 
-    LocaleController.prototype.filterFields = function(fields){
+    JBFormLocaleComponentController.prototype.filterFields = function(fields){
         return Object.keys(fields).reduce(function(sanitizedFields, fieldName){
-            if(!this.fieldsExclude || this.fieldsExclude.indexOf(fieldName) == -1){
-                sanitizedFields[fieldName] = fields[fieldName];
+            var field = fields[fieldName];
+            if((!this.fieldsExclude || this.fieldsExclude.indexOf(field.name) == -1) && field.isPrimary !== true){
+                sanitizedFields[fieldName] = field;
             }
             return sanitizedFields;
         }.bind(this), {});
     };
 
-    LocaleController.prototype._localeIsEmpty = function(locale){
+    JBFormLocaleComponentController.prototype._localeIsEmpty = function(locale){
         return this.fields.every(function(fieldName){
             return this._localePropertyIsEmpty(locale[fieldName]);
         }, this);
     };
 
-    LocaleController.prototype._localePropertyIsEmpty = function(value){
+    JBFormLocaleComponentController.prototype._localePropertyIsEmpty = function(value){
         return angular.isUndefined(value) || value.trim() == '';
     };
 
-    LocaleController.prototype._localeGetChanges = function(locale, originalLocale){
+    JBFormLocaleComponentController.prototype._localeGetChanges = function(locale, originalLocale){
         // the locale is new
         if(!angular.isDefined(originalLocale)){
             // the locale has no data, meaning that there are no changes
@@ -292,7 +293,7 @@
     /**
      * We could also adjust the _localeGetChanges method to be able to deal with locales that were not created.
      */
-    LocaleController.prototype.getSaveCalls = function(){
+    JBFormLocaleComponentController.prototype.getSaveCalls = function(){
 
         var   calls     = [];
 
@@ -325,7 +326,7 @@
         return calls;
     };
 
-    LocaleController.prototype.handleGetData = function(data){
+    JBFormLocaleComponentController.prototype.handleGetData = function(data){
         var locales             = data[this.options.tableName];
         if(locales){
             this.originalLocales    = this.normalizeModel(locales);
@@ -337,21 +338,21 @@
         this.$timeout(this.adjustAllHeights.bind(this));
     };
 
-    LocaleController.prototype.getFields = function(){
+    JBFormLocaleComponentController.prototype.getFields = function(){
         if(!this.fieldDefinitions) return [];
         return this.fields.map(function(fieldName){
             return this.fieldDefinitions[fieldName];
         }, this);
     };
 
-    LocaleController.prototype.normalizeModel = function(data){
+    JBFormLocaleComponentController.prototype.normalizeModel = function(data){
         return data.reduce(function(map, item){
             map[item.language.id] = item;
             return map;
         }, []);
     };
 
-    LocaleController.prototype.getLocales = function(){
+    JBFormLocaleComponentController.prototype.getLocales = function(){
         return this.locales;
     };
     /**
@@ -360,7 +361,7 @@
      *
      * @returns {*}
      */
-    LocaleController.prototype.getSelectFields = function(){
+    JBFormLocaleComponentController.prototype.getSelectFields = function(){
 
         var   localeTableName   = this.options.tableName
             , languageSelector  = [localeTableName, 'language', '*'].join('.')
@@ -377,7 +378,7 @@
     /**
      * @todo: use the registration system to detect all the input fields and let them validate themselves?
      */
-    LocaleController.prototype.isValid = function(){
+    JBFormLocaleComponentController.prototype.isValid = function(){
         return this.locales.reduce(function(localeValidity, locale, index){
             if(angular.isUndefined(locale)) return localeValidity;
             if(angular.isUndefined(this.originalLocales[index]) && this._localeIsEmpty(locale)) return localeValidity;
@@ -387,7 +388,7 @@
         }.bind(this), true);
     };
 
-    _module.controller('LocaleController', [
+    _module.controller('JBFormLocaleComponentController', [
           '$scope'
         , '$q'
         , '$timeout'
@@ -395,6 +396,6 @@
         , 'JBFormComponentsService'
         , 'SessionService'
         , 'BackofficeAPIWrapperService'
-        , LocaleController
+        , JBFormLocaleComponentController
     ]);
 })();

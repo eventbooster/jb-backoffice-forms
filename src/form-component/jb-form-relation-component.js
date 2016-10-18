@@ -196,11 +196,13 @@
 
 	JBFormReferenceController.prototype.getSelectFields = function () {
 		var   selectFields   = this.relationService.extractSelectFields(this.getSuggestionTemplate())
-			, prefixedFields = selectFields.map(function (field) {
-				return [this.relationName, field].join('.');
-			}, this);
+			, prefixedFields;
 
-		if(this.propertyName) prefixedFields.unshift(this.propertyName);
+		prefixedFields = selectFields.map(function (field) {
+			return [this.relationName, field].join('.');
+		}, this);
+
+        if(this.propertyName) selectFields.unshift(this.propertyName);
 
 		return prefixedFields;
 	};
@@ -319,6 +321,17 @@
 
 		return calls;
 	};
+
+    JBFormRelationController.prototype.getSelectFields = function () {
+        var   selectFields   = this.relationService.extractSelectFields(this.getSuggestionTemplate())
+            , prefixedFields;
+
+        prefixedFields = selectFields.map(function (field) {
+            return [this.relationName, field].join('.');
+        }, this);
+
+        return prefixedFields;
+    };
 	/**
 	 * Creates a map between the value of a specific property and the item within a collection of items (assuming that
 	 * the properties are unique).

@@ -106,6 +106,7 @@
                 , entity        : fieldSpec.modelName
                 , relation      : fieldSpec.hasAlias ? fieldSpec.name : fieldSpec.modelName
                 , relatedKey    : fieldSpec.referencedColumn
+                , relationKey   : fieldSpec.targetColumn
                 , alias         : fieldSpec.hasAlias ? fieldSpec.name : false
                 , relationType  : 'multiple'
                 , required      : false //!singleFieldData[ p ].nullable won't work, as nullable ain't set
@@ -138,6 +139,15 @@
                 }
             }
         }, this);
+        // we did not yet find a primary key field
+        if(angular.isUndefined(options.internalFields[fields.primaryKey])){
+            options.internalFields[fields.primaryKey] = {
+                type      : ''
+                , required  : true
+                , isPrimary : true
+                , name      : fields.primaryKey
+            };
+        }
     };
 
     BackofficeAPIWrapperService.prototype.normalizeOptions = function(optionCallData) {

@@ -66,13 +66,13 @@
         return true;
     };
 
-    JBFormComponentsRegistry.prototype.getAfterSaveTasks = function(entity){
+    JBFormComponentsRegistry.prototype.getAfterSaveTasks = function(id){
         var calls = this.registeredComponents.reduce(function(subcalls, component){
             if(angular.isFunction(component.afterSaveTasks)){
-                return subcalls.concat(component.afterSaveTasks());
+                return subcalls.concat(component.afterSaveTasks(id));
             }
             return subcalls;
-        }, [this.$q.when(entity)]);
+        }, []);
         return this.$q.all(calls);
     };
 
