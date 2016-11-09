@@ -1,6 +1,6 @@
 (function(){
     var mod = angular.module('jb.formEvents', []);
-    mod.provider('jbFormEvents', function BackofficeFormEventProvider(){
+    mod.provider('jbFormEvents', function JBFormEventsProvider(){
         var eventKeys = {
             // used to register components, e.g. at the detail view
             registerComponent: 'jb.backoffice-form-event.registerComponent'

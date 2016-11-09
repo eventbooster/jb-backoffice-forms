@@ -251,6 +251,7 @@
     };
 
     JBFormLocaleComponentController.prototype.filterFields = function(fields){
+        if(!fields) return {};
         return Object.keys(fields).reduce(function(sanitizedFields, fieldName){
             var field = fields[fieldName];
             if((!this.fieldsExclude || this.fieldsExclude.indexOf(field.name) == -1) && field.isPrimary !== true){

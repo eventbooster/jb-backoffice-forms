@@ -5,20 +5,20 @@
 ( function() {
 
     'use strict';
-    var _module = angular.module('jb.formComponents', [
+    var _module = angular.module('jb.formComponents'
+        , [
               'jb.fileDropComponent'
-            //, 'jb.backofficeShared'
-            , 'ui.router'
+            //, 'ui.router'
             , 'jb.apiWrapper'
             , 'pascalprecht.translate'
             , 'jb.formEvents'
-            , 'jb.backofficeAPIWrapper' ]
+        ]
     );
 } )();
 
 (function(){
     var mod = angular.module('jb.formEvents', []);
-    mod.provider('jbFormEvents', function BackofficeFormEventProvider(){
+    mod.provider('jbFormEvents', function JBFormEventsProvider(){
         var eventKeys = {
             // used to register components, e.g. at the detail view
             registerComponent: 'jb.backoffice-form-event.registerComponent'
@@ -1097,6 +1097,7 @@
     };
 
     JBFormLocaleComponentController.prototype.filterFields = function(fields){
+        if(!fields) return {};
         return Object.keys(fields).reduce(function(sanitizedFields, fieldName){
             var field = fields[fieldName];
             if((!this.fieldsExclude || this.fieldsExclude.indexOf(field.name) == -1) && field.isPrimary !== true){
@@ -1279,6 +1280,7 @@
 					, 'suggestion'      : '@suggestionTemplate'
 					, 'searchField'     : '@'
 					, 'changeHandler'   : '&'
+                    , 'filters'         : '<'
 				}
 			};
 		};
@@ -1326,7 +1328,7 @@
 	};
 
 	JBFormReferenceController.prototype.getEndpoint = function () {
-		return this.relationName;
+		return this.entityName;
 	};
 
 	// @todo: catch it if the options are not found
@@ -1418,6 +1420,7 @@
 			.attr( 'relation-entity-search-field', this.getSearchField() )
 			.attr( 'relation-suggestion-template', this.getSuggestionTemplate() )
 			.attr( 'multi-select', this.isMultiSelect() )
+            .attr( 'filters', '$ctrl.filters' )
 			.attr( 'ng-model', '$ctrl.currentData' );
 
 		this.$compile( template )( this.$scope );
@@ -1681,21 +1684,25 @@
         if(this.initialId == this.formView.getEntityId()) return calls;
         // id has changed
         call.data   = {};
-        call.data[this.getReferencingFieldName()] = this.formView.getEntityId();
-        return [call].concat(calls);
+        call.data[ this.getReferencingFieldName() ] = this.formView.getEntityId();
+        return [ call ].concat(calls);
     };
+
     /**
      * Inverse Reference (belongs to) handling for nested form views.
+     *
+     * @todo: in the future we probably need to be able to pick a certain element out of the collection (itemIndex)
+     *
      * @param formView
      * @constructor
      */
-
     function JBFormViewAdapterInverseReferenceStrategy(formView){
         this.formView           = formView;
         this.optionsData        = null;
         this.initialParentId    = null;
         this.parentId           = null;
         this.parentOptionsData  = null;
+        this.itemIndex          = 0;
         this.initialize(formView);
     }
 
@@ -1708,17 +1715,15 @@
         var self = this;
         formView.registerComponent({
               registerAt:   function(parent){}
-            , isValid:      function(){
-
-            }
+            , isValid:      function(){}
             /**
              * @todo: set the parent id in the emitted post save task
              */
             , getSaveCalls: function(){
                 var call = { data: {} };
                 if(self.initialParentId == self.parentId) return [];
-                call[self.getReferencingFieldName()] = this.parentId;
-                return [call];
+                call[ self.getReferencingFieldName() ] = this.parentId;
+                return [ call ];
             }
         });
     };
@@ -1752,19 +1757,25 @@
 
         var   content = (data) ? data[this.formView.getEntityName()] : data
             , id
-            , parentId;
+            , parentId
+            , parentIdKey;
 
         if(content){
-            if(content.length) content = content[0];
-            var parentIdKey = this.formView.getIdFieldFrom(this.parentOptionsData);
-            id       = this.formView.getOwnId(content);
-            parentId = data[parentIdKey];
+            if(content.length) content = this.getEntityFromData(content);
+            parentIdKey = this.formView.getIdFieldFrom(this.parentOptionsData);
+            id          = this.formView.getOwnId(content);
+            parentId    = data[ parentIdKey ];
         }
 
         this.initialParentId = parentId;
         this.formView.setEntityId(id);
         return this.formView.distributeData(content);
     };
+
+    JBFormViewAdapterInverseReferenceStrategy.prototype.getEntityFromData = function(data){
+        return data[this.itemIndex];
+    };
+
     // @todo: check for aliases
     JBFormViewAdapterInverseReferenceStrategy.prototype.getSelectFields = function(){
         var   selects = this.formView.getSelectParameters().map(function (select) {
@@ -2092,7 +2103,7 @@ angular
 
     _module.controller('DetailViewController',
         [
-            '$scope'
+              '$scope'
             , '$rootScope'
             , '$q'
             , '$attrs'
@@ -2304,7 +2315,8 @@ angular
              * @todo: check if the fields are used somewhere
              */
             self.makeOptionRequest = function (url) {
-                return boAPIWrapper.getOptions(url);
+                debugger;
+                return APIWrapperService.getOptions(url);
             };
 
             /**
@@ -2967,12 +2979,12 @@ angular
                     ctrl.preLink(scope, element, attrs);
                 }
             }
-            , controller        : 'AutoInputController'
+            , controller        : 'JBFormAutoInputController'
             , scope             : true
         };
     }]);
 
-    function AutoInputController($scope, $attrs, $compile, $rootScope, fieldTypes, subcomponentsService) {
+    function JBFormAutoInputController($scope, $attrs, $compile, $rootScope, fieldTypes, subcomponentsService) {
         this.$scope     = $scope;
         this.$attrs     = $attrs;
         this.$compile   = $compile;
@@ -2981,26 +2993,27 @@ angular
 
         this.name       = $attrs.for;
         this.label      = this.name;
-        this.$attrs.$observe('label', function(value){
+        console.log('UUh');
+        /*this.$attrs.$observe('label', function(value){
             this.label = value;
-        }.bind(this));
+        }.bind(this));*/
 
         this.subcomponentsService   = subcomponentsService;
         this.registry               = null;
     }
 
-    AutoInputController.prototype.preLink = function (scope, element, attrs) {
+    JBFormAutoInputController.prototype.preLink = function (scope, element, attrs) {
         this.registry = this.subcomponentsService.registryFor(scope);
         this.registry.listen();
     };
 
-    AutoInputController.prototype.init = function (scope, element, attrs) {
+    JBFormAutoInputController.prototype.init = function (scope, element, attrs) {
         this.element = element;
         this.registry.registerOptionsDataHandler(this.updateElement.bind(this));
         this.registry.registerYourself();
     };
 
-    AutoInputController.prototype.updateElement = function(fieldSpec){
+    JBFormAutoInputController.prototype.updateElement = function(fieldSpec){
             var   elementType
                 , elementSpec = fieldSpec[this.name];
 
@@ -3034,14 +3047,14 @@ angular
             this.registry.optionsDataHandler(fieldSpec);
     };
 
-    _module.controller('AutoInputController', [
+    _module.controller('JBFormAutoInputController', [
         '$scope',
         '$attrs',
         '$compile',
         '$rootScope',
         typeKey,
         'JBFormComponentsService',
-        AutoInputController ]);
+        JBFormAutoInputController ]);
 })();
 
 
@@ -3386,9 +3399,6 @@ angular
 (function(undefined) {
     'use strict';
 
-    /**
-     *
-     */
     var JBFormTextInputController = function ($scope, $attrs, $q, componentsService) {
 
         this.$scope = $scope;
@@ -3400,6 +3410,8 @@ angular
         this.componentsService = componentsService;
         this.originalData = undefined;
         this.required = true;
+
+        this.options;
     };
 
     JBFormTextInputController.prototype.isRequired = function(){
@@ -3416,19 +3428,23 @@ angular
         parent.registerOptionsDataHandler(this.handleOptionsData.bind(this));
     };
 
-    /*AutoJBFormTextInputController.prototype.getBeforeSaveTasks = function(initialPromise){
-        return initialPromise.then(function(entity){
-            if (this.originalData !== this.$scope.data.value){
-                entity[this.name] = this.$scope.data.value;
-            }
-            return entity;
-        }.bind(this));
-    };*/
-
+    JBFormTextInputController.prototype.selectOptions = function(optionsData){
+        var properties = (optionsData) ? optionsData.properties : optionsData;
+        if(!properties || !properties.length) return;
+        for( var i = 0; i < properties.length; i++ ) {
+            if(properties[i].name == this.name) return properties[i];
+        }
+        return;
+    };
+    /**
+     * @todo: switch into an error state
+     * @param data
+     */
     JBFormTextInputController.prototype.handleOptionsData = function(data){
-        var spec = data[this.name];
+        var spec = this.selectOptions(data);
         if(!angular.isDefined(spec)) return console.error('No options data available for text-field %o', this.name);
-        this.required = spec.required === true;
+        this.options  = spec;
+        this.required = spec.nullable === false;
     };
 
     JBFormTextInputController.prototype.init = function (scope) {

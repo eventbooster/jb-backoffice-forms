@@ -1,34 +1,61 @@
 /**
  * @todo: test directive
  * @todo: test controller
+ * @todo: create an example result of an options call which we can use for the tests
  */
 describe('jb.formTextInput', function(){
+
     var   $controller
         , inputController
         , $scope
         , formEvents;
 
-    beforeEach(module('jb.formEvents'));
-    beforeEach(module('jb.backofficeAutoFormElement'));
+    beforeEach(module('jb.formEvents', 'jb.formComponents'));
 
-    beforeEach(inject(function(_$controller_, _$rootScope_, _backofficeFormEvents_){
+    beforeEach(inject(function(_$controller_, _$rootScope_, _$q_){
+
         $controller = _$controller_;
-        $scope = _$rootScope_.$new();
-        formEvents = _backofficeFormEvents_;
+        $scope      = _$rootScope_.$new();
 
-        inputController = $controller('AutoTextInputController', {
-              $scope    : $scope
-            , $attrs    : {}
-            , backofficeFormEvents : formEvents
+        inputController = $controller('JBFormTextInputController', {
+              $scope                : $scope
+            , $attrs                : {
+                for : 'test'
+            }
+            , $q                    : _$q_
         });
+
     }));
-    it('should be defined', function(){
-        expect(inputController).toBeDefined();
+
+    describe('JBFormTextInputController', function(){
+        it('should be defined', function(){
+            expect(inputController).toBeDefined();
+        });
+
+        it('should be required by default', function(){
+            expect(inputController.isRequired()).toBeTrue();
+        });
+
+        it('should be able to pick the correct options data and adjust its state', function(){
+            var options = {
+                properties : [
+                    {
+                          name      : 'test'
+                        , nullable  : true
+                    }
+                ]
+            };
+            inputController.handleOptionsData(options);
+            expect(inputController.isRequired()).toBeFalse();
+        });
     });
 
-    it('exposes an init method', function(){
-        expect(inputController.init).toBeFunction();
+
+    /*it('exposes an isValid method', function(){
+        expect(inputController.isValid).toBeFunction();
     });
+
+    The emission of the event is now done using a service. So we should test the service for the key that appeared.
 
     it('init method emits an event on the scope', function(){
         spyOn($scope, '$emit');
@@ -52,5 +79,5 @@ describe('jb.formTextInput', function(){
         expect($scope.$emit).toHaveBeenCalledWith(formEvents.registerComponent, inputController);
         expect(elements).toBeArrayOfSize(1);
         expect(handlers).toBeArrayOfSize(1);
-    });
+    });*/
 });

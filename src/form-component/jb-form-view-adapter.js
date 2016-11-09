@@ -57,21 +57,25 @@
         if(this.initialId == this.formView.getEntityId()) return calls;
         // id has changed
         call.data   = {};
-        call.data[this.getReferencingFieldName()] = this.formView.getEntityId();
-        return [call].concat(calls);
+        call.data[ this.getReferencingFieldName() ] = this.formView.getEntityId();
+        return [ call ].concat(calls);
     };
+
     /**
      * Inverse Reference (belongs to) handling for nested form views.
+     *
+     * @todo: in the future we probably need to be able to pick a certain element out of the collection (itemIndex)
+     *
      * @param formView
      * @constructor
      */
-
     function JBFormViewAdapterInverseReferenceStrategy(formView){
         this.formView           = formView;
         this.optionsData        = null;
         this.initialParentId    = null;
         this.parentId           = null;
         this.parentOptionsData  = null;
+        this.itemIndex          = 0;
         this.initialize(formView);
     }
 
@@ -84,17 +88,15 @@
         var self = this;
         formView.registerComponent({
               registerAt:   function(parent){}
-            , isValid:      function(){
-
-            }
+            , isValid:      function(){}
             /**
              * @todo: set the parent id in the emitted post save task
              */
             , getSaveCalls: function(){
                 var call = { data: {} };
                 if(self.initialParentId == self.parentId) return [];
-                call[self.getReferencingFieldName()] = this.parentId;
-                return [call];
+                call[ self.getReferencingFieldName() ] = this.parentId;
+                return [ call ];
             }
         });
     };
@@ -128,19 +130,25 @@
 
         var   content = (data) ? data[this.formView.getEntityName()] : data
             , id
-            , parentId;
+            , parentId
+            , parentIdKey;
 
         if(content){
-            if(content.length) content = content[0];
-            var parentIdKey = this.formView.getIdFieldFrom(this.parentOptionsData);
-            id       = this.formView.getOwnId(content);
-            parentId = data[parentIdKey];
+            if(content.length) content = this.getEntityFromData(content);
+            parentIdKey = this.formView.getIdFieldFrom(this.parentOptionsData);
+            id          = this.formView.getOwnId(content);
+            parentId    = data[ parentIdKey ];
         }
 
         this.initialParentId = parentId;
         this.formView.setEntityId(id);
         return this.formView.distributeData(content);
     };
+
+    JBFormViewAdapterInverseReferenceStrategy.prototype.getEntityFromData = function(data){
+        return data[this.itemIndex];
+    };
+
     // @todo: check for aliases
     JBFormViewAdapterInverseReferenceStrategy.prototype.getSelectFields = function(){
         var   selects = this.formView.getSelectParameters().map(function (select) {

@@ -74,7 +74,7 @@
 
     _module.controller('DetailViewController',
         [
-            '$scope'
+              '$scope'
             , '$rootScope'
             , '$q'
             , '$attrs'
@@ -286,7 +286,8 @@
              * @todo: check if the fields are used somewhere
              */
             self.makeOptionRequest = function (url) {
-                return boAPIWrapper.getOptions(url);
+                debugger;
+                return APIWrapperService.getOptions(url);
             };
 
             /**

@@ -1,13 +1,13 @@
 ( function() {
 
     'use strict';
-    var _module = angular.module('jb.formComponents', [
+    var _module = angular.module('jb.formComponents'
+        , [
               'jb.fileDropComponent'
-            //, 'jb.backofficeShared'
-            , 'ui.router'
+            //, 'ui.router'
             , 'jb.apiWrapper'
             , 'pascalprecht.translate'
             , 'jb.formEvents'
-            , 'jb.backofficeAPIWrapper' ]
+        ]
     );
 } )();

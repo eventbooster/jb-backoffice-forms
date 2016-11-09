@@ -42,12 +42,12 @@
                     ctrl.preLink(scope, element, attrs);
                 }
             }
-            , controller        : 'AutoInputController'
+            , controller        : 'JBFormAutoInputController'
             , scope             : true
         };
     }]);
 
-    function AutoInputController($scope, $attrs, $compile, $rootScope, fieldTypes, subcomponentsService) {
+    function JBFormAutoInputController($scope, $attrs, $compile, $rootScope, fieldTypes, subcomponentsService) {
         this.$scope     = $scope;
         this.$attrs     = $attrs;
         this.$compile   = $compile;
@@ -56,26 +56,27 @@
 
         this.name       = $attrs.for;
         this.label      = this.name;
-        this.$attrs.$observe('label', function(value){
+        console.log('UUh');
+        /*this.$attrs.$observe('label', function(value){
             this.label = value;
-        }.bind(this));
+        }.bind(this));*/
 
         this.subcomponentsService   = subcomponentsService;
         this.registry               = null;
     }
 
-    AutoInputController.prototype.preLink = function (scope, element, attrs) {
+    JBFormAutoInputController.prototype.preLink = function (scope, element, attrs) {
         this.registry = this.subcomponentsService.registryFor(scope);
         this.registry.listen();
     };
 
-    AutoInputController.prototype.init = function (scope, element, attrs) {
+    JBFormAutoInputController.prototype.init = function (scope, element, attrs) {
         this.element = element;
         this.registry.registerOptionsDataHandler(this.updateElement.bind(this));
         this.registry.registerYourself();
     };
 
-    AutoInputController.prototype.updateElement = function(fieldSpec){
+    JBFormAutoInputController.prototype.updateElement = function(fieldSpec){
             var   elementType
                 , elementSpec = fieldSpec[this.name];
 
@@ -109,13 +110,13 @@
             this.registry.optionsDataHandler(fieldSpec);
     };
 
-    _module.controller('AutoInputController', [
+    _module.controller('JBFormAutoInputController', [
         '$scope',
         '$attrs',
         '$compile',
         '$rootScope',
         typeKey,
         'JBFormComponentsService',
-        AutoInputController ]);
+        JBFormAutoInputController ]);
 })();
 

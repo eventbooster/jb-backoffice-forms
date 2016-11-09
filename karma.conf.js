@@ -17,20 +17,21 @@ module.exports = function(config) {
 
 
     // list of files / patterns to load in the browser
+      // @todo: create a dist version of the api-wrapper
     files: [
-        './bower_components/angular/angular.min.js',
-        './node_modules/angular-mocks/angular-mocks.js',
-        './src/backoffice-form-events/jb-backoffice-form-events.js',
-        './src/autoformelement/jb-backoffice-auto-form-element.js',
-        './src/autoinput/jb-auto-input.js',
-        './src/autoinput/jb-auto-text-input.js',
-
-        './src/**/*.spec.js'
+        'bower_components/angular/angular.min.js',
+        'node_modules/angular-mocks/angular-mocks.js',
+        'bower_components/angular-translate/angular-translate.min.js',
+        'bower_components/jb-api-wrapper/src/apiWrapperService.js',
+        'src/*js',
+        'src/**/*.js'
     ],
 
 
     // list of files to exclude
     exclude: [
+        'src/vendor/*.js',
+        'src/deprecated/*.js'
     ],
 
 
@@ -43,9 +44,9 @@ module.exports = function(config) {
     // test results reporter to use
     // possible values: 'dots', 'progress'
     // available reporters: https://npmjs.org/browse/keyword/karma-reporter
-    reporters: ['progress'],
+    reporters: ['progress', 'kjhtml'],
 
-
+    //client: { captureConsole: true },
     // web server port
     port: 9876,
 
@@ -56,7 +57,7 @@ module.exports = function(config) {
 
     // level of logging
     // possible values: config.LOG_DISABLE || config.LOG_ERROR || config.LOG_WARN || config.LOG_INFO || config.LOG_DEBUG
-    logLevel: config.LOG_INFO,
+    logLevel: config.LOG_ERROR,
 
 
     // enable / disable watching file and executing tests whenever any file changes
@@ -76,4 +77,4 @@ module.exports = function(config) {
     // how many browser should be started simultaneous
     concurrency: Infinity
   })
-}
+};

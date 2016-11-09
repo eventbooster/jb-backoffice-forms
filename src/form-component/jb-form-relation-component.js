@@ -32,6 +32,7 @@
 					, 'suggestion'      : '@suggestionTemplate'
 					, 'searchField'     : '@'
 					, 'changeHandler'   : '&'
+                    , 'filters'         : '<'
 				}
 			};
 		};
@@ -79,7 +80,7 @@
 	};
 
 	JBFormReferenceController.prototype.getEndpoint = function () {
-		return this.relationName;
+		return this.entityName;
 	};
 
 	// @todo: catch it if the options are not found
@@ -171,6 +172,7 @@
 			.attr( 'relation-entity-search-field', this.getSearchField() )
 			.attr( 'relation-suggestion-template', this.getSuggestionTemplate() )
 			.attr( 'multi-select', this.isMultiSelect() )
+            .attr( 'filters', '$ctrl.filters' )
 			.attr( 'ng-model', '$ctrl.currentData' );
 
 		this.$compile( template )( this.$scope );

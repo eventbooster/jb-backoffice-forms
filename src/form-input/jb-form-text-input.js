@@ -1,9 +1,6 @@
 (function(undefined) {
     'use strict';
 
-    /**
-     *
-     */
     var JBFormTextInputController = function ($scope, $attrs, $q, componentsService) {
 
         this.$scope = $scope;
@@ -15,6 +12,8 @@
         this.componentsService = componentsService;
         this.originalData = undefined;
         this.required = true;
+
+        this.options;
     };
 
     JBFormTextInputController.prototype.isRequired = function(){
@@ -31,19 +30,23 @@
         parent.registerOptionsDataHandler(this.handleOptionsData.bind(this));
     };
 
-    /*AutoJBFormTextInputController.prototype.getBeforeSaveTasks = function(initialPromise){
-        return initialPromise.then(function(entity){
-            if (this.originalData !== this.$scope.data.value){
-                entity[this.name] = this.$scope.data.value;
-            }
-            return entity;
-        }.bind(this));
-    };*/
-
+    JBFormTextInputController.prototype.selectOptions = function(optionsData){
+        var properties = (optionsData) ? optionsData.properties : optionsData;
+        if(!properties || !properties.length) return;
+        for( var i = 0; i < properties.length; i++ ) {
+            if(properties[i].name == this.name) return properties[i];
+        }
+        return;
+    };
+    /**
+     * @todo: switch into an error state
+     * @param data
+     */
     JBFormTextInputController.prototype.handleOptionsData = function(data){
-        var spec = data[this.name];
+        var spec = this.selectOptions(data);
         if(!angular.isDefined(spec)) return console.error('No options data available for text-field %o', this.name);
-        this.required = spec.required === true;
+        this.options  = spec;
+        this.required = spec.nullable === false;
     };
 
     JBFormTextInputController.prototype.init = function (scope) {

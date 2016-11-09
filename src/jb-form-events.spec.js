@@ -1,19 +1,19 @@
 /**
  * @todo: add proper tests which test the configuration phase
  */
-describe('jb-backoffice-form-events', function(){
+describe('jb-form-events', function(){
 
-    describe('BackofficeFormEventsProvider', function(){
+    describe('JBFormEventsProvider', function(){
 
         var   provider
             , events;
 
         beforeEach(function(){
-            angular.module('test-jb-backoffice-form-events', [])
-                .config(['backofficeFormEventsProvider', function(theProvider){
+            angular.module('testJBFormEvents', [])
+                .config(['jbFormEventsProvider', function(theProvider){
                     provider = theProvider;
                 }]);
-            module('jb.backofficeFormEvents', 'test-jb-backoffice-form-events');
+            module('jb.formEvents', 'testJBFormEvents');
             inject(function(){});
         });
 
@@ -45,7 +45,7 @@ describe('jb-backoffice-form-events', function(){
     });
 
 
-    describe('BackofficeEvents', function(){
+    describe('jbFormEvents', function(){
 
         var events
             , accessor1 = 'test'
@@ -54,14 +54,14 @@ describe('jb-backoffice-form-events', function(){
             , key2      = 'actryplskdfjhlkj123';
 
         beforeEach(function(){
-            angular.module('test-jb-backoffice-form-events', [])
-                .config(['backofficeFormEventsProvider', function(theProvider){
+            angular.module('testJBFormEvents', [])
+                .config(['jbFormEventsProvider', function(theProvider){
                     theProvider.setEventKey(accessor1, key1);
                     theProvider.setEventKey(accessor2, key2);
                 }]);
-            module('jb.backofficeFormEvents', 'test-jb-backoffice-form-events');
-            inject(function(_backofficeFormEvents_){
-                events = _backofficeFormEvents_;
+            module('jb.formEvents', 'testJBFormEvents');
+            inject(function(_jbFormEvents_){
+                events = _jbFormEvents_;
             });
         });
 
