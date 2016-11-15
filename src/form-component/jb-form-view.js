@@ -8,10 +8,7 @@
      * - Stores data on server
      *
      * Child components must/may implement the following methods:
-     * - register: When all components were registered, GET call is made.
-     *             To be called after OPTION data was processed by component.
-     * - registerOptionsDataHandler: get OPTION data (optional)
-     * - registerGetDataHandler: get GET data (optional)
+     * - registerAt(parent) which is used to register options and get call handlers
      * - getSaveCalls: Returns POST calls (optional)
      * - isValid: Returns true if component is valid (optional)
      * - getSelectFields: Returns select fields (replaces the select property)
@@ -19,7 +16,7 @@
 
     var _module = angular.module('jb.formComponents');
 
-    _module.directive('jbFormView', [function () {
+    _module.directive('jbFormView', ['$compile', function ($compile) {
 
         return {
             link: {
@@ -28,7 +25,8 @@
                         ctrl.preLink(scope, element, attrs);
                     }
                 }
-                , post: function (scope, element, attrs, ctrl) {
+                , post: function (scope, element, attrs, ctrl, transclude) {
+                    var errorMessage = angular.element('<h1 ng-if="$ctrl.error">{{$ctrl.error}}</h1>');
                     element.addClass('jb-form-view');
                     ctrl.init(scope, element, attrs);
                 }
@@ -42,35 +40,19 @@
              * We cannot use an isolated scope here: the nested elements would be attached to the parent scope
              * and we would not be able to listen to the corresponding events.
              *
+             * Otherwise we'd have to use transclusion.
+             *
              *  {
                  *        'entityName'  : '<'
                  *      , 'entityId'    : '<'
                  *      , 'isRoot'      :
+                 *      , 'index'       : '<'
                  *  }
              */
             , scope: true
         };
 
     }]);
-    /**
-     * @todo: do a clean implementation!
-     */
-    function DetailViewController($scope, $rootScope, $q, $filter, $state, APIWrapperService, subcomponentsService, boAPIWrapper) {
-        this.$scope             = $scope;
-        this.$rootScope         = $rootScope;
-        this.$q                 = $q;
-        this.$filter            = $filter;
-        this.$state             = $state;
-        this.api                = APIWrapperService;
-        this.boAPI              = boAPIWrapper;
-        this.componentsService  = subcomponentsService;
-        // this will be resolved in the linking phase
-        this.componentsRegistry = null;
-    }
-
-    DetailViewController.prototype.init = function(scope, element, attrs){
-
-    };
 
     _module.controller('DetailViewController',
         [
@@ -97,6 +79,7 @@
             self.componentsService  = subcomponentsService;
             self.componentsRegistry = null;
             self.adapterService     = adapterService;
+            self.index              = 0;
             /**
              * Data we loaded ourselves.
              */
@@ -105,6 +88,10 @@
             $scope.$watchGroup(['$ctrl.entityName', '$ctrl.entityId'], function () {
                 self.setTitle();
             });
+
+            /*$scope.$watch(function(){
+                return self.index
+            })*/
 
             /**
              * Set up the registry waiting for subcomponents in the pre-link phase.
@@ -223,14 +210,29 @@
                     self.setEntityId(stateParams.id);
                 }
                 // register myself as a component to possible parents
+
                 self.componentsService.registerComponent(scope, self.adapterService.getAdapter(this));
                 // @todo: store the promises otherwise and chain them as soon as the option handler is invoked (to make shure all data is available)
                 $q.all(promises).then(function () {
                     // load option data if we are root
-                    if (self.isRoot) self.getOptionData().then(self.getData).catch(function(err){
-                        console.error(err);
-                    });
+                    // todo: switch into read only mode or display error message if we are not allowed to see the current entity
+                    if (self.isRoot){
+                        self.getOptionData()
+                            .then(self.checkAccessRights)
+                            .then(self.getData)
+                            .catch(function(err){
+                                console.error(err);
+                            });
+                    }
                 });
+            };
+
+            self.isNew = function(){
+                return !this.getEntityId() && this.getEntityId() !== 0;
+            };
+
+            self.checkAccessRights = function(optionData){
+                return optionData;
             };
 
             self.setEntityName = function (name) {
@@ -258,7 +260,11 @@
             };
 
             self.getSpecFromOptionsData = function(data){
-                return data[self.entityName];
+                var relations = (data && data.relations && data.relations.length) ? data.relations : [];
+                for(var i = 0; i < relations.length; i++){
+                    var relation = relations[i];
+                    if(relation.remote.resource === this.entityName) return relation;
+                }
             };
 
             /**
@@ -269,24 +275,21 @@
                 return self
                     .makeOptionRequest('/' + self.getEntityName())
                     .then(
-                    self.internallyHandleOptionsData
-                    , function (err) {
-                        $rootScope.$broadcast('notification', {
-                            'type': 'error'
-                            , 'message': 'web.backoffice.detail.optionsLoadingError'
-                            , variables: {errorMessage: err}
+                          self.internallyHandleOptionsData
+                        , function (err) {
+                            $rootScope.$broadcast('notification', {
+                                  'type': 'error'
+                                , 'message': 'web.backoffice.detail.optionsLoadingError'
+                                , variables: {errorMessage: err}
+                            });
                         });
-
-                    });
-
-            };
+                    };
 
             /**
              * Makes options call, sets self.fields
              * @todo: check if the fields are used somewhere
              */
             self.makeOptionRequest = function (url) {
-                debugger;
                 return APIWrapperService.getOptions(url);
             };
 
@@ -326,10 +329,14 @@
                     .then(
                     self.distributeData
                     , function (err) {
+                        // debugger;
+                        // @todo: if the entity is not available or the user is not able to access the entity we get a 404 (due to the tenant restriction)
+                        // if(err.statusCode)
+                        self.error = 'Unable to load!!';
                         $rootScope.$broadcast('notification', {
-                            type: 'error'
-                            , message: 'web.backoffice.detail.loadingError'
-                            , variables: {
+                              type      : 'error'
+                            , message   : 'web.backoffice.detail.loadingError'
+                            , variables : {
                                 errorMessage: err
                             }
                         });
@@ -350,8 +357,8 @@
              */
             self.makeGetRequest = function () {
 
-                var url = self.getEntityUrl()
-                    , select = self.getSelectParameters();
+                var   url       = self.getEntityUrl()
+                    , select    = self.getSelectParameters();
 
                 console.log('DetailView: Get Data from %o with select %o', url, select);
 
@@ -381,12 +388,13 @@
              *                                                _not_ redirected to the new entity. Needed for manual saving.
              * @returns <Integer>                            ID of the current entity
              */
-            $scope.save = function (dontNotifyOrRedirect, ev, callback) {
+            $scope.save = function (ev, dontNotifyOrRedirect, callback) {
 
                 // Needed for nested detailViews: We don't want to propagate the save event to the parent detailView
                 // See e.g. article in CC back office
                 if (ev && angular.isFunction(ev.preventDefault)) {
                     ev.preventDefault();
+                    ev.stopPropagation();
                 }
 
                 // We need to get the saved entity's id so that we can redirect the user to it
@@ -400,7 +408,6 @@
                 return self
                     .makeSaveRequest(self.registeredComponents, self.getEntityName())
                     .then(function (entityId) {
-
                         // Entity didn't have an ID (was newly created): Redirect to new entity
                         if (self.parseUrl().isNew && !dontNotifyOrRedirect) {
                             $state.go('app.detail', {entityName: self.getEntityName(), entityId: self.getEntityId()});
@@ -444,7 +451,6 @@
              * Stores all component's data on server
              */
             self.makeSaveRequest = function () {
-
                 if (!self.isValid()) return $q.reject(new Error('Not all required fields filled out.'));
 
                 // Pre-save tasks (upload images)
@@ -492,13 +498,13 @@
                 return self.componentsRegistry.getAfterSaveTasks(id);
             };
 
+            /**
+             * @todo: make this more abstract and safe
+             * @param optionsData
+             * @returns {*}
+             */
             self.getIdFieldFrom = function(optionsData){
-                var keys = Object.keys(optionsData.internalFields);
-                for(var i=0; i<keys.length; i++){
-                    var field = optionsData.internalFields[keys[i]];
-                    if(field.isPrimary === true) return field.name;
-                }
-                return null;
+                return (optionsData && optionsData.primaryKeys) ? optionsData.primaryKeys[0] : null;
             };
 
             self.getOwnIdField = function(){
@@ -524,8 +530,10 @@
              * @todo: the post save tasks should create relations having access to the previously saved id (store it into a meta parameter)
              */
             self.makeMainSaveCall = function () {
+
                 var calls = self.generateSaveCalls();
-                console.log('DetailView: Save calls are %o', calls);
+
+                console.log('DetailView: Save calls for %o are %o', this.entityName, calls);
 
                 var mainCall
                     , relationCalls = []
@@ -618,7 +626,6 @@
                 if (!componentCall.url) {
                     componentCall.url = self.getEntityUrl();
                 }
-
 
                 // Method's missing
                 if (!componentCall.method) {
@@ -841,12 +848,18 @@
              * @todo: the redirection should not be a matter of the detail-view itself, if we have nested detail
              * @param <Boolean> nonInteractive        True if user should not be redirected to main view
              */
-            $scope.delete = function (nonInteractive) {
-
+            $scope.delete = function (event, nonInteractive) {
+                if(event){
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
                 console.log('DetailView: Delete');
 
-                // Display confirmation dialog – must be done in interactive and non-interactive mode
-                var confirmed = confirm($filter('translate')('web.backoffice.detail.confirmDeletion'));
+                var   confirmed       = false
+                    , confirmMessage = $filter('translate')('web.backoffice.detail.confirmDeletion');
+
+                confirmMessage += '\n'+self.getEntityName() + '('+self.getEntityId()+')';
+                confirmed = confirm(confirmMessage);
 
                 if (!confirmed) {
                     return;
@@ -896,13 +909,17 @@
             self.makeDeleteRequest = function () {
 
                 console.log('DetailView: Make DELETE request');
-
-                return APIWrapperService.request({
-                    url: '/' + self.getEntityName() + '/' + self.getEntityId()
-                    , method: 'DELETE'
+                var promise = $q.when();
+                if(!self.isNew()) {
+                    promise = APIWrapperService.request({
+                        url: '/' + self.getEntityName() + '/' + self.getEntityId()
+                        , method: 'DELETE'
+                    });
+                }
+                return promise.then(function(){
+                    return $scope.$destroy();
                 });
             };
-
 
         }]);
 })();

@@ -3,7 +3,7 @@
 
     'use strict';
 
-    var AutoDateTimeInputController = function ($scope, $attrs, componentsService) {
+    var JBFormDateTimeInputController = function ($scope, $attrs, componentsService) {
         this.$attrs = $attrs;
         this.$scope = $scope;
         this.subcomponentsService = componentsService;
@@ -15,20 +15,20 @@
         this.required = true;
     };
 
-    AutoDateTimeInputController.prototype.getSelectFields = function(){
+    JBFormDateTimeInputController.prototype.getSelectFields = function(){
         return [this.name];
     };
 
-    AutoDateTimeInputController.prototype.isRequired = function () {
+    JBFormDateTimeInputController.prototype.isRequired = function () {
         return this.required === true;
     };
 
-    AutoDateTimeInputController.prototype.isValid = function () {
+    JBFormDateTimeInputController.prototype.isValid = function () {
         if (this.isRequired()) return !!this.date;
         return true;
     };
 
-    AutoDateTimeInputController.prototype.updateData = function (data) {
+    JBFormDateTimeInputController.prototype.updateData = function (data) {
         var value = (data) ? data[this.name] : data;
         this.date = (value) ? new Date(value) : undefined;
         this.originalData = this.date;
@@ -38,7 +38,7 @@
         return nr < 10 ? '0' + nr : nr;
     }
 
-    AutoDateTimeInputController.prototype.getSaveCalls = function () {
+    JBFormDateTimeInputController.prototype.getSaveCalls = function () {
 
         var   currentDate   = this.date
             , originalDate  = this.originalData
@@ -62,26 +62,42 @@
 
     };
 
-    AutoDateTimeInputController.prototype.init = function (scope) {
+    JBFormDateTimeInputController.prototype.init = function (scope) {
         this.subcomponentsService.registerComponent(scope, this);
     };
 
-    AutoDateTimeInputController.prototype.registerAt = function (parent) {
+    JBFormDateTimeInputController.prototype.registerAt = function (parent) {
         parent.registerOptionsDataHandler(this.handleOptionsData.bind(this));
         parent.registerGetDataHandler(this.updateData.bind(this));
     };
 
-    AutoDateTimeInputController.prototype.handleOptionsData = function (data) {
-        var spec = data[this.name];
-        if (!spec) return console.error('AutoDateTimeInput: No field spec for %o', this.name);
-
-        this.required = spec.required === true;
-        this.time = spec.time === true;
+    JBFormDateTimeInputController.prototype.unregisterAt = function (parent) {
+        parent.unregisterOptionsDataHandler(this.handleOptionsData);
+        parent.unregisterGetDataHandler(this.updateData);
     };
-    AutoDateTimeInputController.prototype.showTime = function () {
+
+    JBFormDateTimeInputController.prototype.selectSpec = function(data){
+        var properties = (data && data.properties) ? data.properties : [];
+        if(!properties.length) return ;
+        for(var i=0; i<properties.length; i++){
+            var property = properties[i];
+            if(property.name === this.name) return property;
+        }
+    };
+
+    JBFormDateTimeInputController.prototype.handleOptionsData = function (data) {
+        var spec = this.selectSpec(data);
+
+        if (!spec) return console.error('JBFormDateTimeInputController: No field spec for %o', this.name);
+
+        this.required       = spec.nullable === false;
+        this.time           = spec.type === 'datetime';
+        this.showDate       = spec.type !== 'time';
+    };
+
+    JBFormDateTimeInputController.prototype.showTime = function () {
         return this.time;
     };
-
 
     var _module = angular.module('jb.formComponents');
     _module.directive('jbFormDateTimeInput', [function () {
@@ -91,29 +107,30 @@
                     label : '@'
                   , name  : '@for'
               }
-            , controller        : 'AutoDateTimeInputController'
+            , controller        : 'JBFormDateTimeInputController'
             , bindToController  : true
             , controllerAs      : '$ctrl'
             , link: function (scope, element, attrs, ctrl) {
                 ctrl.init(scope, element, attrs);
             }
-            , template: '<div class="form-group form-group-sm">' +
-            '<label jb-form-label-component data-label-identifier="{{$ctrl.label}}" data-is-required="$ctrl.isRequired()" data-is-valid="$ctrl.isValid()"></label>' +
-            '<div data-ng-class="{ \'col-md-9\': !$ctrl.showTime(), \'col-md-5\': $ctrl.showTime() }">' +
-            '<input type="date" class="form-control input-sm input-date" data-ng-model="$ctrl.date">' +
-            '</div>' +
-            '<div class="col-md-4" data-ng-if="$ctrl.showTime()">' +
-            '<input type="time" class="form-control input-sm input-time" data-ng-model="$ctrl.date" />' +
-            '</div>' +
-            '</div>'
+            , template:
+                '<div class="form-group form-group-sm">' +
+                    '<label jb-form-label-component data-label-identifier="{{$ctrl.label}}" data-is-required="$ctrl.isRequired()" data-is-valid="$ctrl.isValid()"></label>' +
+                    '<div data-ng-class="{ \'col-md-9\': !$ctrl.showTime(), \'col-md-5\': $ctrl.showTime() }">' +
+                        '<input type="date" class="form-control input-sm input-date" data-ng-model="$ctrl.date">' +
+                    '</div>' +
+                    '<div class="col-md-4" data-ng-if="$ctrl.showTime()">' +
+                        '<input type="time" class="form-control input-sm input-time" data-ng-model="$ctrl.date" />' +
+                    '</div>' +
+                '</div>'
         };
 
     }]);
 
-    _module.controller('AutoDateTimeInputController', [
+    _module.controller('JBFormDateTimeInputController', [
         '$scope',
         '$attrs',
         'JBFormComponentsService',
-        AutoDateTimeInputController]);
+        JBFormDateTimeInputController]);
 
 })();

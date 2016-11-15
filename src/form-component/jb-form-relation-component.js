@@ -64,7 +64,9 @@
 		this.element                = null;
 		this.currentData            = [];
 		this.referencedPropertyName = null;
-		this.entities               = [];
+        this.relationTypes          = ['hasOne'];
+        this.rendered               = false;
+        this.isWatchingForCallback  = false;
 	}
 
 	JBFormReferenceController.prototype.preLink = function () {};
@@ -77,6 +79,11 @@
 	JBFormReferenceController.prototype.registerAt = function (parent) {
 		parent.registerOptionsDataHandler(this.handleOptionsData.bind(this));
 		parent.registerGetDataHandler(this.handleGetData.bind(this));
+	};
+
+	JBFormReferenceController.prototype.unregisterAt = function (parent) {
+		parent.unregisterOptionsDataHandler(this.handleOptionsData);
+		parent.unregisterGetDataHandler(this.handleGetData);
 	};
 
 	JBFormReferenceController.prototype.getEndpoint = function () {
@@ -95,60 +102,54 @@
 			this.currentData = selectedData;
 		}
 		this.originalData = angular.copy(this.currentData);
-		this.$scope.$watch(
-			function(){ return this.currentData; }.bind(this)
-			, function(newValue, oldValue){
-				if(this.changeHandler) this.changeHandler({ newValue: newValue , oldValue: oldValue });
-			}.bind(this));
+        if(!this.isWatchingForCallback){
+            this.$scope.$watch(
+                  function(){ return this.currentData; }.bind(this)
+                , function(newValue, oldValue){
+                    if(this.changeHandler) this.changeHandler({ newValue: newValue , oldValue: oldValue });
+                }.bind(this));
+            this.isWatchingForCallback = true;
+        }
 		console.log('BackofficeReferenceComponentController: Model updated (updateData) to %o', this.currentData);
 	};
 
 	// @todo: make this method abstract and implement it for reference as well as relation
 	JBFormReferenceController.prototype.getSpec = function(data){
 
-		var   spec
-			, hasInternalReferences;
+		var relations = (data && data.relations) ? data.relations : [];
 
-		// No data available
-		if(!data) return spec;
+        if(!relations.length) return;
 
-		// If the references are listed separately
-		hasInternalReferences = angular.isDefined(data.internalReferences);
+        for(var i= 0; i<relations.length; i++){
+            var current = relations[i];
+            if(this.relationTypes.indexOf(current.type) === -1) continue;
+            if(this.propertyName === current.property)      return current;
+            if(this.entityName === current.remote.resource) return current;
+            if(this.relationName === current.name)          return current;
+        }
 
-		// the property name has the hightest priority (no fallback!!), e.g. id_city
-		if(this.propertyName && hasInternalReferences) return data.internalReferences[this.propertyName];
-
-		// the entity name has the second highest property
-		if(this.entityName && hasInternalReferences) {
-			// if there is a reference to the corresponding entity, we take it
-			var keys = Object.keys(data.internalReferences);
-			for(var i=0; i<keys.length; i++){
-				var key = keys[i];
-				if(data.internalReferences[key].entity == this.entityName) return data.internalReferences[key];
-			}
-			return spec;
-		}
-		// we can also just specify the relation name directly (which might be the same as the entity name)
-		if(this.relationName) return data[this.relationName];
-		return spec;
 	};
 
 	JBFormReferenceController.prototype.handleOptionsData = function (data) {
-		var fieldSpec = this.getSpec(data);
+
+        if(this.rendered === true) return;
+
+        var fieldSpec = this.getSpec(data);
+
 		if (!angular.isDefined(fieldSpec)) {
 			return console.error(
 				'JBFormReferenceController: No options data found for name %o referencing entity %o.'
 				, this.propertyName
 				, this.entityName);
 		}
-		this.propertyName           = fieldSpec.relationKey;
-		this.entityName             = fieldSpec.entity;
-		this.relationName           = fieldSpec.relation;
-		this.referencedPropertyName = fieldSpec.relatedKey;
+		this.propertyName           = fieldSpec.property;
+		this.entityName             = fieldSpec.remote.resource;
+		this.relationName           = fieldSpec.name;
+		this.referencedPropertyName = fieldSpec.remote.property;
 		this.options                = fieldSpec;
 
 		// Now we've got all the necessary information to render the component (this is hacky stuff).
-		this.renderComponent();
+		return this.renderComponent();
 	};
 	JBFormReferenceController.prototype.isMultiSelect = function(){
 		return false;
@@ -177,6 +178,7 @@
 
 		this.$compile( template )( this.$scope );
 		this.element.prepend( template );
+        this.rendered = true;
 	};
 
 	JBFormReferenceController.prototype.addModelTransformations = function(template){
@@ -204,14 +206,14 @@
 			return [this.relationName, field].join('.');
 		}, this);
 
-        if(this.propertyName) selectFields.unshift(this.propertyName);
+        if(this.propertyName) prefixedFields.unshift(this.propertyName);
 
 		return prefixedFields;
 	};
 
 	JBFormReferenceController.prototype.isRequired = function () {
 		if (!this.options) return true;
-		return this.options.required === true;
+		return this.options.nullable === true;
 	};
 
 	JBFormReferenceController.prototype.isMultiSelect = function () {
@@ -263,6 +265,7 @@
 
 	function JBFormRelationController($scope, $attrs, $compile, $templateCache, componentsService, relationService){
 		JBFormReferenceController.call(this, $scope, $attrs, $compile, $templateCache, componentsService, relationService);
+        this.relationTypes = ['hasMany', 'hasManyAndBelongsToMany'];
 	}
 
 	/**
@@ -275,13 +278,6 @@
 		return true;
 	};
 
-	JBFormRelationController.prototype.getSpec = function(data){
-		// No data available
-		if(!data) return;
-
-		if(this.relationName) return data[this.relationName];
-		return data[this.entityName];
-	};
 	/**
 	 * @todo: this might be implemented as a post-save call to ensure that the original entity was saved
      * @todo: remove the workaround for content data on delete requests
@@ -289,12 +285,12 @@
 	 */
 	JBFormRelationController.prototype.getSaveCalls = function(){
 
-		var   currentProperties  = this.mapProperties(this.currentData, this.referencedPropertyName)
+		var   currentProperties  = this.mapProperties(this.currentData, this.propertyName)
 			, calls;
 
 		// check for items that are present in the original data and the current data
 		calls = this.originalData.reduce(function(removeCalls, item){
-			var value = item[this.referencedPropertyName];
+			var value = item[this.propertyName];
 			if(angular.isDefined(currentProperties[value])){
 				// defined in both
 				delete currentProperties[value];
@@ -313,14 +309,13 @@
 		// newly added items are all the items that remain in the current properties map
 		Object.keys(currentProperties).forEach(function(value){
 			calls.push({
-				method    : 'POST'
+				  method    : 'POST'
 				, url       : {
-					path       : [ this.relationName, value].join('/')
+					  path       : [ this.relationName, value].join('/')
 					, mainEntity : 'append'
 				}
 			});
 		}, this);
-
 		return calls;
 	};
 
@@ -350,7 +345,7 @@
 	};
 
 	_module.controller('JBFormReferenceController', [
-		'$scope'
+		  '$scope'
 		, '$attrs'
 		, '$compile'
 		, '$templateCache'
@@ -360,7 +355,7 @@
 	]);
 
 	_module.controller('JBFormRelationController', [
-		'$scope'
+		  '$scope'
 		, '$attrs'
 		, '$compile'
 		, '$templateCache'
@@ -372,8 +367,8 @@
 	_module.run(['$templateCache', function ($templateCache) {
 		$templateCache.put('referenceComponentTemplate.html',
 			'<div class="form-group">' +
-			'<label jb-form-label-component label-identifier="{{$ctrl.getLabel()}}" is-required="$ctrl.isRequired()" is-valid="$ctrl.isValid()"></label>' +
-			'<div relation-input class="relation-select col-md-9"></div>' +
+			    '<label jb-form-label-component label-identifier="{{$ctrl.getLabel()}}" is-required="$ctrl.isRequired()" is-valid="$ctrl.isValid()"></label>' +
+			    '<div relation-input class="relation-select col-md-9"></div>' +
 			'</div>');
 	}]);
 })();

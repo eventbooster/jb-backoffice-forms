@@ -30,13 +30,17 @@
         parent.registerOptionsDataHandler(this.handleOptionsData.bind(this));
     };
 
+    JBFormTextInputController.prototype.unregisterAt = function(parent){
+        parent.unregisterGetDataHandler(this.updateData.bind(this));
+        parent.unregisterOptionsDataHandler(this.handleOptionsData.bind(this));
+    };
+
     JBFormTextInputController.prototype.selectOptions = function(optionsData){
         var properties = (optionsData) ? optionsData.properties : optionsData;
         if(!properties || !properties.length) return;
         for( var i = 0; i < properties.length; i++ ) {
             if(properties[i].name == this.name) return properties[i];
         }
-        return;
     };
     /**
      * @todo: switch into an error state
@@ -93,11 +97,11 @@
 
             return {
                   scope : {
-                        label: '@'
-                      , name: '@for'
+                        label   : '@'
+                      , name    : '@for'
                   }
-                , controllerAs: '$ctrl'
-                , bindToController: true
+                , controllerAs      : '$ctrl'
+                , bindToController  : true
                 , link: {
                     post: function (scope, element, attrs, ctrl) {
                         ctrl.init(scope, element, attrs);
@@ -107,7 +111,7 @@
                     }
                 }
                 , controller: 'JBFormTextInputController'
-                , template: '<div class=\'form-group form-group-sm\'>' +
+                , template: '<div class="form-group form-group-sm">' +
                                 '<label jb-form-label-component data-label-identifier="{{$ctrl.label}}" data-is-valid="$ctrl.isValid()" data-is-required="$ctrl.isRequired()"></label>' +
                                 '<div class="col-md-9">' +
                                     '<input type="text" data-ng-attr-id="data.name" class="form-control input-sm" data-ng-attrs-required="$ctrl.isRequired()" data-ng-model="data.value"/>' +

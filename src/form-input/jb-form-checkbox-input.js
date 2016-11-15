@@ -58,6 +58,10 @@
         parent.registerGetDataHandler(this.updateData.bind(this));
     };
 
+    JBFormCheckboxInputController.prototype.unregisterAt = function (parent) {
+        parent.unregisterGetDataHandler(this.updateData);
+    };
+
     JBFormCheckboxInputController.prototype.init = function (scope, element, attrs) {
         this.subcomponentsService.registerComponent(scope, this);
     };

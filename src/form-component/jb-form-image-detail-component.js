@@ -60,9 +60,17 @@
             componentsService.registerComponent(scope, self);
 		};
 
+		self.isValid = function(){
+			return true;
+		};
+
         self.registerAt = function(parent){
             parent.registerGetDataHandler( self.updateData );
         };
+
+			self.unregisterAt = function(parent){
+				parent.unregisterGetDataHandler( self.updateData );
+			};
 
 		self.updateData = function( data ) {
 

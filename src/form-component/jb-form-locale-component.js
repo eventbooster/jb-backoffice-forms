@@ -111,6 +111,11 @@
         parent.registerGetDataHandler(this.handleGetData.bind(this));
     };
 
+    JBFormLocaleComponentController.prototype.unregisterAt = function(parent){
+        parent.unregisterOptionsDataHandler(this.handleOptionsData);
+        parent.unregisterGetDataHandler(this.handleGetData);
+    };
+
     JBFormLocaleComponentController.prototype.getSelectedLanguages = function(){
         var selected = [];
         for(var i=0; i<this.supportedLanguages.length; i++){
@@ -212,18 +217,27 @@
         }, true);
     };
 
+    JBFormLocaleComponentController.prototype.selectSpec = function(data){
+        var relations = (data && data.relations) ? data.relations : [];
+        if(!relations.length) return;
+        for(var i = 0; i<relations.length; i++){
+            var current = relations[i]
+            if(current.type !== 'hasManyAndBelongsToMany') continue;
+            if(this.entityName === current.remote.resource) return current;
+            if(this.relationName === current.name) return current;
+        }
+    };
     /**
      * Takes the options data passed by the containing component, and sets up the corresponding fieldDefinitions which
      * are necessary to validate the contained fields.
      *
      * @note: In the select call we need to set the related table name and select all fields plus the languages. Currently
      * we are not able to properly identify locales.
+     * @todo: trigger error state
      */
     JBFormLocaleComponentController.prototype.handleOptionsData = function(data){
-        var spec;
-
-        if(!data || !angular.isDefined(data[this.relationName])) return console.error('No OPTIONS data found in locale component.');
-        spec            = data[this.relationName];
+        var spec = this.selectSpec(data);
+        if(!spec) return console.error('No OPTIONS data found in locale component.');
 
         this.options    = spec;
         this.loadFields().then(function(fields){
@@ -241,10 +255,10 @@
      * @returns {*}
      */
     JBFormLocaleComponentController.prototype.loadFields = function(){
-        var url = '/' + this.options.tableName;
+        var url = '/' + this.getLocaleProperty();
         if(this.fieldDefinitions) return this.$q.when(this.fieldDefinitions);
-        return this.boAPI.getOptions(url).then(function(fields){
-            return fields.internalFields;
+        return this.api.getOptions(url).then(function(fields){
+            return fields.properties;
         }.bind(this), function(error){
             console.error(error);
         });
@@ -252,10 +266,9 @@
 
     JBFormLocaleComponentController.prototype.filterFields = function(fields){
         if(!fields) return {};
-        return Object.keys(fields).reduce(function(sanitizedFields, fieldName){
-            var field = fields[fieldName];
+        return fields.reduce(function(sanitizedFields, field){
             if((!this.fieldsExclude || this.fieldsExclude.indexOf(field.name) == -1) && field.isPrimary !== true){
-                sanitizedFields[fieldName] = field;
+                sanitizedFields[field.name] = field;
             }
             return sanitizedFields;
         }.bind(this), {});
@@ -326,9 +339,15 @@
         }, this);
         return calls;
     };
+    /**
+     * Returns the name of the property we need to select the localization table on the base entity.
+     */
+    JBFormLocaleComponentController.prototype.getLocaleProperty = function(){
+        return this.options.via.resource;
+    };
 
     JBFormLocaleComponentController.prototype.handleGetData = function(data){
-        var locales             = data[this.options.tableName];
+        var locales             = data[this.getLocaleProperty()];
         if(locales){
             this.originalLocales    = this.normalizeModel(locales);
             this.locales            = angular.copy(this.originalLocales);
@@ -364,7 +383,7 @@
      */
     JBFormLocaleComponentController.prototype.getSelectFields = function(){
 
-        var   localeTableName   = this.options.tableName
+        var   localeTableName   = this.getLocaleProperty()
             , languageSelector  = [localeTableName, 'language', '*'].join('.')
             , selects           = [];
 

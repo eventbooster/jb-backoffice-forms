@@ -76,4 +76,46 @@ describe('jb-form-events', function(){
            expect(Object.isFrozen(events)).toBeTrue();
         });
     });
+
+    describe('JBFormComponentsService', function(){
+        var   service
+            , $rootScope
+            , events;
+
+        beforeEach(module('jb.formEvents'));
+        beforeEach(inject(function(_JBFormComponentsService_, _$rootScope_, _jbFormEvents_){
+            service     = _JBFormComponentsService_;
+            $rootScope  = _$rootScope_;
+            events      = _jbFormEvents_;
+        }));
+
+        it('should be defined', function(){
+            expect(service).toBeDefined();
+        });
+
+        it('should expose a register component method', function(){
+            expect(service.registerComponent).toBeFunction();
+        });
+
+        it('should emit an event on the parent scope if we register a component', function(){
+
+            var   mockScope     = $rootScope.$new()
+                , mockComponent = {};
+
+            spyOn($rootScope, '$emit');
+            service.registerComponent(mockScope, mockComponent);
+            expect($rootScope.$emit).toHaveBeenCalledWith(events.registerComponent, mockComponent);
+        });
+
+        it('should expose a method to create a registry', function(){
+            expect(service.registryFor).toBeFunction();
+        });
+
+        it('which is bound to the scope', function(){
+            var   mockScope     = $rootScope.$new()
+                , registry      = service.registryFor(mockScope);
+
+            expect(registry).toBeDefined();
+        });
+    });
 });

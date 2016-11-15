@@ -22,26 +22,27 @@
                     , 'imageModel'      : '=model'
                     , 'label'           : '@'
                 }
-                , template: '<div class="row">' +
-                '<label jb-form-label-component data-label-identifier="{{backofficeImageComponent.label}}" data-is-required="false" data-is-valid="true"></label>' +
-                '<div class="col-md-9 backoffice-image-component" >' +
-                '<div data-file-drop-component data-supported-file-types="[\'image/jpeg\']" data-model="backofficeImageComponent.images" data-error-handler="backofficeImageComponent.handleDropError(error)">' +
-                '<ol class="clearfix">' +
-                '<li data-ng-repeat="image in backofficeImageComponent.images">' +
-                '<a href="#" data-ng-click="backofficeImageComponent.openDetailView( $event, image )">' +
-                    // #Todo: Use smaller file
-                '<img data-ng-attr-src="{{image.url || image.fileData}}"/>' +
-                '<button class="remove" data-ng-click="backofficeImageComponent.removeImage($event,image)">&times</button>' +
-                '</a>' +
-                '<span class="image-size-info" data-ng-if="!!image.width && !!image.height">{{image.width}}&times;{{image.height}} Pixels</span>' +
-                '<span class="image-file-size-info" data-ng-if="!!image.fileSize">{{image.fileSize/1000/1000 | number: 1 }} MB</span>' +
-                '<span class="focal-point-info" data-ng-if="!!image.focalPoint">Focal Point</span>' +
-                '</li>' +
-                '<li><button class="add-file-button" data-ng-click="backofficeImageComponent.uploadFile()">+</button></li>' +
-                '</ol>' +
-                '<input type="file" multiple/>' +
-                '</div>' +
-                '</div>' +
+                , template: '' +
+                    '<div class="row">' +
+                        '<label jb-form-label-component data-label-identifier="{{backofficeImageComponent.label}}" data-is-required="false" data-is-valid="true"></label>' +
+                        '<div class="col-md-9 backoffice-image-component" >' +
+                            '<div data-file-drop-component data-supported-file-types="[\'image/jpeg\']" data-model="backofficeImageComponent.images" data-error-handler="backofficeImageComponent.handleDropError(error)">' +
+                            '<ol class="clearfix">' +
+                                '<li data-ng-repeat="image in backofficeImageComponent.images">' +
+                                    '<a href="#" data-ng-click="backofficeImageComponent.openDetailView( $event, image )">' +
+                                    // #Todo: Use smaller file
+                                        '<img data-ng-attr-src="{{image.url || image.fileData}}"/>' +
+                                        '<button class="remove" data-ng-click="backofficeImageComponent.removeImage($event,image)">&times</button>' +
+                                    '</a>' +
+                                    '<span class="image-size-info" data-ng-if="!!image.width && !!image.height">{{image.width}}&times;{{image.height}} Pixels</span>' +
+                                    '<span class="image-file-size-info" data-ng-if="!!image.fileSize">{{image.fileSize/1000/1000 | number: 1 }} MB</span>' +
+                                    '<span class="focal-point-info" data-ng-if="!!image.focalPoint">Focal Point</span>' +
+                                '</li>' +
+                                '<li><button class="add-file-button" data-ng-click="backofficeImageComponent.uploadFile()">+</button></li>' +
+                            '</ol>' +
+                            '<input type="file" multiple/>' +
+                        '</div>' +
+                    '</div>' +
                 '</div>'
             };
 
@@ -80,6 +81,11 @@
                 self.registerAt = function (parent) {
                     parent.registerOptionsDataHandler(self.updateOptionsData);
                     parent.registerGetDataHandler(self.updateData);
+                };
+
+                self.unregisterAt = function (parent) {
+                    parent.unregisterOptionsDataHandler(self.updateOptionsData);
+                    parent.unregisterGetDataHandler(self.updateData);
                 };
                 /**
                  * @todo: an image might be required?!
@@ -175,29 +181,38 @@
 
                 }
 
+                self.selectSpec = function(data){
+                    var   relations = (data && data.relations) ? data.relations : []
+                        , imageRelations;
 
+                    if(!relations.length) return;
+                    imageRelations = relations.reduce(function(selected, relation){
+                        if(relation.remote.resource === 'image'){
+                            selected.push(relation);
+                        }
+                        return selected;
+                    }, []);
+
+                    for(var i=0; i<imageRelations.length; i++){
+                        var relation = imageRelations[i];
+                        if(relation.name === this.propertyName) return relation;
+                    }
+                };
                 /**
                  * Called with OPTIONS data
                  */
                 self.updateOptionsData = function (data) {
+                    var spec = self.selectSpec(data);
 
-                    if (!data[self.propertyName] || !angular.isObject(data[self.propertyName])) {
-                        console.error('jbFormImageComponentController: Missing data for %o', self.propertyName);
-                        return;
-                    }
+                    if(!spec) return console.error('jbFormImageComponentController: Missing data for %o', self.propertyName);
 
                     // Relation is 1:n and stored on the entity's id_image field (or similar):
                     // Store relation key (e.g. id_image).
-                    if (data[self.propertyName].relationKey) {
-                        _relationKey = data[self.propertyName].relationKey;
-                        _singleRelation = true;
+                    // this is the former belongsTo!
+                    _singleRelation = spec.type === 'hasOne';
+                    if(_singleRelation){
+                        _relationKey = spec.property;
                     }
-                    else {
-                        _singleRelation = false;
-                    }
-
-                    //_detailViewController.register( self );
-
                 };
 
 

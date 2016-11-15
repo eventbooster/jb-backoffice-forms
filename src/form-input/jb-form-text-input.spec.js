@@ -8,14 +8,16 @@ describe('jb.formTextInput', function(){
     var   $controller
         , inputController
         , $scope
-        , formEvents;
+        , formEvents
+        , $rootScope;
 
     beforeEach(module('jb.formEvents', 'jb.formComponents'));
 
-    beforeEach(inject(function(_$controller_, _$rootScope_, _$q_){
+    beforeEach(inject([ '$controller', '$rootScope', '$q', 'JBFormComponentsService', function(_$controller_, _$rootScope_, _$q_, JBFormComponentsService){
 
         $controller = _$controller_;
         $scope      = _$rootScope_.$new();
+        $rootScope  = _$rootScope_;
 
         inputController = $controller('JBFormTextInputController', {
               $scope                : $scope
@@ -23,16 +25,18 @@ describe('jb.formTextInput', function(){
                 for : 'test'
             }
             , $q                    : _$q_
+            , JBFormComponentsService : JBFormComponentsService
         });
 
-    }));
+    }]));
 
     describe('JBFormTextInputController', function(){
         it('should be defined', function(){
             expect(inputController).toBeDefined();
         });
 
-        it('should be required by default', function(){
+        it('exposes an isRequird method which should return true by default (to avoid saving before proper population)', function(){
+            expect(inputController.isRequired).toBeFunction();
             expect(inputController.isRequired()).toBeTrue();
         });
 
@@ -51,30 +55,16 @@ describe('jb.formTextInput', function(){
     });
 
 
-    /*it('exposes an isValid method', function(){
+    it('exposes an isValid method', function(){
         expect(inputController.isValid).toBeFunction();
     });
 
-    The emission of the event is now done using a service. So we should test the service for the key that appeared.
-
-    it('init method emits an event on the scope', function(){
+    /*it('init method emits an event on the scope', function(){
         spyOn($scope, '$emit');
         var   elements = []
             , handlers = [];
-        inputController.init(null, {
-            register: function(controller){
-                elements.push(controller);
-            }
-            , getEntityName: function(){
-                return 'test';
-            }
-            , getEntityId: function(){
-                return 1;
-            }
-            , registerGetDataHandler: function(handler){
-                handlers.push(handler);
-            }
-        });
+
+        inputController.init($scope);
 
         expect($scope.$emit).toHaveBeenCalledWith(formEvents.registerComponent, inputController);
         expect(elements).toBeArrayOfSize(1);

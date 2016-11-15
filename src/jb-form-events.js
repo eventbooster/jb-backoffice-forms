@@ -34,14 +34,18 @@
         this.getDataHandlers        = [];
         this.$q                     = $q;
         this.formEvents             = formEvents;
+        this.unregistrationHandlers  = [];
     }
 
     JBFormComponentsRegistry.prototype.listen = function(){
-        this.scope.$on(this.formEvents.registerComponent, function(event, component){
+        this.scope.$on(this.formEvents.registerComponent, function(event, component, sourceScope){
             console.log('REGISTRATION OF:', component);
             // this check should not be necessary anymore, since we emit the registration event on the parent scope
             if(component === this) return;
             event.stopPropagation();
+            sourceScope.$on('$destroy', function(){
+                this.unregisterComponent(component);
+            }.bind(this));
             this.registerComponent(component);
         }.bind(this));
         return this;
@@ -52,10 +56,31 @@
         component.registerAt(this);
     };
 
+    JBFormComponentsRegistry.prototype.onUnregistration = function(callback){
+        this.unregistrationHandlers.push(callback);
+    };
+
+    JBFormComponentsRegistry.prototype.unregisterComponent = function(component){
+        var index = this.registeredComponents.indexOf(component);
+        if(index >= 0) {
+            if(!angular.isFunction(component.unregisterAt)){
+                //debugger;
+                console.warn('JBFormComponentsRegistry: Component %o does not know how to react to unlinking', component);
+            } else {
+                component.unregisterAt(this);
+            }
+            this.registeredComponents.splice(index, 1);
+            this.unregistrationHandlers.forEach(function(handler){
+                handler(component, index);
+            });
+        }
+    };
+
+
     JBFormComponentsRegistry.prototype.getSaveCalls = function(){
         return this.registeredComponents.reduce(function(calls, component){
             var subcalls = component.getSaveCalls();
-            return calls.concat(component.getSaveCalls());
+            return calls.concat(subcalls);
         }, []);
     };
 
@@ -66,6 +91,10 @@
         return true;
     };
 
+    JBFormComponentsRegistry.prototype.afterSaveTasks = function(id){
+        return this.getAfterSaveTasks(id);
+    };
+
     JBFormComponentsRegistry.prototype.getAfterSaveTasks = function(id){
         var calls = this.registeredComponents.reduce(function(subcalls, component){
             if(angular.isFunction(component.afterSaveTasks)){
@@ -73,7 +102,13 @@
             }
             return subcalls;
         }, []);
-        return this.$q.all(calls);
+        return this.$q.all(calls).then(function(){
+          return id;
+        });
+    };
+
+    JBFormComponentsRegistry.prototype.beforeSaveTasks = function(entity){
+        return this.getBeforeSaveTasks(entity);
     };
 
     JBFormComponentsRegistry.prototype.getBeforeSaveTasks = function(entity){
@@ -83,7 +118,9 @@
             }
             return tasks;
         }, []);
-        return this.$q.all(calls);
+        return this.$q.all(calls).then(function(){
+            return entity;
+        });
     };
 
     JBFormComponentsRegistry.prototype.getSelectFields = function () {
@@ -99,7 +136,9 @@
     JBFormComponentsRegistry.prototype.optionsDataHandler = function(data){
         return this.$q.all(this.optionsDataHandlers.map(function(handler){
             return this.$q.when(handler(data));
-        }, this));
+        }, this)).then(function(){
+            return data;
+        });
     };
 
     JBFormComponentsRegistry.prototype.registerOptionsDataHandler = function(handler){
@@ -123,14 +162,31 @@
             handler(data);
         });
     };
+    /**
+     * Distributes all the items in the collection after the other to the internal handlers.
+     *
+     * @note: does not check if there are more handlers than data
+     * @param collection
+     */
+    JBFormComponentsRegistry.prototype.distributeIndexed = function(data){
+        this.getDataHandlers.forEach(function(handler, index){
+            handler(data, index);
+        });
+    };
 
     JBFormComponentsRegistry.prototype.registerYourself = function(scope){
-        (scope || this.scope).$parent.$emit(this.formEvents.registerComponent, this);
+        var targetScope = scope || this.scope;
+        targetScope.$parent.$emit(this.formEvents.registerComponent, this, targetScope);
     };
 
     JBFormComponentsRegistry.prototype.registerAt = function(parent){
         parent.registerOptionsDataHandler(this.optionsDataHandler.bind(this));
         parent.registerGetDataHandler(this.getDataHandler.bind(this));
+    };
+
+    JBFormComponentsRegistry.prototype.unregisterAt = function(parent){
+        parent.unregisterOptionsDataHandler(this.optionsDataHandler);
+        parent.unregisterGetDataHandler(this.getDataHandler);
     };
 
     mod.factory(
@@ -145,7 +201,7 @@
                         return registry;
                     }
                     , registerComponent : function(scope, component){
-                        scope.$parent.$emit(formEvents.registerComponent, component);
+                        scope.$parent.$emit(formEvents.registerComponent, component, scope);
                     }
                 }
             }

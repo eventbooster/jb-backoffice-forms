@@ -9,8 +9,6 @@
      *          auto-form-element. The main problem is the fact that not all components need the same data. Further,
      *          some components require the option data to be able to register their selects.
      *
-     * @todo: remove the explicit dependency to the parent controller
-     * @todo: emit registration event after linking phase
      */
 
     /**
@@ -24,6 +22,7 @@
     _module.value(typeKey, {
           'text'    : 'text'
         , 'number'  : 'text'
+        , 'string'  : 'text'
         , 'boolean' : 'checkbox'
         , 'datetime': 'date-time'
         , 'date'    : 'date-time'
@@ -34,6 +33,7 @@
         return {
               controllerAs      : '$ctrl'
             , bindToController  : true
+            , restrict          : 'E'
             , link : {
                 post: function (scope, element, attrs, ctrl) {
                     ctrl.init(scope, element, attrs);
@@ -43,23 +43,21 @@
                 }
             }
             , controller        : 'JBFormAutoInputController'
-            , scope             : true
+            , scope             : {
+                  label :  '@'
+            }
         };
     }]);
 
-    function JBFormAutoInputController($scope, $attrs, $compile, $rootScope, fieldTypes, subcomponentsService) {
+    function JBFormAutoInputController($scope, $attrs, $compile, fieldTypes, subcomponentsService) {
+
         this.$scope     = $scope;
         this.$attrs     = $attrs;
         this.$compile   = $compile;
-        this.$rootScope = $rootScope;
         this.fieldTypes = fieldTypes;
 
         this.name       = $attrs.for;
         this.label      = this.name;
-        console.log('UUh');
-        /*this.$attrs.$observe('label', function(value){
-            this.label = value;
-        }.bind(this));*/
 
         this.subcomponentsService   = subcomponentsService;
         this.registry               = null;
@@ -75,10 +73,25 @@
         this.registry.registerOptionsDataHandler(this.updateElement.bind(this));
         this.registry.registerYourself();
     };
+    // @todo: share this functionality with all the other literal inputs
+    JBFormAutoInputController.prototype.selectOptions = function(optionsData){
+        var properties = (optionsData) ? optionsData.properties : optionsData;
+        if(!properties || !properties.length) return;
+        for( var i = 0; i < properties.length; i++ ) {
+            if(properties[i].name == this.name) return properties[i];
+        }
+        return;
+    };
 
+    /**
+     * @todo: switch into an error state if there is no spec or corresponding type
+     * @todo: think about a more angularish version of this procedure, since it is super messy!
+     * @param fieldSpec
+     */
     JBFormAutoInputController.prototype.updateElement = function(fieldSpec){
+
             var   elementType
-                , elementSpec = fieldSpec[this.name];
+                , elementSpec = this.selectOptions(fieldSpec);
 
             if (!elementSpec || !elementSpec.type) {
                 console.error('AutoFormElement: fieldSpec %o is missing type for field %o', fieldSpec, this.name);
@@ -99,7 +112,7 @@
             var dashedCasedElementType = elementType.replace(/[A-Z]/g, function (v) {
                 return '-' + v.toLowerCase();
             });
-
+            // this is not cool!
             var newElement = angular.element('<div jb-form-' + dashedCasedElementType + '-input for="' + this.name + '" label="' + this.label + '"></div>');
             // @todo: not sure if we still need to prepend the new element when we actually just inject the registry
             this.element.replaceWith(newElement);
@@ -107,14 +120,13 @@
             this.$compile(newElement)(this.$scope);
             // now the registry should know all the subcomponents
             // delegate to the options data handlers of the components
-            this.registry.optionsDataHandler(fieldSpec);
+            return this.registry.optionsDataHandler(fieldSpec);
     };
 
     _module.controller('JBFormAutoInputController', [
         '$scope',
         '$attrs',
         '$compile',
-        '$rootScope',
         typeKey,
         'JBFormComponentsService',
         JBFormAutoInputController ]);

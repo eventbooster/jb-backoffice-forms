@@ -20,8 +20,10 @@
         return this.formView.makeSaveRequest();
     };
 
+    JBFormViewAdapterReferenceStrategy.prototype.afterSaveTasks = function(){};
+
     JBFormViewAdapterReferenceStrategy.prototype.getReferencingFieldName = function(){
-        return this.optionsData.relationKey;
+        return this.optionsData.property;
     };
     /**
      * Extracts the id of the nested object and extracts the data the form view has to distribute.
@@ -82,20 +84,20 @@
     /**
      * This one should add the save call at the form-view.
      * @todo: add a validator which checks if the reference to the parent form-view is required!
+     * @todo: check this, there are cases where the parent id might be the same (if we create a new sub entity in relation to a parent)
      * @param formView
      */
     JBFormViewAdapterInverseReferenceStrategy.prototype.initialize = function(formView){
         var self = this;
+
         formView.registerComponent({
               registerAt:   function(parent){}
+            , unregisterAt: function(parent){}
             , isValid:      function(){}
-            /**
-             * @todo: set the parent id in the emitted post save task
-             */
             , getSaveCalls: function(){
                 var call = { data: {} };
-                if(self.initialParentId == self.parentId) return [];
-                call[ self.getReferencingFieldName() ] = this.parentId;
+                if(self.initialParentId == self.parentId && angular.isDefined(self.formView.getEntityId())) return [];
+                call.data[ self.getReferencingFieldName() ] = self.parentId;
                 return [ call ];
             }
         });
@@ -119,19 +121,21 @@
     JBFormViewAdapterInverseReferenceStrategy.prototype.beforeSaveTasks = function(){};
 
     JBFormViewAdapterInverseReferenceStrategy.prototype.getReferencingFieldName = function(){
-        return this.optionsData.relationKey;
+        return this.optionsData.remote.property;
     };
     /**
      * Extracts the id of the nested object and extracts the data the form view has to distribute.
      * @todo: how should this work if there is no entity!! check that
      * @param data
      */
-    JBFormViewAdapterInverseReferenceStrategy.prototype.handleGetData = function(data){
+    JBFormViewAdapterInverseReferenceStrategy.prototype.handleGetData = function(data, index){
 
         var   content = (data) ? data[this.formView.getEntityName()] : data
             , id
             , parentId
             , parentIdKey;
+
+        if(angular.isDefined(index)) this.itemIndex = index;
 
         if(content){
             if(content.length) content = this.getEntityFromData(content);
@@ -166,6 +170,15 @@
         return [];
     };
 
+    /**
+     * Inverse Reference (belongs to) handling for nested form views.
+     *
+     * @todo: in the future we probably need to be able to pick a certain element out of the collection (itemIndex)
+     *
+     * @param formView
+     * @constructor
+     */
+
     function JBFormViewAdapter($q, formView){
         this.optionsData    = null;
         this.$q             = $q;
@@ -182,6 +195,11 @@
         parent.registerGetDataHandler(this.handleGetData.bind(this));
     };
 
+    JBFormViewAdapter.prototype.unregisterAt = function(parent){
+        parent.unregisterOptionsDataHandler(this.handleOptionsData);
+        parent.unregisterGetDataHandler(this.handleGetData);
+    };
+
     /**
      * 1. reference:    instantiate a reference strategy
      * 2. belongsTo:    instantiate an inverse reference strategy
@@ -192,16 +210,17 @@
         // the extraction of the options data works as long as there is no alias!
 
         var spec = this.formView.getSpecFromOptionsData(data);
-        if(!spec) return console.error('No options data found for form-viwe %o', this.formView);
+        if(!spec) return console.error('No options data found for form-view %o', this.formView);
 
         this.strategy = this.createViewAdapterStrategy(spec);
         return this.strategy.handleOptionsData(data);
     };
 
     JBFormViewAdapter.prototype.createViewAdapterStrategy = function(options){
-
-        switch(options.originalRelation){
-            case 'belongsTo':
+        switch(options.type){
+            case 'hasManyAndBelongsToMany':
+                return new JBFormViewMappingStrategy(this.formView);
+            case 'hasMany':
                 return new JBFormViewAdapterInverseReferenceStrategy(this.formView);
             case 'hasOne':
             default:
