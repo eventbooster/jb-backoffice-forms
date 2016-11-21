@@ -7,20 +7,19 @@ angular
 .directive( 'jbFormTreeComponent', [ function() {
 
 	return {
-		require				: [ '^detailView', 'backofficeTreeComponent' ]
-		, controller		: 'JBFormJBFormTreeComponentController'
+
+		  controller		: 'JBFormTreeComponentController'
 		, link				: function( scope, element, attrs, ctrl ) {
-			
-			ctrl[ 1 ].init( element, ctrl[ 0 ] );
-		
+			ctrl.init(scope);
 		}
 		, templateUrl		: 'treeTemplate.html'
 		, scope				: {
 			// Filter: When making GET call, filter is applied, e.g id_menu=5. Is needed if 
 			// the nested set is grouped (e.g. menuItems might be grouped by menu). 
 			// If data is stored, filter is passed through POST call to the server; 
-			// { id: 5, children[ { id: 2 } ] } becomes { id: 5, id_menu: 3, children[ { id: 2, id_menu: 3 } ] } 
-			filter			: '=treeComponentFilter'
+			// { id: 5, children[ { id: 2 } ] } becomes { id: 5, id_menu: 3, children[ { id: 2, id_menu: 3 } ] }
+            // @todo: this might not be working due to the isolated scope
+			  filter	    : '=treeComponentFilter'
 			, labelName		: '@treeComponentLabel'
 			, entityName	: '@for'
 			, maxDepth		: '@'
@@ -32,7 +31,15 @@ angular
 } ] )
 
 
-.controller( 'JBFormTreeComponentController', [ '$scope', '$rootScope', '$attrs', '$location', '$q', 'APIWrapperService', function( $scope, $rootScope, $attrs, $location, $q, APIWrapperService ) {
+.controller( 'JBFormTreeComponentController', [
+          '$scope'
+        , '$rootScope'
+        , '$attrs'
+        , '$location'
+        , '$q'
+        , 'APIWrapperService'
+        , 'JBFormComponentsService'
+        , function( $scope, $rootScope, $attrs, $location, $q, APIWrapperService, componentsService ) {
 
 	var self			= this
 		, element
@@ -59,25 +66,26 @@ angular
 
 
 	// Called by link function
-	self.init = function( el, detViewCtrl ) {
+	self.init = function( scope, el, detViewCtrl ) {
 
 		element					= el;
-		detailViewController	= detViewCtrl;
-
-		detailViewController.register( self );
-
-		self.getData();
+		componentsService.registerComponent(scope, self);
 
 	};
 
-
-
+    /*
+     * @todo: check what we need!
+     */
+    self.registerAt = function(parent){
+        parent.registerOptionsDataHandler(self.handleOptionsData);
+        parent.registerGetDataHandler(self.handleGetData);
+    };
 
 	/**
 	* If we get data through the detailViewController (self.select/registerGetDataHandler)
-	* we can't pass a range argument. The menu might be much l
+	* we can't pass a range argument. The menu might be much longer!
 	*/
-	self.getData = function() {
+	self.getData = function(parent) {
 
 		// Create headers
 		var headers = {
@@ -99,10 +107,11 @@ angular
 			, headers		: headers
 		} )
 		.then( function( data ) {
-
+            debugger;
 			self.updateData( data );
 
 		}, function( err ) {
+                debugger;
 			$rootScope.$broadcast( 'notification', {
 				type				: 'error'
 				, message			: 'web.backoffice.detail.loadingError'

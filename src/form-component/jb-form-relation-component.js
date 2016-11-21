@@ -93,6 +93,7 @@
 	// @todo: catch it if the options are not found
 	// @todo: make this method abstract and implement it for the reference as well as the relation
 	JBFormReferenceController.prototype.handleGetData = function (data) {
+        if(this.relationName == 'childEvent') debugger;
 		this.currentData = [];
 		if (data && data[this.relationName]) {
 			var selectedData = data[this.relationName];
@@ -115,7 +116,6 @@
 
 	// @todo: make this method abstract and implement it for reference as well as relation
 	JBFormReferenceController.prototype.getSpec = function(data){
-
 		var relations = (data && data.relations) ? data.relations : [];
 
         if(!relations.length) return;
@@ -123,9 +123,9 @@
         for(var i= 0; i<relations.length; i++){
             var current = relations[i];
             if(this.relationTypes.indexOf(current.type) === -1) continue;
-            if(this.propertyName === current.property)      return current;
-            if(this.entityName === current.remote.resource) return current;
-            if(this.relationName === current.name)          return current;
+            if(current.property && this.propertyName === current.property)              return current;
+            if(current.remote.resource && this.entityName === current.remote.resource)  return current;
+            if(current.name && this.relationName === current.name)                      return current;
         }
 
 	};

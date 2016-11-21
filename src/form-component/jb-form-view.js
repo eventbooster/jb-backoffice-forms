@@ -47,6 +47,7 @@
                  *      , 'entityId'    : '<'
                  *      , 'isRoot'      :
                  *      , 'index'       : '<'
+                 *      , ''
                  *  }
              */
             , scope: true
@@ -66,7 +67,8 @@
             , 'JBFormComponentsService'
             , 'BackofficeAPIWrapperService'
             , 'JBFormViewAdapterService'
-            , function ($scope, $rootScope, $q, $attrs, $filter, $state, APIWrapperService, subcomponentsService, boAPIWrapper, adapterService) {
+            , '$parse'
+            , function ($scope, $rootScope, $q, $attrs, $filter, $state, APIWrapperService, subcomponentsService, boAPIWrapper, adapterService, $parse) {
 
 
             /**
@@ -187,20 +189,30 @@
                 if (self.hasEntityName) {
                     var nameDeferred = $q.defer();
                     promises.push(nameDeferred.promise);
-                    scope.$watch(function(){ return attrs.entityName; } , function (value) {
-                        console.info(value);
-                        if(!value) return;
-                        self.setEntityName(value);
-                        nameDeferred.resolve();
+                    attrs.$observe('entityName', function(content){
+                        var getter = $parse(content);
+                        scope.$parent.$watch(function(){
+                            return getter(scope.$parent);
+                        }, function(value){
+                            if(!value) return;
+                            self.setEntityName(value);
+                            nameDeferred.resolve();
+                        });
                     });
                 }
 
                 if (self.hasEntityId) {
                     var idDeferred = $q.defer();
                     promises.push(idDeferred.promise);
-                    scope.$watch(function(){ return attrs.entityId; }, function (value) {
-                        self.setEntityId(value);
-                        idDeferred.resolve();
+                    attrs.$observe('entityId', function(content){
+                        var getter = $parse(content);
+                        scope.$parent.$watch(function(){
+                            return getter(scope.$parent);
+                        }, function(newValue, oldValue){
+                            if(!newValue) return;
+                            self.setEntityId(newValue);
+                            idDeferred.resolve();
+                        });
                     });
                 }
 

@@ -18,13 +18,13 @@
 	, "license"		: "MIT"
 	, "authors"		: [
 		{ 
-			"name"			: "Felix Steiner"
+			  "name"		: "Felix Steiner"
 			, "email"		: "felix@joinbox.com"
 			, "homepage"	: "http://joinbox.com" 
 		}
 	]
 	, "repository"	: {
-		"type"		: "git"
+		  "type"	: "git"
 		, "url"		: "git://github.com/joinbox/jb-backoffice-forms.git"
 	}
 }
