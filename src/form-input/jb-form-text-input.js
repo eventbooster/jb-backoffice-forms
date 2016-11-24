@@ -3,15 +3,17 @@
 
     var JBFormTextInputController = function ($scope, $attrs, $q, componentsService) {
 
-        this.$scope = $scope;
-        this.$attrs = $attrs;
-        this.name = $attrs['for'];
-        this.$q = $q;
-        this.label =  this.name;
-        this.select = this.name;
-        this.componentsService = componentsService;
-        this.originalData = undefined;
-        this.required = true;
+        this.$scope     = $scope;
+        this.$attrs     = $attrs;
+        this.name       = $attrs['for'];
+        this.$q         = $q;
+        this.label      =  this.name;
+        this.select     = this.name;
+        this.componentsService  = componentsService;
+        this.originalData       = undefined;
+        this.required           = true;
+        this.showLabel          = true;
+        this.isReadonly         = false;
 
         this.options;
     };
@@ -21,7 +23,7 @@
     };
 
     JBFormTextInputController.prototype.isValid = function () {
-        if(this.isRequired()) return !!this.$scope.data.value;
+        if(this.isRequired()) return !!this.value;
         return true;
     };
 
@@ -67,15 +69,16 @@
 
     JBFormTextInputController.prototype.updateData = function (data) {
         if(!data) return;
-        this.originalData = this.$scope.data.value = data[this.name];
+        this.originalData = this.value;
+        this.value = data[this.name];
     };
 
     JBFormTextInputController.prototype.getSaveCalls = function () {
 
-        if (this.originalData === this.$scope.data.value) return [];
+        if (this.originalData === this.value) return [];
 
         var data = {};
-        data[this.name] = this.$scope.data.value;
+        data[this.name] = this.value;
 
         return [{
             data: data
@@ -97,8 +100,10 @@
 
             return {
                   scope : {
-                        label   : '@'
-                      , name    : '@for'
+                        label       : '@'
+                      , name        : '@for'
+                      , isReadonly  : '<'
+                      , showLabel   : '<'
                   }
                 , controllerAs      : '$ctrl'
                 , bindToController  : true
@@ -112,9 +117,14 @@
                 }
                 , controller: 'JBFormTextInputController'
                 , template: '<div class="form-group form-group-sm">' +
-                                '<label jb-form-label-component data-label-identifier="{{$ctrl.label}}" data-is-valid="$ctrl.isValid()" data-is-required="$ctrl.isRequired()"></label>' +
-                                '<div class="col-md-9">' +
-                                    '<input type="text" data-ng-attr-id="data.name" class="form-control input-sm" data-ng-attrs-required="$ctrl.isRequired()" data-ng-model="data.value"/>' +
+                                '<label ng-if="$ctrl.showLabel" jb-form-label-component label-identifier="{{$ctrl.label}}" is-valid="$ctrl.isValid()" is-required="$ctrl.isRequired()"></label>' +
+                                '<div ng-class="{ \'col-md-9\' : $ctrl.showLabel, \'col-md-12\' : !$ctrl.showLabel }" >' +
+                                    '<input type="text" ' +
+                                            'ng-attr-id="$ctrl.name" ' +
+                                            'ng-attrs-required="$ctrl.isRequired()" ' +
+                                            'ng-model="$ctrl.value"' +
+                                            'ng-readonly="$ctrl.isReadonly"' +
+                                            'class="form-control input-sm" />' +
                                 '</div>' +
                             '</div>'
             };

@@ -167,8 +167,11 @@
              */
 
             self.init = function (scope, el, attrs) {
-                var promises = [];
-                element = el;
+                var   promises = []
+                    , element = el
+                    , idGetter
+                    , nameGetter;
+
                 /**
                  * Observe these values.
                  * 1. If there is no entity name and id set, load it from the state, and set the value (is the isRoot property important then?).
@@ -187,32 +190,36 @@
                 self.hasEntityId    = attrs.hasOwnProperty('entityId');
 
                 if (self.hasEntityName) {
-                    var nameDeferred = $q.defer();
+
+                    var   nameDeferred  = $q.defer();
+
+                    nameGetter    = $parse(attrs.entityName);
+
                     promises.push(nameDeferred.promise);
-                    attrs.$observe('entityName', function(content){
-                        var getter = $parse(content);
-                        scope.$parent.$watch(function(){
-                            return getter(scope.$parent);
-                        }, function(value){
-                            if(!value) return;
-                            self.setEntityName(value);
-                            nameDeferred.resolve();
-                        });
+
+                    scope.$watch(function(){
+                        return nameGetter(scope.$parent);
+                    }, function(value){
+                        if(value === 573) debugger;
+                        if(!value) return;
+                        self.setEntityName(value);
+                        nameDeferred.resolve();
                     });
                 }
 
                 if (self.hasEntityId) {
-                    var idDeferred = $q.defer();
+                    var   idDeferred = $q.defer();
+
+                    idGetter     = $parse(attrs.entityId);
+
                     promises.push(idDeferred.promise);
-                    attrs.$observe('entityId', function(content){
-                        var getter = $parse(content);
-                        scope.$parent.$watch(function(){
-                            return getter(scope.$parent);
-                        }, function(newValue, oldValue){
+
+                    scope.$watch(function(){
+                        return idGetter(scope.$parent);
+                    }, function(newValue, oldValue){
                             if(!newValue) return;
                             self.setEntityId(newValue);
                             idDeferred.resolve();
-                        });
                     });
                 }
 
@@ -283,6 +290,7 @@
              * OPTION data
              */
             self.getOptionData = function () {
+                if(self.getEntityName() === 573) debugger;
                 console.log('DetailView: Make OPTIONS call for %o', self.getEntityName());
                 return self
                     .makeOptionRequest('/' + self.getEntityName())

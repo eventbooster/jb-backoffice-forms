@@ -93,7 +93,6 @@
 	// @todo: catch it if the options are not found
 	// @todo: make this method abstract and implement it for the reference as well as the relation
 	JBFormReferenceController.prototype.handleGetData = function (data) {
-        if(this.relationName == 'childEvent') debugger;
 		this.currentData = [];
 		if (data && data[this.relationName]) {
 			var selectedData = data[this.relationName];

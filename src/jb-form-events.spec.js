@@ -97,7 +97,7 @@ describe('jb-form-events', function(){
             expect(service.registerComponent).toBeFunction();
         });
 
-        it('should emit an event on the parent scope if we register a component', function(){
+        /*it('should emit an event on the parent scope if we register a component', function(){
 
             var   mockScope     = $rootScope.$new()
                 , mockComponent = {};
@@ -105,7 +105,7 @@ describe('jb-form-events', function(){
             spyOn($rootScope, '$emit');
             service.registerComponent(mockScope, mockComponent);
             expect($rootScope.$emit).toHaveBeenCalledWith(events.registerComponent, mockComponent);
-        });
+        });*/
 
         it('should expose a method to create a registry', function(){
             expect(service.registryFor).toBeFunction();

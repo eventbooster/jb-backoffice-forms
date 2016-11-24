@@ -1439,7 +1439,6 @@
 	// @todo: catch it if the options are not found
 	// @todo: make this method abstract and implement it for the reference as well as the relation
 	JBFormReferenceController.prototype.handleGetData = function (data) {
-        if(this.relationName == 'childEvent') debugger;
 		this.currentData = [];
 		if (data && data[this.relationName]) {
 			var selectedData = data[this.relationName];
@@ -1803,10 +1802,11 @@
                     this.componentsRegistry
                         .optionsDataHandler(this.optionData)
                         .then(function(success) {
-                            var value = this.componentsRegistry.distributeIndexed(data);
-                            return value;
+                            return this.componentsRegistry.distributeIndexed(data);
+                            //return value;
                         }.bind(this)
                         , function(error) {
+                            console.error(error);
                             debugger;
                         });
                 }.bind(this), 0);
@@ -1839,15 +1839,22 @@
                     ctrl.preLink(scope);
                 }
                 , post: function(scope, element, attrs, ctrl){
-                    attrs.$observe('entityName', function(value){
-                        var accessor = $parse(value);
-                        scope.$watch(function(){
-                            return accessor(scope.$parent);
-                        }, function(newValue){
-                            ctrl.entityName = attrs.entityName;
-                        });
+                    var   nameAccessor       = $parse(attrs.entityName)
+                        , buttonTextAccessor = $parse(attrs.buttonText);
+
+                    scope.$watch(function(){
+                        return nameAccessor(scope.$parent);
+                    }, function(newValue){
+                        ctrl.entityName = newValue;
                     });
-                    //ctrl.entityName = attrs.entityName;
+
+
+                    scope.$watch(function(){
+                        return buttonTextAccessor(scope.$parent);
+                    }, function(newValue){
+                        ctrl.buttonText = newValue;
+                    });
+
                     ctrl.postLink(scope);
 
                     scope.addElement = function(event){
@@ -1858,7 +1865,7 @@
                         ctrl.addElement();
                     };
 
-                    var button = angular.element('<div class="button-group"><button class="btn btn-sm btn-default pull-right" ng-click="addElement($event)">{{ "Add Element" | translate }}</button></div>');
+                    var button = angular.element('<div class="container clearfix"><button class="btn btn-sm btn-default pull-right" ng-click="addElement($event)">{{ $ctrl.buttonText | translate }}</button></div>');
                     element.append(button);
                     $compile(button)(scope);
                 }
@@ -2456,8 +2463,11 @@ angular
              */
 
             self.init = function (scope, el, attrs) {
-                var promises = [];
-                element = el;
+                var   promises = []
+                    , element = el
+                    , idGetter
+                    , nameGetter;
+
                 /**
                  * Observe these values.
                  * 1. If there is no entity name and id set, load it from the state, and set the value (is the isRoot property important then?).
@@ -2476,32 +2486,36 @@ angular
                 self.hasEntityId    = attrs.hasOwnProperty('entityId');
 
                 if (self.hasEntityName) {
-                    var nameDeferred = $q.defer();
+
+                    var   nameDeferred  = $q.defer();
+
+                    nameGetter    = $parse(attrs.entityName);
+
                     promises.push(nameDeferred.promise);
-                    attrs.$observe('entityName', function(content){
-                        var getter = $parse(content);
-                        scope.$parent.$watch(function(){
-                            return getter(scope.$parent);
-                        }, function(value){
-                            if(!value) return;
-                            self.setEntityName(value);
-                            nameDeferred.resolve();
-                        });
+
+                    scope.$watch(function(){
+                        return nameGetter(scope.$parent);
+                    }, function(value){
+                        if(value === 573) debugger;
+                        if(!value) return;
+                        self.setEntityName(value);
+                        nameDeferred.resolve();
                     });
                 }
 
                 if (self.hasEntityId) {
-                    var idDeferred = $q.defer();
+                    var   idDeferred = $q.defer();
+
+                    idGetter     = $parse(attrs.entityId);
+
                     promises.push(idDeferred.promise);
-                    attrs.$observe('entityId', function(content){
-                        var getter = $parse(content);
-                        scope.$parent.$watch(function(){
-                            return getter(scope.$parent);
-                        }, function(newValue, oldValue){
+
+                    scope.$watch(function(){
+                        return idGetter(scope.$parent);
+                    }, function(newValue, oldValue){
                             if(!newValue) return;
                             self.setEntityId(newValue);
                             idDeferred.resolve();
-                        });
                     });
                 }
 
@@ -2572,6 +2586,7 @@ angular
              * OPTION data
              */
             self.getOptionData = function () {
+                if(self.getEntityName() === 573) debugger;
                 console.log('DetailView: Make OPTIONS call for %o', self.getEntityName());
                 return self
                     .makeOptionRequest('/' + self.getEntityName())
@@ -3723,15 +3738,17 @@ angular
 
     var JBFormTextInputController = function ($scope, $attrs, $q, componentsService) {
 
-        this.$scope = $scope;
-        this.$attrs = $attrs;
-        this.name = $attrs['for'];
-        this.$q = $q;
-        this.label =  this.name;
-        this.select = this.name;
-        this.componentsService = componentsService;
-        this.originalData = undefined;
-        this.required = true;
+        this.$scope     = $scope;
+        this.$attrs     = $attrs;
+        this.name       = $attrs['for'];
+        this.$q         = $q;
+        this.label      =  this.name;
+        this.select     = this.name;
+        this.componentsService  = componentsService;
+        this.originalData       = undefined;
+        this.required           = true;
+        this.showLabel          = true;
+        this.isReadonly         = false;
 
         this.options;
     };
@@ -3741,7 +3758,7 @@ angular
     };
 
     JBFormTextInputController.prototype.isValid = function () {
-        if(this.isRequired()) return !!this.$scope.data.value;
+        if(this.isRequired()) return !!this.value;
         return true;
     };
 
@@ -3787,15 +3804,16 @@ angular
 
     JBFormTextInputController.prototype.updateData = function (data) {
         if(!data) return;
-        this.originalData = this.$scope.data.value = data[this.name];
+        this.originalData = this.value;
+        this.value = data[this.name];
     };
 
     JBFormTextInputController.prototype.getSaveCalls = function () {
 
-        if (this.originalData === this.$scope.data.value) return [];
+        if (this.originalData === this.value) return [];
 
         var data = {};
-        data[this.name] = this.$scope.data.value;
+        data[this.name] = this.value;
 
         return [{
             data: data
@@ -3817,8 +3835,10 @@ angular
 
             return {
                   scope : {
-                        label   : '@'
-                      , name    : '@for'
+                        label       : '@'
+                      , name        : '@for'
+                      , isReadonly  : '<'
+                      , showLabel   : '<'
                   }
                 , controllerAs      : '$ctrl'
                 , bindToController  : true
@@ -3832,9 +3852,14 @@ angular
                 }
                 , controller: 'JBFormTextInputController'
                 , template: '<div class="form-group form-group-sm">' +
-                                '<label jb-form-label-component data-label-identifier="{{$ctrl.label}}" data-is-valid="$ctrl.isValid()" data-is-required="$ctrl.isRequired()"></label>' +
-                                '<div class="col-md-9">' +
-                                    '<input type="text" data-ng-attr-id="data.name" class="form-control input-sm" data-ng-attrs-required="$ctrl.isRequired()" data-ng-model="data.value"/>' +
+                                '<label ng-if="$ctrl.showLabel" jb-form-label-component label-identifier="{{$ctrl.label}}" is-valid="$ctrl.isValid()" is-required="$ctrl.isRequired()"></label>' +
+                                '<div ng-class="{ \'col-md-9\' : $ctrl.showLabel, \'col-md-12\' : !$ctrl.showLabel }" >' +
+                                    '<input type="text" ' +
+                                            'ng-attr-id="$ctrl.name" ' +
+                                            'ng-attrs-required="$ctrl.isRequired()" ' +
+                                            'ng-model="$ctrl.value"' +
+                                            'ng-readonly="$ctrl.isReadonly"' +
+                                            'class="form-control input-sm" />' +
                                 '</div>' +
                             '</div>'
             };

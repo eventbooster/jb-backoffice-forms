@@ -83,10 +83,11 @@
                     this.componentsRegistry
                         .optionsDataHandler(this.optionData)
                         .then(function(success) {
-                            var value = this.componentsRegistry.distributeIndexed(data);
-                            return value;
+                            return this.componentsRegistry.distributeIndexed(data);
+                            //return value;
                         }.bind(this)
                         , function(error) {
+                            console.error(error);
                             debugger;
                         });
                 }.bind(this), 0);
@@ -119,15 +120,22 @@
                     ctrl.preLink(scope);
                 }
                 , post: function(scope, element, attrs, ctrl){
-                    attrs.$observe('entityName', function(value){
-                        var accessor = $parse(value);
-                        scope.$watch(function(){
-                            return accessor(scope.$parent);
-                        }, function(newValue){
-                            ctrl.entityName = attrs.entityName;
-                        });
+                    var   nameAccessor       = $parse(attrs.entityName)
+                        , buttonTextAccessor = $parse(attrs.buttonText);
+
+                    scope.$watch(function(){
+                        return nameAccessor(scope.$parent);
+                    }, function(newValue){
+                        ctrl.entityName = newValue;
                     });
-                    //ctrl.entityName = attrs.entityName;
+
+
+                    scope.$watch(function(){
+                        return buttonTextAccessor(scope.$parent);
+                    }, function(newValue){
+                        ctrl.buttonText = newValue;
+                    });
+
                     ctrl.postLink(scope);
 
                     scope.addElement = function(event){
@@ -138,7 +146,7 @@
                         ctrl.addElement();
                     };
 
-                    var button = angular.element('<div class="button-group"><button class="btn btn-sm btn-default pull-right" ng-click="addElement($event)">{{ "Add Element" | translate }}</button></div>');
+                    var button = angular.element('<div class="container clearfix"><button class="btn btn-sm btn-default pull-right" ng-click="addElement($event)">{{ $ctrl.buttonText | translate }}</button></div>');
                     element.append(button);
                     $compile(button)(scope);
                 }
