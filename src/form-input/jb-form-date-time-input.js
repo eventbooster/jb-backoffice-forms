@@ -24,7 +24,7 @@
     };
 
     JBFormDateTimeInputController.prototype.isValid = function () {
-        if (this.isRequired()) return !!this.date;
+        if(this.isRequired() && !this.isReadonly) return !!this.value && isNaN(this.value.getTime());
         return true;
     };
 
@@ -59,11 +59,13 @@
         } // else, date was deleted
         call.data[this.name] = dateString;
         return [call];
-
     };
 
     JBFormDateTimeInputController.prototype.init = function (scope) {
         this.subcomponentsService.registerComponent(scope, this);
+        if(angular.isUndefined(this.showLabel)){
+            this.showLabel = true;
+        }
     };
 
     JBFormDateTimeInputController.prototype.registerAt = function (parent) {
@@ -91,12 +93,12 @@
         if (!spec) return console.error('JBFormDateTimeInputController: No field spec for %o', this.name);
 
         this.required       = spec.nullable === false;
-        this.time           = spec.type === 'datetime';
-        this.showDate       = spec.type !== 'time';
-    };
+        this.isReadonly     = this.isReadonly === true || spec.readonly === true;
 
-    JBFormDateTimeInputController.prototype.showTime = function () {
-        return this.time;
+        /*this.showDate       = spec.type !== 'time';
+        this.showTime       = spec.type === 'datetime' || spec.type === 'time';*/
+        this.showDate = true;
+        this.showTime = true;
     };
 
     var _module = angular.module('jb.formComponents');
@@ -104,8 +106,10 @@
 
         return {
               scope : {
-                    label : '@'
-                  , name  : '@for'
+                    label       : '@'
+                  , name        : '@for'
+                  , showLabel   : '<'
+                  , isReadonly  : '<'
               }
             , controller        : 'JBFormDateTimeInputController'
             , bindToController  : true
@@ -115,12 +119,16 @@
             }
             , template:
                 '<div class="form-group form-group-sm">' +
-                    '<label jb-form-label-component data-label-identifier="{{$ctrl.label}}" data-is-required="$ctrl.isRequired()" data-is-valid="$ctrl.isValid()"></label>' +
-                    '<div data-ng-class="{ \'col-md-9\': !$ctrl.showTime(), \'col-md-5\': $ctrl.showTime() }">' +
-                        '<input type="date" class="form-control input-sm input-date" data-ng-model="$ctrl.date">' +
-                    '</div>' +
-                    '<div class="col-md-4" data-ng-if="$ctrl.showTime()">' +
-                        '<input type="time" class="form-control input-sm input-time" data-ng-model="$ctrl.date" />' +
+                    '<label ng-if="$ctrl.showLabel" jb-form-label-component label-identifier="{{$ctrl.label}}" is-required="$ctrl.isRequired()" is-valid="$ctrl.isValid()"></label>' +
+                    '<div ng-class="{\'col-md-9\' : $ctrl.showLabel, \'col-md-12\': !ctrl.showLabel }">' +
+                        '<div class="row">' +
+                            '<div ng-if="$ctrl.showDate" ng-class="{ \'col-md-6\': $ctrl.showTime, \'col-md-12\': !$ctrl.showTime }">' +
+                                '<input type="date" class="form-control input-sm input-date" data-ng-model="$ctrl.date" ng-disabled="$ctrl.isReadonly">' +
+                            '</div>' +
+                            '<div ng-if="$ctrl.showTime" ng-class="{ \'col-md-6\': $ctrl.showDate, \'col-md-12\': !$ctrl.showDate }">' +
+                                '<input type="time" class="form-control input-sm input-time" data-ng-model="$ctrl.date" ng-disabled="$ctrl.isReadonly"/>' +
+                            '</div>' +
+                        '</div>' +
                     '</div>' +
                 '</div>'
         };

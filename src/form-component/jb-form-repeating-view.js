@@ -56,16 +56,23 @@
         parent.unregisterGetDataHandler(this.handleGetData);
     };
 
+    /*
+     * Due to the fact that the inner entities are usually included in an ng-repat directive, we need to make
+     * sure that at least one view was rendered.
+     */
     JBFormRepeatingViewController.prototype.handleOptionsData = function(optionsData){
         this.optionData = optionsData;
-        return this.componentsRegistry.optionsDataHandler(optionsData);
+        return this.$timeout(function(){
+            return this.componentsRegistry.optionsDataHandler(optionsData);
+        }.bind(this));
+
     };
     // We assume that the data we got delivered is an array?
     // now we should add a new copy of the inner view to all
     // @todo: use arrow functions
     // @todo: do we need to trigger two digests to be sure that all sub views are unlinked?
     JBFormRepeatingViewController.prototype.handleGetData = function(data){
-        this.$timeout(function(){
+        return this.$timeout(function(){
             this.entities.splice(0);
         }.bind(this), 0)
             .then(function(){
@@ -88,7 +95,6 @@
                         }.bind(this)
                         , function(error) {
                             console.error(error);
-                            debugger;
                         });
                 }.bind(this), 0);
             }.bind(this));
@@ -97,7 +103,7 @@
     JBFormRepeatingViewController.prototype.addElement = function(){
         this.entities.push({});
         this.$timeout(function(){
-            this.componentsRegistry.optionsDataHandler(this.optionData);
+            return this.componentsRegistry.optionsDataHandler(this.optionData);
         }.bind(this));
     };
 
@@ -116,24 +122,20 @@
             , controllerAs      : '$ctrl'
             , controller        : 'JBFormRepeatingViewController'
             , link              : {
-                pre: function(scope, element, attrs, ctrl){
+
+                  pre: function(scope, element, attrs, ctrl){
                     ctrl.preLink(scope);
                 }
-                , post: function(scope, element, attrs, ctrl){
-                    var   nameAccessor       = $parse(attrs.entityName)
-                        , buttonTextAccessor = $parse(attrs.buttonText);
 
-                    scope.$watch(function(){
-                        return nameAccessor(scope.$parent);
-                    }, function(newValue){
+                , post: function(scope, element, attrs, ctrl){
+
+                    attrs.$observe('entityName', function(newValue){
                         ctrl.entityName = newValue;
                     });
 
-
-                    scope.$watch(function(){
-                        return buttonTextAccessor(scope.$parent);
-                    }, function(newValue){
+                    attrs.$observe('buttonText', function(newValue){
                         ctrl.buttonText = newValue;
+                        scope.buttonText = newValue;
                     });
 
                     ctrl.postLink(scope);
@@ -146,9 +148,9 @@
                         ctrl.addElement();
                     };
 
-                    var button = angular.element('<div class="container clearfix"><button class="btn btn-sm btn-default pull-right" ng-click="addElement($event)">{{ $ctrl.buttonText | translate }}</button></div>');
+                    /*var button = angular.element('<div class="container clearfix"><button class="btn btn-sm btn-default pull-right" ng-click="addElement($event)">{{ $ctrl.buttonText | translate }}</button></div>');
                     element.append(button);
-                    $compile(button)(scope);
+                    $compile(button)(scope);*/
                 }
             }
         }

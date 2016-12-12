@@ -5,10 +5,11 @@
     var _module = angular.module('jb.formComponents');
 
     function JBFormViewAdapterReferenceStrategy(formView){
-        this.formView    = formView;
-        this.optionsData = null;
-        this.initialId   = null;
-        this.parentOptionsData = null;
+        this.formView           = formView;
+        this.optionsData        = null;
+        this.initialId          = null;
+        this.parentOptionsData  = null;
+        this.isDeleted          = false;
     }
 
     JBFormViewAdapterReferenceStrategy.prototype.handleOptionsData = function(data){
@@ -53,6 +54,16 @@
 
     JBFormViewAdapterReferenceStrategy.prototype.getSaveCalls = function(){
 
+        if(this.isDeleted && !this.formView.isNew()) {
+            return [{
+                  method    : 'delete'
+                , url       : {
+                      path          : [this.formView.getEntityName(), this.formView.getEntityId()].join('/')
+                    , mainEntity    : 'append'
+                }
+            }]
+        }
+
         var   calls    = this.formView.generateSaveCalls()
             , call     = {};
 
@@ -61,6 +72,10 @@
         call.data   = {};
         call.data[ this.getReferencingFieldName() ] = this.formView.getEntityId();
         return [ call ].concat(calls);
+    };
+
+    JBFormViewAdapterReferenceStrategy.prototype.storeDeleteRequest = function(){
+        this.isDeleted = true;
     };
 
     /**
@@ -78,6 +93,7 @@
         this.parentId           = null;
         this.parentOptionsData  = null;
         this.itemIndex          = 0;
+        this.isDeleted          = false;
         this.initialize(formView);
     }
 
@@ -118,7 +134,9 @@
         return this.formView.makeSaveRequest();
     };
 
-    JBFormViewAdapterInverseReferenceStrategy.prototype.beforeSaveTasks = function(){};
+    JBFormViewAdapterInverseReferenceStrategy.prototype.beforeSaveTasks = function(){
+
+    };
 
     JBFormViewAdapterInverseReferenceStrategy.prototype.getReferencingFieldName = function(){
         return this.optionsData.remote.property;
@@ -170,6 +188,97 @@
         return [];
     };
 
+    JBFormViewAdapterInverseReferenceStrategy.prototype.storeDeleteRequest = function(){
+        this.isDeleted = true;
+    };
+
+    function JBFormViewMappingStrategy(formView){
+        this.formView           = formView;
+        this.optionsData        = null;
+        this.initialParentId    = null;
+        this.parentId           = null;
+        this.parentOptionsData  = null;
+        this.rootEntity         = null;
+        this.itemIndex          = 0;
+        this.initialize(formView);
+    }
+
+    JBFormViewMappingStrategy.prototype.initialize = function(formView){
+        var self = this;
+    };
+
+    JBFormViewMappingStrategy.prototype.handleOptionsData = function(data){
+        this.optionsData        = this.formView.getSpecFromOptionsData(data);
+        this.parentOptionsData  = data;
+        this.rootEntity         = data.resource;
+        return this.formView.getOptionsData();
+    };
+
+    JBFormViewMappingStrategy.prototype.getReferencingFieldName = function(){
+        return this.optionsData.remote.property;
+    };
+
+    JBFormViewMappingStrategy.prototype.handleGetData = function(data, index){
+
+        var   content = (data) ? data[this.formView.getEntityName()] : data
+            , id
+            , parentId
+            , parentIdKey;
+
+        if(angular.isDefined(index)) this.itemIndex = index;
+
+        if(content){
+            if(content.length) content = this.getEntityFromData(content);
+            parentIdKey = this.formView.getIdFieldFrom(this.parentOptionsData);
+            id          = this.formView.getOwnId(content);
+            parentId    = data[ parentIdKey ];
+        }
+
+        this.initialParentId = parentId;
+        this.formView.setEntityId(id);
+
+        return this.formView.distributeData(content);
+    };
+
+    JBFormViewMappingStrategy.prototype.isValid = function(){
+        // add the referenced property name to the selects
+        return this.formView.isValid();
+    };
+
+    JBFormViewMappingStrategy.prototype.getSelectFields = function(){
+        var   selects = this.formView.getSelectParameters().map(function (select) {
+            return [this.formView.getEntityName(), select].join('.');
+        }.bind(this));
+        return selects;
+    };
+
+    JBFormViewMappingStrategy.prototype.afterSaveTasks = function(id){
+        /*this.parentId = id;
+        return this.formView.makeSaveRequest();*/
+    };
+
+    JBFormViewMappingStrategy.prototype.beforeSaveTasks = function(){
+        return this.formView.makeSaveRequest();
+    };
+
+    JBFormViewMappingStrategy.prototype.getSaveCalls = function(){
+        //if(this.deleteRequest) return [this.deleteRequest];
+        return [];
+    };
+
+    JBFormViewMappingStrategy.prototype.storeDeleteRequest = function(){
+        if(!this.formView.isNew()){
+            this.deleteRequest = {
+                method: 'delete'
+                , url: {
+                    path       : [ this.formView.getEntityName(), this.formView.getEntityId() ].join('/')
+                    , mainEntity : 'append'
+                }
+            };
+        }
+        this.formView.unlink();
+    };
+
     /**
      * Inverse Reference (belongs to) handling for nested form views.
      *
@@ -208,7 +317,6 @@
      */
     JBFormViewAdapter.prototype.handleOptionsData = function(data){
         // the extraction of the options data works as long as there is no alias!
-
         var spec = this.formView.getSpecFromOptionsData(data);
         if(!spec) return console.error('No options data found for form-view %o', this.formView);
 
@@ -232,8 +340,8 @@
      * 1. reference:    pass the data
      * 2. belongsTo:    pass the first object
      */
-    JBFormViewAdapter.prototype.handleGetData = function(data){
-        return this.strategy.handleGetData(data);
+    JBFormViewAdapter.prototype.handleGetData = function(data, index){
+        return this.strategy.handleGetData(data, index);
     };
 
     /**
@@ -256,8 +364,12 @@
         return this.strategy.getSelectFields();
     };
 
+    JBFormViewAdapter.prototype.storeDeleteRequest = function(){
+        return this.strategy.storeDeleteRequest();
+    };
+
     JBFormViewAdapter.prototype.isValid = function(){
-        return this.strategy && this.strategy.isValid();
+        return this.formView.isReadonly || (this.strategy && this.strategy.isValid());
     };
 
     _module.factory('JBFormViewAdapterService', [

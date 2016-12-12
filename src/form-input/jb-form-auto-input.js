@@ -28,7 +28,7 @@
         , 'date'    : 'date-time'
     });
 
-    _module.directive('jbFormAutoInput', ['$compile', function ($compile) {
+    _module.directive('jbFormAutoInput', ['$compile', '$parse', function ($compile, $parse) {
 
         return {
               controllerAs      : '$ctrl'
@@ -36,6 +36,30 @@
             , restrict          : 'E'
             , link : {
                 post: function (scope, element, attrs, ctrl) {
+
+                    var readonlyGetter;
+
+                    attrs.$observe('label', function(newValue){
+                        ctrl.label = newValue;
+                    });
+                    attrs.$observe('for', function(newValue){
+                        ctrl.name = newValue;
+                    });
+
+                    attrs.$observe('showLabel', function(newValue){
+                        ctrl.showLabel = newValue !== 'false';
+                    });
+
+                    if(attrs.hasOwnProperty('isReadonly')){
+                        readonlyGetter = $parse(attrs.isReadonly);
+                        scope.$watch(function(){
+                            return readonlyGetter(scope.$parent);
+                        },
+                        function(newValue){
+                            ctrl.isReadonly = newValue;
+                        })
+                    }
+
                     ctrl.init(scope, element, attrs);
                 }
                 , pre: function (scope, element, attrs, ctrl) {
@@ -43,9 +67,7 @@
                 }
             }
             , controller        : 'JBFormAutoInputController'
-            , scope             : {
-                  label :  '@'
-            }
+            , scope             : true
         };
     }]);
 
@@ -113,10 +135,10 @@
                 return '-' + v.toLowerCase();
             });
             // this is not cool!
-            var newElement = angular.element('<div jb-form-' + dashedCasedElementType + '-input for="' + this.name + '" label="' + this.label + '"></div>');
+            var newElement = angular.element('<div jb-form-' + dashedCasedElementType + '-input for="{{$ctrl.name}}" label="{{$ctrl.label}}" is-readonly="$ctrl.isReadonly" show-label="$ctrl.showLabel"></div>');
             // @todo: not sure if we still need to prepend the new element when we actually just inject the registry
-            this.element.replaceWith(newElement);
             this.registry.unregisterOptionsDataHandler(this.updateElement);
+            this.element.replaceWith(newElement);
             this.$compile(newElement)(this.$scope);
             // now the registry should know all the subcomponents
             // delegate to the options data handlers of the components

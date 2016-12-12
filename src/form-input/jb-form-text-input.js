@@ -5,15 +5,10 @@
 
         this.$scope     = $scope;
         this.$attrs     = $attrs;
-        this.name       = $attrs['for'];
         this.$q         = $q;
-        this.label      =  this.name;
-        this.select     = this.name;
         this.componentsService  = componentsService;
         this.originalData       = undefined;
         this.required           = true;
-        this.showLabel          = true;
-        this.isReadonly         = false;
 
         this.options;
     };
@@ -22,8 +17,12 @@
         return this.required === true;
     };
 
+    /**
+     * @todo: check if the readonly property should influence the behavior
+     * @returns {boolean}
+     */
     JBFormTextInputController.prototype.isValid = function () {
-        if(this.isRequired()) return !!this.value;
+        if(this.isRequired() && !this.isReadonly) return !!this.value;
         return true;
     };
 
@@ -51,31 +50,33 @@
     JBFormTextInputController.prototype.handleOptionsData = function(data){
         var spec = this.selectOptions(data);
         if(!angular.isDefined(spec)) return console.error('No options data available for text-field %o', this.name);
-        this.options  = spec;
-        this.required = spec.nullable === false;
+        this.options    = spec;
+        this.required   = spec.nullable === false;
+        this.isReadonly = this.isReadonly === true || spec.readonly === true;
     };
 
     JBFormTextInputController.prototype.init = function (scope) {
         this.componentsService.registerComponent(scope, this);
+        if(angular.isUndefined(this.showLabel)){
+            this.showLabel = true;
+        }
     };
 
     JBFormTextInputController.prototype.preLink = function (scope) {
-        scope.data = {
-              name: this.name
-            , value: undefined
-            , valid: false
-        };
+    };
+
+    JBFormTextInputController.prototype.getSelectFields = function(){
+        return [this.name];
     };
 
     JBFormTextInputController.prototype.updateData = function (data) {
-        if(!data) return;
         this.originalData = this.value;
-        this.value = data[this.name];
+        this.value = data ? data[this.name] : data;
     };
 
     JBFormTextInputController.prototype.getSaveCalls = function () {
 
-        if (this.originalData === this.value) return [];
+        if (this.originalData === this.value || this.isReadonly) return [];
 
         var data = {};
         data[this.name] = this.value;
@@ -102,8 +103,8 @@
                   scope : {
                         label       : '@'
                       , name        : '@for'
-                      , isReadonly  : '<'
-                      , showLabel   : '<'
+                      , isReadonly  : '<?'
+                      , showLabel   : '<?'
                   }
                 , controllerAs      : '$ctrl'
                 , bindToController  : true
@@ -123,7 +124,7 @@
                                             'ng-attr-id="$ctrl.name" ' +
                                             'ng-attrs-required="$ctrl.isRequired()" ' +
                                             'ng-model="$ctrl.value"' +
-                                            'ng-readonly="$ctrl.isReadonly"' +
+                                            'ng-disabled="$ctrl.isReadonly"' +
                                             'class="form-control input-sm" />' +
                                 '</div>' +
                             '</div>'

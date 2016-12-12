@@ -15,7 +15,12 @@
      */
 
     var _module = angular.module('jb.formComponents');
-
+    /*
+     * @todo: add a readonly mode
+     * @todo: prevent the user from seeing stuff it is not able to!
+     * @todo: catch 404 errors and add an error state
+     * @todo: add a loader
+    */
     _module.directive('jbFormView', ['$compile', function ($compile) {
 
         return {
@@ -47,7 +52,7 @@
                  *      , 'entityId'    : '<'
                  *      , 'isRoot'      :
                  *      , 'index'       : '<'
-                 *      , ''
+                 *      , 'isReadonly'  : '<'
                  *  }
              */
             , scope: true
@@ -90,10 +95,6 @@
             $scope.$watchGroup(['$ctrl.entityName', '$ctrl.entityId'], function () {
                 self.setTitle();
             });
-
-            /*$scope.$watch(function(){
-                return self.index
-            })*/
 
             /**
              * Set up the registry waiting for subcomponents in the pre-link phase.
@@ -143,7 +144,7 @@
                 var   titleSuffix = self.getEntityName()
                     , titlePrefix = $filter('translate')('web.backoffice.create');
 
-                if (self.entityId) {
+                if (!self.isNew()) {
                     titlePrefix = $filter('translate')('web.backoffice.edit');
                     titleSuffix = titleSuffix + ' #'+ self.entityId;
                 }
@@ -169,8 +170,7 @@
             self.init = function (scope, el, attrs) {
                 var   promises = []
                     , element = el
-                    , idGetter
-                    , nameGetter;
+                    , readonlyGetter;
 
                 /**
                  * Observe these values.
@@ -185,52 +185,56 @@
                 // @todo: bind this shit to the controller
                 self.setEntityId(undefined);
 
-                self.isRoot         = attrs.hasOwnProperty('isRoot');
-                self.hasEntityName  = attrs.hasOwnProperty('entityName');
-                self.hasEntityId    = attrs.hasOwnProperty('entityId');
+                self.isRoot             = attrs.hasOwnProperty('isRoot');
+                self.hasEntityName      = attrs.hasOwnProperty('entityName');
+                self.hasEntityId        = attrs.hasOwnProperty('entityId');
+                self.hasReadonlyFlag    = attrs.hasOwnProperty('isReadonly');
 
                 if (self.hasEntityName) {
 
                     var   nameDeferred  = $q.defer();
-
-                    nameGetter    = $parse(attrs.entityName);
-
                     promises.push(nameDeferred.promise);
-
-                    scope.$watch(function(){
-                        return nameGetter(scope.$parent);
-                    }, function(value){
-                        if(value === 573) debugger;
-                        if(!value) return;
-                        self.setEntityName(value);
+                    attrs.$observe('entityName', function(newValue){
+                        if(!newValue) return;
+                        self.setEntityName(newValue);
                         nameDeferred.resolve();
                     });
                 }
 
                 if (self.hasEntityId) {
                     var   idDeferred = $q.defer();
-
-                    idGetter     = $parse(attrs.entityId);
-
                     promises.push(idDeferred.promise);
-
-                    scope.$watch(function(){
-                        return idGetter(scope.$parent);
-                    }, function(newValue, oldValue){
+                    attrs.$observe('entityId', function(newValue){
                             if(!newValue) return;
-                            self.setEntityId(newValue);
+                            if(newValue !== 'new') self.setEntityId(newValue);
                             idDeferred.resolve();
                     });
                 }
-
                 if (!self.hasEntityName && !self.hasEntityId) {
                     var stateParams = self.parseUrl();
                     self.setEntityName(stateParams.name);
                     self.setEntityId(stateParams.id);
                 }
-                // register myself as a component to possible parents
 
-                self.componentsService.registerComponent(scope, self.adapterService.getAdapter(this));
+                if(self.hasReadonlyFlag) {
+                    readonlyGetter = $parse(attrs.isReadonly);
+                    scope.$watch(function(){
+                        return readonlyGetter(scope.$parent);
+                    }, function(value){
+                        if(value === true || value === false){
+                            self.isReadonly = value;
+                            if(value === true) {
+                                element.addClass('jb-form-readonly');
+                            }
+                        }
+                    });
+                }
+
+
+                // register myself as a component to possible parents
+                self.adapter = self.adapterService.getAdapter(this);
+                self.componentsService.registerComponent(scope, self.adapter);
+
                 // @todo: store the promises otherwise and chain them as soon as the option handler is invoked (to make shure all data is available)
                 $q.all(promises).then(function () {
                     // load option data if we are root
@@ -267,10 +271,17 @@
             /**
              * This is shitty! We need to load more options data as soon as we receive the options to to be able to
              * distribute options to the nested fields.
+             *
              * @param fields
              */
             self.internallyHandleOptionsData = function (data) {
                 self.optionData = data;
+
+                if(data.permissions.update === false){
+                    data.properties.forEach(function(property){
+                        property.readonly = true;
+                    });
+                }
                 return self.componentsRegistry.optionsDataHandler(data);
             };
 
@@ -278,7 +289,7 @@
                 return self.getOptionData();
             };
 
-            self.getSpecFromOptionsData = function(data){
+            self.getSpecFromOptionsData = function(data) {
                 var relations = (data && data.relations && data.relations.length) ? data.relations : [];
                 for(var i = 0; i < relations.length; i++){
                     var relation = relations[i];
@@ -290,7 +301,6 @@
              * OPTION data
              */
             self.getOptionData = function () {
-                if(self.getEntityName() === 573) debugger;
                 console.log('DetailView: Make OPTIONS call for %o', self.getEntityName());
                 return self
                     .makeOptionRequest('/' + self.getEntityName())
@@ -376,7 +386,6 @@
              * Gets current entity's data through GET call
              */
             self.makeGetRequest = function () {
-
                 var   url       = self.getEntityUrl()
                     , select    = self.getSelectParameters();
 
@@ -400,7 +409,12 @@
             //
             // Save
             //
-
+            $scope.edit = function(){
+                $state.go('app.detail', {
+                      entityName    : self.getEntityName()
+                    , entityId      : self.isNew() ? 'new' : self.getEntityId()
+                });
+            };
             /**
              * Called when user clicks 'save'. Can be called manually through scope().
              *
@@ -424,7 +438,7 @@
                 /*var returnValue = {
                  id: undefined
                  };*/
-
+                if(self.isReadonly) return;
                 return self
                     .makeSaveRequest(self.registeredComponents, self.getEntityName())
                     .then(function (entityId) {
@@ -472,6 +486,7 @@
              */
             self.makeSaveRequest = function () {
                 if (!self.isValid()) return $q.reject(new Error('Not all required fields filled out.'));
+                if(self.isReadonly) return $q.when();
 
                 // Pre-save tasks (upload images)
                 return self.executePreSaveTasks()
@@ -850,6 +865,7 @@
              * - a Promise
              */
             self.generateSaveCalls = function () {
+                if(self.isReadonly) return [];
                 var saveCalls = self.componentsRegistry.getSaveCalls().reduce(function (calls, componentCalls) {
                     self.addCall(componentCalls, calls);
                     return calls;
@@ -862,10 +878,14 @@
             //
             // DELETE
             //
+            self.unlink = function(){
+                return $scope.$destroy();
+            };
 
             /**
              * Deletes the entity.
              * @todo: the redirection should not be a matter of the detail-view itself, if we have nested detail
+             * todo: let the adapter do the delete requests it is aware of the context of the entity and can trigger all the delete requests correctly
              * @param <Boolean> nonInteractive        True if user should not be redirected to main view
              */
             $scope.delete = function (event, nonInteractive) {
@@ -895,8 +915,8 @@
                             $state.go('app.list', {entityName: self.getEntityName()});
 
                             $rootScope.$broadcast('notification', {
-                                type: 'success'
-                                , message: 'web.backoffice.detail.deleteSuccess'
+                                  type      : 'success'
+                                , message   : 'web.backoffice.detail.deleteSuccess'
                             });
 
                         }
@@ -908,9 +928,9 @@
 
                         if (!nonInteractive) {
                             $rootScope.$broadcast('notification', {
-                                type: 'error'
-                                , message: 'web.backoffice.detail.deleteError'
-                                , variables: {
+                                  type      : 'error'
+                                , message   : 'web.backoffice.detail.deleteError'
+                                , variables : {
                                     errorMessage: err
                                 }
                             });
@@ -925,6 +945,8 @@
 
             /**
              * Delete an entity
+             *
+             * todo: only delete the entity directly if it is a root entry, otherwise delegate it to the adapter!
              */
             self.makeDeleteRequest = function () {
 
@@ -937,7 +959,7 @@
                     });
                 }
                 return promise.then(function(){
-                    return $scope.$destroy();
+                    return self.unlink();
                 });
             };
 

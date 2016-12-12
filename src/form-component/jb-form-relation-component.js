@@ -29,10 +29,12 @@
 					, 'entityName'      : '@entity'
 					, 'relationName'    : '@relation'
 					, 'label'           : '@'
+					, 'showLabel'		: '<?'
 					, 'suggestion'      : '@suggestionTemplate'
 					, 'searchField'     : '@'
 					, 'changeHandler'   : '&'
                     , 'filters'         : '<'
+					, 'interactive'		: '<isInteractive'
 				}
 			};
 		};
@@ -72,6 +74,7 @@
 	JBFormReferenceController.prototype.preLink = function () {};
 
 	JBFormReferenceController.prototype.postLink = function (scope, element, attrs) {
+	    if(angular.isUndefined(this.showLabel)) this.showLabel = true;
 		this.subcomponentsService.registerComponent(scope, this);
 		this.element = element;
 	};
@@ -92,6 +95,7 @@
 
 	// @todo: catch it if the options are not found
 	// @todo: make this method abstract and implement it for the reference as well as the relation
+
 	JBFormReferenceController.prototype.handleGetData = function (data) {
 		this.currentData = [];
 		if (data && data[this.relationName]) {
@@ -165,8 +169,8 @@
 		var template = angular.element(this.$templateCache.get('referenceComponentTemplate.html'));
 		template
 			.find( '[relation-input]')
-			.attr( 'relation-entity-endpoint', this.getEndpoint() )
-			.attr( 'relation-interactive', this.isInteractive() )
+			.attr( 'relation-entity-endpoint'	, this.getEndpoint() )
+			.attr( 'relation-interactive'		, '$ctrl.isInteractive()' )
 			// deleteable is evaluated by the directive, nevertheless i don't like that since it is likely to break.
 			.attr( 'deletable', '$ctrl.isDeletable()' )
 			.attr( 'relation-entity-search-field', this.getSearchField() )
@@ -185,7 +189,8 @@
 	};
 
 	JBFormReferenceController.prototype.isInteractive = function(){
-		return true;
+	    console.info(this.interactive);
+		return angular.isDefined(this.interactive) ? this.interactive : true;
 	};
 
 	JBFormReferenceController.prototype.isDeletable = function(){
@@ -366,8 +371,13 @@
 	_module.run(['$templateCache', function ($templateCache) {
 		$templateCache.put('referenceComponentTemplate.html',
 			'<div class="form-group">' +
-			    '<label jb-form-label-component label-identifier="{{$ctrl.getLabel()}}" is-required="$ctrl.isRequired()" is-valid="$ctrl.isValid()"></label>' +
-			    '<div relation-input class="relation-select col-md-9"></div>' +
+			    '<label jb-form-label-component ' +
+						'label-identifier="{{$ctrl.getLabel()}}" ' +
+						'is-required="$ctrl.isRequired()" ' +
+						'is-valid="$ctrl.isValid()" ' +
+						'ng-if="$ctrl.showLabel">' +
+				'</label>' +
+			    '<div relation-input class="relation-select" ng-class="{ \'col-md-9\' : $ctrl.showLabel , \'col-md-12\' : !$ctrl.showLabel }"></div>' +
 			'</div>');
 	}]);
 })();

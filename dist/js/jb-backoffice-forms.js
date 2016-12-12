@@ -97,6 +97,7 @@
 
     JBFormComponentsRegistry.prototype.getSaveCalls = function(){
         return this.registeredComponents.reduce(function(calls, component){
+            if(!angular.isFunction(component.getSaveCalls)) debugger;
             var subcalls = component.getSaveCalls();
             return calls.concat(subcalls);
         }, []);
@@ -211,8 +212,9 @@
         'JBFormComponentsService' ,
         [
             '$q' ,
+            '$parse',
             'jbFormEvents' ,
-            function($q, formEvents){
+            function($q, $parse, formEvents){
                 return {
                     registryFor   : function(scope){
                         var registry = new JBFormComponentsRegistry($q, formEvents, scope);
@@ -1165,7 +1167,7 @@
         if(!spec) return console.error('No OPTIONS data found in locale component.');
 
         this.options    = spec;
-        this.loadFields().then(function(fields){
+        return this.loadFields().then(function(fields){
             this.$timeout(function(){
                 this.fieldDefinitions = this.filterFields(fields);
                 this.fields = Object.keys(this.fieldDefinitions);
@@ -1375,10 +1377,12 @@
 					, 'entityName'      : '@entity'
 					, 'relationName'    : '@relation'
 					, 'label'           : '@'
+					, 'showLabel'		: '<?'
 					, 'suggestion'      : '@suggestionTemplate'
 					, 'searchField'     : '@'
 					, 'changeHandler'   : '&'
                     , 'filters'         : '<'
+					, 'interactive'		: '<isInteractive'
 				}
 			};
 		};
@@ -1418,6 +1422,7 @@
 	JBFormReferenceController.prototype.preLink = function () {};
 
 	JBFormReferenceController.prototype.postLink = function (scope, element, attrs) {
+	    if(angular.isUndefined(this.showLabel)) this.showLabel = true;
 		this.subcomponentsService.registerComponent(scope, this);
 		this.element = element;
 	};
@@ -1438,6 +1443,7 @@
 
 	// @todo: catch it if the options are not found
 	// @todo: make this method abstract and implement it for the reference as well as the relation
+
 	JBFormReferenceController.prototype.handleGetData = function (data) {
 		this.currentData = [];
 		if (data && data[this.relationName]) {
@@ -1511,8 +1517,8 @@
 		var template = angular.element(this.$templateCache.get('referenceComponentTemplate.html'));
 		template
 			.find( '[relation-input]')
-			.attr( 'relation-entity-endpoint', this.getEndpoint() )
-			.attr( 'relation-interactive', this.isInteractive() )
+			.attr( 'relation-entity-endpoint'	, this.getEndpoint() )
+			.attr( 'relation-interactive'		, '$ctrl.isInteractive()' )
 			// deleteable is evaluated by the directive, nevertheless i don't like that since it is likely to break.
 			.attr( 'deletable', '$ctrl.isDeletable()' )
 			.attr( 'relation-entity-search-field', this.getSearchField() )
@@ -1531,7 +1537,8 @@
 	};
 
 	JBFormReferenceController.prototype.isInteractive = function(){
-		return true;
+	    console.info(this.interactive);
+		return angular.isDefined(this.interactive) ? this.interactive : true;
 	};
 
 	JBFormReferenceController.prototype.isDeletable = function(){
@@ -1712,8 +1719,13 @@
 	_module.run(['$templateCache', function ($templateCache) {
 		$templateCache.put('referenceComponentTemplate.html',
 			'<div class="form-group">' +
-			    '<label jb-form-label-component label-identifier="{{$ctrl.getLabel()}}" is-required="$ctrl.isRequired()" is-valid="$ctrl.isValid()"></label>' +
-			    '<div relation-input class="relation-select col-md-9"></div>' +
+			    '<label jb-form-label-component ' +
+						'label-identifier="{{$ctrl.getLabel()}}" ' +
+						'is-required="$ctrl.isRequired()" ' +
+						'is-valid="$ctrl.isValid()" ' +
+						'ng-if="$ctrl.showLabel">' +
+				'</label>' +
+			    '<div relation-input class="relation-select" ng-class="{ \'col-md-9\' : $ctrl.showLabel , \'col-md-12\' : !$ctrl.showLabel }"></div>' +
 			'</div>');
 	}]);
 })();
@@ -1775,16 +1787,23 @@
         parent.unregisterGetDataHandler(this.handleGetData);
     };
 
+    /*
+     * Due to the fact that the inner entities are usually included in an ng-repat directive, we need to make
+     * sure that at least one view was rendered.
+     */
     JBFormRepeatingViewController.prototype.handleOptionsData = function(optionsData){
         this.optionData = optionsData;
-        return this.componentsRegistry.optionsDataHandler(optionsData);
+        return this.$timeout(function(){
+            return this.componentsRegistry.optionsDataHandler(optionsData);
+        }.bind(this));
+
     };
     // We assume that the data we got delivered is an array?
     // now we should add a new copy of the inner view to all
     // @todo: use arrow functions
     // @todo: do we need to trigger two digests to be sure that all sub views are unlinked?
     JBFormRepeatingViewController.prototype.handleGetData = function(data){
-        this.$timeout(function(){
+        return this.$timeout(function(){
             this.entities.splice(0);
         }.bind(this), 0)
             .then(function(){
@@ -1807,7 +1826,6 @@
                         }.bind(this)
                         , function(error) {
                             console.error(error);
-                            debugger;
                         });
                 }.bind(this), 0);
             }.bind(this));
@@ -1816,7 +1834,7 @@
     JBFormRepeatingViewController.prototype.addElement = function(){
         this.entities.push({});
         this.$timeout(function(){
-            this.componentsRegistry.optionsDataHandler(this.optionData);
+            return this.componentsRegistry.optionsDataHandler(this.optionData);
         }.bind(this));
     };
 
@@ -1835,24 +1853,20 @@
             , controllerAs      : '$ctrl'
             , controller        : 'JBFormRepeatingViewController'
             , link              : {
-                pre: function(scope, element, attrs, ctrl){
+
+                  pre: function(scope, element, attrs, ctrl){
                     ctrl.preLink(scope);
                 }
-                , post: function(scope, element, attrs, ctrl){
-                    var   nameAccessor       = $parse(attrs.entityName)
-                        , buttonTextAccessor = $parse(attrs.buttonText);
 
-                    scope.$watch(function(){
-                        return nameAccessor(scope.$parent);
-                    }, function(newValue){
+                , post: function(scope, element, attrs, ctrl){
+
+                    attrs.$observe('entityName', function(newValue){
                         ctrl.entityName = newValue;
                     });
 
-
-                    scope.$watch(function(){
-                        return buttonTextAccessor(scope.$parent);
-                    }, function(newValue){
+                    attrs.$observe('buttonText', function(newValue){
                         ctrl.buttonText = newValue;
+                        scope.buttonText = newValue;
                     });
 
                     ctrl.postLink(scope);
@@ -1865,9 +1879,9 @@
                         ctrl.addElement();
                     };
 
-                    var button = angular.element('<div class="container clearfix"><button class="btn btn-sm btn-default pull-right" ng-click="addElement($event)">{{ $ctrl.buttonText | translate }}</button></div>');
+                    /*var button = angular.element('<div class="container clearfix"><button class="btn btn-sm btn-default pull-right" ng-click="addElement($event)">{{ $ctrl.buttonText | translate }}</button></div>');
                     element.append(button);
-                    $compile(button)(scope);
+                    $compile(button)(scope);*/
                 }
             }
         }
@@ -1880,10 +1894,11 @@
     var _module = angular.module('jb.formComponents');
 
     function JBFormViewAdapterReferenceStrategy(formView){
-        this.formView    = formView;
-        this.optionsData = null;
-        this.initialId   = null;
-        this.parentOptionsData = null;
+        this.formView           = formView;
+        this.optionsData        = null;
+        this.initialId          = null;
+        this.parentOptionsData  = null;
+        this.isDeleted          = false;
     }
 
     JBFormViewAdapterReferenceStrategy.prototype.handleOptionsData = function(data){
@@ -1928,6 +1943,16 @@
 
     JBFormViewAdapterReferenceStrategy.prototype.getSaveCalls = function(){
 
+        if(this.isDeleted && !this.formView.isNew()) {
+            return [{
+                  method    : 'delete'
+                , url       : {
+                      path          : [this.formView.getEntityName(), this.formView.getEntityId()].join('/')
+                    , mainEntity    : 'append'
+                }
+            }]
+        }
+
         var   calls    = this.formView.generateSaveCalls()
             , call     = {};
 
@@ -1936,6 +1961,10 @@
         call.data   = {};
         call.data[ this.getReferencingFieldName() ] = this.formView.getEntityId();
         return [ call ].concat(calls);
+    };
+
+    JBFormViewAdapterReferenceStrategy.prototype.storeDeleteRequest = function(){
+        this.isDeleted = true;
     };
 
     /**
@@ -1953,6 +1982,7 @@
         this.parentId           = null;
         this.parentOptionsData  = null;
         this.itemIndex          = 0;
+        this.isDeleted          = false;
         this.initialize(formView);
     }
 
@@ -1993,7 +2023,9 @@
         return this.formView.makeSaveRequest();
     };
 
-    JBFormViewAdapterInverseReferenceStrategy.prototype.beforeSaveTasks = function(){};
+    JBFormViewAdapterInverseReferenceStrategy.prototype.beforeSaveTasks = function(){
+
+    };
 
     JBFormViewAdapterInverseReferenceStrategy.prototype.getReferencingFieldName = function(){
         return this.optionsData.remote.property;
@@ -2045,6 +2077,97 @@
         return [];
     };
 
+    JBFormViewAdapterInverseReferenceStrategy.prototype.storeDeleteRequest = function(){
+        this.isDeleted = true;
+    };
+
+    function JBFormViewMappingStrategy(formView){
+        this.formView           = formView;
+        this.optionsData        = null;
+        this.initialParentId    = null;
+        this.parentId           = null;
+        this.parentOptionsData  = null;
+        this.rootEntity         = null;
+        this.itemIndex          = 0;
+        this.initialize(formView);
+    }
+
+    JBFormViewMappingStrategy.prototype.initialize = function(formView){
+        var self = this;
+    };
+
+    JBFormViewMappingStrategy.prototype.handleOptionsData = function(data){
+        this.optionsData        = this.formView.getSpecFromOptionsData(data);
+        this.parentOptionsData  = data;
+        this.rootEntity         = data.resource;
+        return this.formView.getOptionsData();
+    };
+
+    JBFormViewMappingStrategy.prototype.getReferencingFieldName = function(){
+        return this.optionsData.remote.property;
+    };
+
+    JBFormViewMappingStrategy.prototype.handleGetData = function(data, index){
+
+        var   content = (data) ? data[this.formView.getEntityName()] : data
+            , id
+            , parentId
+            , parentIdKey;
+
+        if(angular.isDefined(index)) this.itemIndex = index;
+
+        if(content){
+            if(content.length) content = this.getEntityFromData(content);
+            parentIdKey = this.formView.getIdFieldFrom(this.parentOptionsData);
+            id          = this.formView.getOwnId(content);
+            parentId    = data[ parentIdKey ];
+        }
+
+        this.initialParentId = parentId;
+        this.formView.setEntityId(id);
+
+        return this.formView.distributeData(content);
+    };
+
+    JBFormViewMappingStrategy.prototype.isValid = function(){
+        // add the referenced property name to the selects
+        return this.formView.isValid();
+    };
+
+    JBFormViewMappingStrategy.prototype.getSelectFields = function(){
+        var   selects = this.formView.getSelectParameters().map(function (select) {
+            return [this.formView.getEntityName(), select].join('.');
+        }.bind(this));
+        return selects;
+    };
+
+    JBFormViewMappingStrategy.prototype.afterSaveTasks = function(id){
+        /*this.parentId = id;
+        return this.formView.makeSaveRequest();*/
+    };
+
+    JBFormViewMappingStrategy.prototype.beforeSaveTasks = function(){
+        return this.formView.makeSaveRequest();
+    };
+
+    JBFormViewMappingStrategy.prototype.getSaveCalls = function(){
+        //if(this.deleteRequest) return [this.deleteRequest];
+        return [];
+    };
+
+    JBFormViewMappingStrategy.prototype.storeDeleteRequest = function(){
+        if(!this.formView.isNew()){
+            this.deleteRequest = {
+                method: 'delete'
+                , url: {
+                    path       : [ this.formView.getEntityName(), this.formView.getEntityId() ].join('/')
+                    , mainEntity : 'append'
+                }
+            };
+        }
+        this.formView.unlink();
+    };
+
     /**
      * Inverse Reference (belongs to) handling for nested form views.
      *
@@ -2083,7 +2206,6 @@
      */
     JBFormViewAdapter.prototype.handleOptionsData = function(data){
         // the extraction of the options data works as long as there is no alias!
-
         var spec = this.formView.getSpecFromOptionsData(data);
         if(!spec) return console.error('No options data found for form-view %o', this.formView);
 
@@ -2107,8 +2229,8 @@
      * 1. reference:    pass the data
      * 2. belongsTo:    pass the first object
      */
-    JBFormViewAdapter.prototype.handleGetData = function(data){
-        return this.strategy.handleGetData(data);
+    JBFormViewAdapter.prototype.handleGetData = function(data, index){
+        return this.strategy.handleGetData(data, index);
     };
 
     /**
@@ -2131,8 +2253,12 @@
         return this.strategy.getSelectFields();
     };
 
+    JBFormViewAdapter.prototype.storeDeleteRequest = function(){
+        return this.strategy.storeDeleteRequest();
+    };
+
     JBFormViewAdapter.prototype.isValid = function(){
-        return this.strategy && this.strategy.isValid();
+        return this.formView.isReadonly || (this.strategy && this.strategy.isValid());
     };
 
     _module.factory('JBFormViewAdapterService', [
@@ -2311,7 +2437,12 @@ angular
      */
 
     var _module = angular.module('jb.formComponents');
-
+    /*
+     * @todo: add a readonly mode
+     * @todo: prevent the user from seeing stuff it is not able to!
+     * @todo: catch 404 errors and add an error state
+     * @todo: add a loader
+    */
     _module.directive('jbFormView', ['$compile', function ($compile) {
 
         return {
@@ -2343,7 +2474,7 @@ angular
                  *      , 'entityId'    : '<'
                  *      , 'isRoot'      :
                  *      , 'index'       : '<'
-                 *      , ''
+                 *      , 'isReadonly'  : '<'
                  *  }
              */
             , scope: true
@@ -2386,10 +2517,6 @@ angular
             $scope.$watchGroup(['$ctrl.entityName', '$ctrl.entityId'], function () {
                 self.setTitle();
             });
-
-            /*$scope.$watch(function(){
-                return self.index
-            })*/
 
             /**
              * Set up the registry waiting for subcomponents in the pre-link phase.
@@ -2439,7 +2566,7 @@ angular
                 var   titleSuffix = self.getEntityName()
                     , titlePrefix = $filter('translate')('web.backoffice.create');
 
-                if (self.entityId) {
+                if (!self.isNew()) {
                     titlePrefix = $filter('translate')('web.backoffice.edit');
                     titleSuffix = titleSuffix + ' #'+ self.entityId;
                 }
@@ -2465,8 +2592,7 @@ angular
             self.init = function (scope, el, attrs) {
                 var   promises = []
                     , element = el
-                    , idGetter
-                    , nameGetter;
+                    , readonlyGetter;
 
                 /**
                  * Observe these values.
@@ -2481,52 +2607,56 @@ angular
                 // @todo: bind this shit to the controller
                 self.setEntityId(undefined);
 
-                self.isRoot         = attrs.hasOwnProperty('isRoot');
-                self.hasEntityName  = attrs.hasOwnProperty('entityName');
-                self.hasEntityId    = attrs.hasOwnProperty('entityId');
+                self.isRoot             = attrs.hasOwnProperty('isRoot');
+                self.hasEntityName      = attrs.hasOwnProperty('entityName');
+                self.hasEntityId        = attrs.hasOwnProperty('entityId');
+                self.hasReadonlyFlag    = attrs.hasOwnProperty('isReadonly');
 
                 if (self.hasEntityName) {
 
                     var   nameDeferred  = $q.defer();
-
-                    nameGetter    = $parse(attrs.entityName);
-
                     promises.push(nameDeferred.promise);
-
-                    scope.$watch(function(){
-                        return nameGetter(scope.$parent);
-                    }, function(value){
-                        if(value === 573) debugger;
-                        if(!value) return;
-                        self.setEntityName(value);
+                    attrs.$observe('entityName', function(newValue){
+                        if(!newValue) return;
+                        self.setEntityName(newValue);
                         nameDeferred.resolve();
                     });
                 }
 
                 if (self.hasEntityId) {
                     var   idDeferred = $q.defer();
-
-                    idGetter     = $parse(attrs.entityId);
-
                     promises.push(idDeferred.promise);
-
-                    scope.$watch(function(){
-                        return idGetter(scope.$parent);
-                    }, function(newValue, oldValue){
+                    attrs.$observe('entityId', function(newValue){
                             if(!newValue) return;
-                            self.setEntityId(newValue);
+                            if(newValue !== 'new') self.setEntityId(newValue);
                             idDeferred.resolve();
                     });
                 }
-
                 if (!self.hasEntityName && !self.hasEntityId) {
                     var stateParams = self.parseUrl();
                     self.setEntityName(stateParams.name);
                     self.setEntityId(stateParams.id);
                 }
-                // register myself as a component to possible parents
 
-                self.componentsService.registerComponent(scope, self.adapterService.getAdapter(this));
+                if(self.hasReadonlyFlag) {
+                    readonlyGetter = $parse(attrs.isReadonly);
+                    scope.$watch(function(){
+                        return readonlyGetter(scope.$parent);
+                    }, function(value){
+                        if(value === true || value === false){
+                            self.isReadonly = value;
+                            if(value === true) {
+                                element.addClass('jb-form-readonly');
+                            }
+                        }
+                    });
+                }
+
+
+                // register myself as a component to possible parents
+                self.adapter = self.adapterService.getAdapter(this);
+                self.componentsService.registerComponent(scope, self.adapter);
+
                 // @todo: store the promises otherwise and chain them as soon as the option handler is invoked (to make shure all data is available)
                 $q.all(promises).then(function () {
                     // load option data if we are root
@@ -2563,10 +2693,17 @@ angular
             /**
              * This is shitty! We need to load more options data as soon as we receive the options to to be able to
              * distribute options to the nested fields.
+             *
              * @param fields
              */
             self.internallyHandleOptionsData = function (data) {
                 self.optionData = data;
+
+                if(data.permissions.update === false){
+                    data.properties.forEach(function(property){
+                        property.readonly = true;
+                    });
+                }
                 return self.componentsRegistry.optionsDataHandler(data);
             };
 
@@ -2574,7 +2711,7 @@ angular
                 return self.getOptionData();
             };
 
-            self.getSpecFromOptionsData = function(data){
+            self.getSpecFromOptionsData = function(data) {
                 var relations = (data && data.relations && data.relations.length) ? data.relations : [];
                 for(var i = 0; i < relations.length; i++){
                     var relation = relations[i];
@@ -2586,7 +2723,6 @@ angular
              * OPTION data
              */
             self.getOptionData = function () {
-                if(self.getEntityName() === 573) debugger;
                 console.log('DetailView: Make OPTIONS call for %o', self.getEntityName());
                 return self
                     .makeOptionRequest('/' + self.getEntityName())
@@ -2672,7 +2808,6 @@ angular
              * Gets current entity's data through GET call
              */
             self.makeGetRequest = function () {
-
                 var   url       = self.getEntityUrl()
                     , select    = self.getSelectParameters();
 
@@ -2696,7 +2831,12 @@ angular
             //
             // Save
             //
-
+            $scope.edit = function(){
+                $state.go('app.detail', {
+                      entityName    : self.getEntityName()
+                    , entityId      : self.isNew() ? 'new' : self.getEntityId()
+                });
+            };
             /**
              * Called when user clicks 'save'. Can be called manually through scope().
              *
@@ -2720,7 +2860,7 @@ angular
                 /*var returnValue = {
                  id: undefined
                  };*/
-
+                if(self.isReadonly) return;
                 return self
                     .makeSaveRequest(self.registeredComponents, self.getEntityName())
                     .then(function (entityId) {
@@ -2768,6 +2908,7 @@ angular
              */
             self.makeSaveRequest = function () {
                 if (!self.isValid()) return $q.reject(new Error('Not all required fields filled out.'));
+                if(self.isReadonly) return $q.when();
 
                 // Pre-save tasks (upload images)
                 return self.executePreSaveTasks()
@@ -3146,6 +3287,7 @@ angular
              * - a Promise
              */
             self.generateSaveCalls = function () {
+                if(self.isReadonly) return [];
                 var saveCalls = self.componentsRegistry.getSaveCalls().reduce(function (calls, componentCalls) {
                     self.addCall(componentCalls, calls);
                     return calls;
@@ -3158,10 +3300,14 @@ angular
             //
             // DELETE
             //
+            self.unlink = function(){
+                return $scope.$destroy();
+            };
 
             /**
              * Deletes the entity.
              * @todo: the redirection should not be a matter of the detail-view itself, if we have nested detail
+             * todo: let the adapter do the delete requests it is aware of the context of the entity and can trigger all the delete requests correctly
              * @param <Boolean> nonInteractive        True if user should not be redirected to main view
              */
             $scope.delete = function (event, nonInteractive) {
@@ -3191,8 +3337,8 @@ angular
                             $state.go('app.list', {entityName: self.getEntityName()});
 
                             $rootScope.$broadcast('notification', {
-                                type: 'success'
-                                , message: 'web.backoffice.detail.deleteSuccess'
+                                  type      : 'success'
+                                , message   : 'web.backoffice.detail.deleteSuccess'
                             });
 
                         }
@@ -3204,9 +3350,9 @@ angular
 
                         if (!nonInteractive) {
                             $rootScope.$broadcast('notification', {
-                                type: 'error'
-                                , message: 'web.backoffice.detail.deleteError'
-                                , variables: {
+                                  type      : 'error'
+                                , message   : 'web.backoffice.detail.deleteError'
+                                , variables : {
                                     errorMessage: err
                                 }
                             });
@@ -3221,6 +3367,8 @@ angular
 
             /**
              * Delete an entity
+             *
+             * todo: only delete the entity directly if it is a root entry, otherwise delegate it to the adapter!
              */
             self.makeDeleteRequest = function () {
 
@@ -3233,7 +3381,7 @@ angular
                     });
                 }
                 return promise.then(function(){
-                    return $scope.$destroy();
+                    return self.unlink();
                 });
             };
 
@@ -3269,7 +3417,7 @@ angular
         , 'date'    : 'date-time'
     });
 
-    _module.directive('jbFormAutoInput', ['$compile', function ($compile) {
+    _module.directive('jbFormAutoInput', ['$compile', '$parse', function ($compile, $parse) {
 
         return {
               controllerAs      : '$ctrl'
@@ -3277,6 +3425,30 @@ angular
             , restrict          : 'E'
             , link : {
                 post: function (scope, element, attrs, ctrl) {
+
+                    var readonlyGetter;
+
+                    attrs.$observe('label', function(newValue){
+                        ctrl.label = newValue;
+                    });
+                    attrs.$observe('for', function(newValue){
+                        ctrl.name = newValue;
+                    });
+
+                    attrs.$observe('showLabel', function(newValue){
+                        ctrl.showLabel = newValue !== 'false';
+                    });
+
+                    if(attrs.hasOwnProperty('isReadonly')){
+                        readonlyGetter = $parse(attrs.isReadonly);
+                        scope.$watch(function(){
+                            return readonlyGetter(scope.$parent);
+                        },
+                        function(newValue){
+                            ctrl.isReadonly = newValue;
+                        })
+                    }
+
                     ctrl.init(scope, element, attrs);
                 }
                 , pre: function (scope, element, attrs, ctrl) {
@@ -3284,9 +3456,7 @@ angular
                 }
             }
             , controller        : 'JBFormAutoInputController'
-            , scope             : {
-                  label :  '@'
-            }
+            , scope             : true
         };
     }]);
 
@@ -3354,10 +3524,10 @@ angular
                 return '-' + v.toLowerCase();
             });
             // this is not cool!
-            var newElement = angular.element('<div jb-form-' + dashedCasedElementType + '-input for="' + this.name + '" label="' + this.label + '"></div>');
+            var newElement = angular.element('<div jb-form-' + dashedCasedElementType + '-input for="{{$ctrl.name}}" label="{{$ctrl.label}}" is-readonly="$ctrl.isReadonly" show-label="$ctrl.showLabel"></div>');
             // @todo: not sure if we still need to prepend the new element when we actually just inject the registry
-            this.element.replaceWith(newElement);
             this.registry.unregisterOptionsDataHandler(this.updateElement);
+            this.element.replaceWith(newElement);
             this.$compile(newElement)(this.$scope);
             // now the registry should know all the subcomponents
             // delegate to the options data handlers of the components
@@ -3379,20 +3549,12 @@ angular
 
     /**
      * Auto checkbox input.
-     *
      */
 
     var JBFormCheckboxInputController = function ($scope, $attrs, componentsService) {
 
         this.$attrs = $attrs;
         this.$scope = $scope;
-        this.name   = $attrs['for'];
-        this.label  = this.name;
-
-        $attrs.$observe('label', function (value) {
-            this.label = value;
-        }.bind(this));
-
         this.subcomponentsService = componentsService;
     };
 
@@ -3401,11 +3563,11 @@ angular
     };
 
     JBFormCheckboxInputController.prototype.getSelectFields = function(){
-        return this.name;
+        return [this.name];
     };
 
     JBFormCheckboxInputController.prototype.getSaveCalls = function () {
-        if (this.originalData === this.$scope.data.value) return [];
+        if (this.originalData === this.$scope.data.value || this.isReadonly) return [];
 
         var data = {};
         data[this.$scope.data.name] = this.$scope.data.value === true;
@@ -3440,13 +3602,21 @@ angular
 
     JBFormCheckboxInputController.prototype.init = function (scope, element, attrs) {
         this.subcomponentsService.registerComponent(scope, this);
+        if(angular.isUndefined(this.showLabel)){
+            this.showLabel = true;
+        }
     };
 
     var _module = angular.module('jb.formComponents');
     _module.directive('jbFormCheckboxInput', [function () {
 
         return {
-              scope             : true
+            scope : {
+                  label       : '@'
+                , name        : '@for'
+                , isReadonly  : '<?'
+                , showLabel   : '<?'
+            }
             , controller        : 'JBFormCheckboxInputController'
             , bindToController  : true
             , controllerAs      : '$ctrl'
@@ -3458,14 +3628,15 @@ angular
                     ctrl.init(scope, element, attrs);
                 }
             }
-            , template: '<div class="form-group">' +
-            '<label jb-form-label-component data-label-identifier="{{$ctrl.label}}" data-is-valid="$ctrl.isValid()" data-is-required="$ctr.isRequired()"></label>' +
-            '<div class="col-md-9">' +
-            '<div class="checkbox">' +
-            '<input type="checkbox" data-ng-model="data.value"/>' +
-            '</div>' +
-            '</div>' +
-            '</div>'
+            , template:
+                '<div class="form-group">' +
+                    '<label ng-if="$ctrl.showLabel"jb-form-label-component data-label-identifier="{{$ctrl.label}}" data-is-valid="$ctrl.isValid()" data-is-required="$ctr.isRequired()"></label>' +
+                    '<div ng-class="{ \'col-md-9\' : $ctrl.showLabel, \'col-md-12\' : !$ctrl.showLabel }">' +
+                        '<div class="checkbox">' +
+                            '<input type="checkbox" data-ng-model="data.value"/>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>'
         };
 
     }]);
@@ -3502,7 +3673,7 @@ angular
     };
 
     JBFormDateTimeInputController.prototype.isValid = function () {
-        if (this.isRequired()) return !!this.date;
+        if(this.isRequired() && !this.isReadonly) return !!this.value && isNaN(this.value.getTime());
         return true;
     };
 
@@ -3537,11 +3708,13 @@ angular
         } // else, date was deleted
         call.data[this.name] = dateString;
         return [call];
-
     };
 
     JBFormDateTimeInputController.prototype.init = function (scope) {
         this.subcomponentsService.registerComponent(scope, this);
+        if(angular.isUndefined(this.showLabel)){
+            this.showLabel = true;
+        }
     };
 
     JBFormDateTimeInputController.prototype.registerAt = function (parent) {
@@ -3569,12 +3742,12 @@ angular
         if (!spec) return console.error('JBFormDateTimeInputController: No field spec for %o', this.name);
 
         this.required       = spec.nullable === false;
-        this.time           = spec.type === 'datetime';
-        this.showDate       = spec.type !== 'time';
-    };
+        this.isReadonly     = this.isReadonly === true || spec.readonly === true;
 
-    JBFormDateTimeInputController.prototype.showTime = function () {
-        return this.time;
+        /*this.showDate       = spec.type !== 'time';
+        this.showTime       = spec.type === 'datetime' || spec.type === 'time';*/
+        this.showDate = true;
+        this.showTime = true;
     };
 
     var _module = angular.module('jb.formComponents');
@@ -3582,8 +3755,10 @@ angular
 
         return {
               scope : {
-                    label : '@'
-                  , name  : '@for'
+                    label       : '@'
+                  , name        : '@for'
+                  , showLabel   : '<'
+                  , isReadonly  : '<'
               }
             , controller        : 'JBFormDateTimeInputController'
             , bindToController  : true
@@ -3593,12 +3768,16 @@ angular
             }
             , template:
                 '<div class="form-group form-group-sm">' +
-                    '<label jb-form-label-component data-label-identifier="{{$ctrl.label}}" data-is-required="$ctrl.isRequired()" data-is-valid="$ctrl.isValid()"></label>' +
-                    '<div data-ng-class="{ \'col-md-9\': !$ctrl.showTime(), \'col-md-5\': $ctrl.showTime() }">' +
-                        '<input type="date" class="form-control input-sm input-date" data-ng-model="$ctrl.date">' +
-                    '</div>' +
-                    '<div class="col-md-4" data-ng-if="$ctrl.showTime()">' +
-                        '<input type="time" class="form-control input-sm input-time" data-ng-model="$ctrl.date" />' +
+                    '<label ng-if="$ctrl.showLabel" jb-form-label-component label-identifier="{{$ctrl.label}}" is-required="$ctrl.isRequired()" is-valid="$ctrl.isValid()"></label>' +
+                    '<div ng-class="{\'col-md-9\' : $ctrl.showLabel, \'col-md-12\': !ctrl.showLabel }">' +
+                        '<div class="row">' +
+                            '<div ng-if="$ctrl.showDate" ng-class="{ \'col-md-6\': $ctrl.showTime, \'col-md-12\': !$ctrl.showTime }">' +
+                                '<input type="date" class="form-control input-sm input-date" data-ng-model="$ctrl.date" ng-disabled="$ctrl.isReadonly">' +
+                            '</div>' +
+                            '<div ng-if="$ctrl.showTime" ng-class="{ \'col-md-6\': $ctrl.showDate, \'col-md-12\': !$ctrl.showDate }">' +
+                                '<input type="time" class="form-control input-sm input-time" data-ng-model="$ctrl.date" ng-disabled="$ctrl.isReadonly"/>' +
+                            '</div>' +
+                        '</div>' +
                     '</div>' +
                 '</div>'
         };
@@ -3740,15 +3919,10 @@ angular
 
         this.$scope     = $scope;
         this.$attrs     = $attrs;
-        this.name       = $attrs['for'];
         this.$q         = $q;
-        this.label      =  this.name;
-        this.select     = this.name;
         this.componentsService  = componentsService;
         this.originalData       = undefined;
         this.required           = true;
-        this.showLabel          = true;
-        this.isReadonly         = false;
 
         this.options;
     };
@@ -3757,8 +3931,12 @@ angular
         return this.required === true;
     };
 
+    /**
+     * @todo: check if the readonly property should influence the behavior
+     * @returns {boolean}
+     */
     JBFormTextInputController.prototype.isValid = function () {
-        if(this.isRequired()) return !!this.value;
+        if(this.isRequired() && !this.isReadonly) return !!this.value;
         return true;
     };
 
@@ -3786,31 +3964,33 @@ angular
     JBFormTextInputController.prototype.handleOptionsData = function(data){
         var spec = this.selectOptions(data);
         if(!angular.isDefined(spec)) return console.error('No options data available for text-field %o', this.name);
-        this.options  = spec;
-        this.required = spec.nullable === false;
+        this.options    = spec;
+        this.required   = spec.nullable === false;
+        this.isReadonly = this.isReadonly === true || spec.readonly === true;
     };
 
     JBFormTextInputController.prototype.init = function (scope) {
         this.componentsService.registerComponent(scope, this);
+        if(angular.isUndefined(this.showLabel)){
+            this.showLabel = true;
+        }
     };
 
     JBFormTextInputController.prototype.preLink = function (scope) {
-        scope.data = {
-              name: this.name
-            , value: undefined
-            , valid: false
-        };
+    };
+
+    JBFormTextInputController.prototype.getSelectFields = function(){
+        return [this.name];
     };
 
     JBFormTextInputController.prototype.updateData = function (data) {
-        if(!data) return;
         this.originalData = this.value;
-        this.value = data[this.name];
+        this.value = data ? data[this.name] : data;
     };
 
     JBFormTextInputController.prototype.getSaveCalls = function () {
 
-        if (this.originalData === this.value) return [];
+        if (this.originalData === this.value || this.isReadonly) return [];
 
         var data = {};
         data[this.name] = this.value;
@@ -3837,8 +4017,8 @@ angular
                   scope : {
                         label       : '@'
                       , name        : '@for'
-                      , isReadonly  : '<'
-                      , showLabel   : '<'
+                      , isReadonly  : '<?'
+                      , showLabel   : '<?'
                   }
                 , controllerAs      : '$ctrl'
                 , bindToController  : true
@@ -3858,7 +4038,7 @@ angular
                                             'ng-attr-id="$ctrl.name" ' +
                                             'ng-attrs-required="$ctrl.isRequired()" ' +
                                             'ng-model="$ctrl.value"' +
-                                            'ng-readonly="$ctrl.isReadonly"' +
+                                            'ng-disabled="$ctrl.isReadonly"' +
                                             'class="form-control input-sm" />' +
                                 '</div>' +
                             '</div>'

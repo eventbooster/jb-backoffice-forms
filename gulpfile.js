@@ -34,11 +34,10 @@ gulp.task( 'scripts', function() {
 		.pipe( gulpPrint() )
 		.pipe( jshint() )
 		.pipe( concat( 'jb-backoffice-forms.js' ) )
-		.pipe( gulp.dest( paths.jsDest ) )
-		.pipe( rename( 'jb-backoffice-forms.min.js' ) )
+        .pipe( gulp.dest( paths.jsDest ) )
 		.pipe( uglify() )
-		.pipe( gulp.dest( paths.jsDest ) );
-
+        .pipe( rename( 'jb-backoffice-forms.min.js' ) )
+        .pipe( gulp.dest( paths.jsDest ) );
 } );
 
 

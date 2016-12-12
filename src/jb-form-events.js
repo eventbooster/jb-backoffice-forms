@@ -79,6 +79,7 @@
 
     JBFormComponentsRegistry.prototype.getSaveCalls = function(){
         return this.registeredComponents.reduce(function(calls, component){
+            if(!angular.isFunction(component.getSaveCalls)) debugger;
             var subcalls = component.getSaveCalls();
             return calls.concat(subcalls);
         }, []);
@@ -193,8 +194,9 @@
         'JBFormComponentsService' ,
         [
             '$q' ,
+            '$parse',
             'jbFormEvents' ,
-            function($q, formEvents){
+            function($q, $parse, formEvents){
                 return {
                     registryFor   : function(scope){
                         var registry = new JBFormComponentsRegistry($q, formEvents, scope);

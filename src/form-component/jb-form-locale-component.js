@@ -240,7 +240,7 @@
         if(!spec) return console.error('No OPTIONS data found in locale component.');
 
         this.options    = spec;
-        this.loadFields().then(function(fields){
+        return this.loadFields().then(function(fields){
             this.$timeout(function(){
                 this.fieldDefinitions = this.filterFields(fields);
                 this.fields = Object.keys(this.fieldDefinitions);
