@@ -97,7 +97,6 @@
 
     JBFormComponentsRegistry.prototype.getSaveCalls = function(){
         return this.registeredComponents.reduce(function(calls, component){
-            if(!angular.isFunction(component.getSaveCalls)) debugger;
             var subcalls = component.getSaveCalls();
             return calls.concat(subcalls);
         }, []);
@@ -188,14 +187,24 @@
      * @param collection
      */
     JBFormComponentsRegistry.prototype.distributeIndexed = function(data){
-        this.getDataHandlers.forEach(function(handler, index){
-            handler(data, index);
-        });
+        return this.distributeIndexedFrom(data, 0);
     };
 
-    JBFormComponentsRegistry.prototype.registerYourself = function(scope){
-        var targetScope = scope || this.scope;
-        targetScope.$parent.$emit(this.formEvents.registerComponent, this, targetScope);
+    JBFormComponentsRegistry.prototype.distributeIndexedFrom = function(data, startIndex){
+        for(var i = startIndex; i<this.getDataHandlers.length; i++){
+            this.getDataHandlers[i](data, i);
+        }
+    };
+
+    JBFormComponentsRegistry.prototype.componentAt = function(index){
+        return this.registeredComponents[index];
+    };
+
+    JBFormComponentsRegistry.prototype.registerYourself = function(scope, stayOnScope){
+        var   sourceScope = scope || this.scope
+            , targetScope = (stayOnScope === true) ? sourceScope : sourceScope.$parent;
+
+        targetScope.$emit(this.formEvents.registerComponent, this, targetScope);
     };
 
     JBFormComponentsRegistry.prototype.registerAt = function(parent){
@@ -220,8 +229,9 @@
                         var registry = new JBFormComponentsRegistry($q, formEvents, scope);
                         return registry;
                     }
-                    , registerComponent : function(scope, component){
-                        scope.$parent.$emit(formEvents.registerComponent, component, scope);
+                    , registerComponent : function(scope, component, stayOnScope){
+                        var targetScope = (stayOnScope === true) ? scope : scope.$parent;
+                        targetScope.$emit(formEvents.registerComponent, component, scope);
                     }
                 }
             }
@@ -351,12 +361,16 @@
                     // append and amount of images will grow if we don't reset it to [].
                     self.images = [];
 
+                    // Check if there even is data.
+                    if(!data){
+                        data = {};
+                    }
+
                     // No image set: use empty array
                     // Don't use !angular.isArray( data.image ); it will create [ undefined ] if there's no data.image.
                     if (!data.image) {
                         data.image = [];
                     }
-
 
                     // Image has a hasOne-relation: Is delivered as an object (instead of an array):
                     // Convert to array
@@ -364,10 +378,8 @@
                         data.image = [data.image];
                     }
 
-
                     // Store original data (to only send differences to the server when saving)
                     _originalData = data.image.slice();
-
 
                     // Create self.images from data.image.
                     data.image.forEach(function (image) {
@@ -941,6 +953,7 @@
                   fieldsExclude : '<'
                 , entityName    : '@entity'
                 , relationName  : '@relation'
+                , isReadonly    : '<'
             }
             , template: '<div class="locale-component container">' +
                             '<!-- LOCALE-COMPONENT: way too many divs in here -->'+
@@ -957,10 +970,10 @@
                                 '</div>'+
                             '</div>' +
                             '<div class="locale-content">' +
-                                '<div class="locale-col" ng-repeat="language in $ctrl.getSelectedLanguages()">' +
+                                '<div class="locale-col" ng-repeat="language in $ctrl.selectedLanguages">' +
                                     '<p>{{ language.code | uppercase }}</p>' +
-                                    '<ul>' +
-                                        '<li ng-repeat="field in $ctrl.getFields()">' +
+                                    '<ul ng-if="$ctrl.fieldDefinitions">' +
+                                        '<li ng-repeat="field in $ctrl.fieldDefinitions">' +
                                             '<label ng-attr-for="locale-{{language.code}}-{{field.name}}" ng-class="{ \'invalid\' : !$ctrl.fieldIsValid($ctrl.locales[ language.id ], field.name)}">' +
                                                 '<span data-translate="web.backoffice.{{$ctrl.entityName}}.{{field.name}}"></span>' +
                                                 '<span class="required-indicator" data-ng-show="field.required">*</span>' +
@@ -968,6 +981,7 @@
                                             '<textarea ng-model="$ctrl.locales[ language.id ][ field.name ]" ' +
                                                 'ng-attr-id="locale-{{language.code}}-{{field.name}}"' +
                                                 'class="form-control" ' +
+                                                'ng-disabled="$ctrl.isReadonly"' +
                                                 'ng-keyup="$ctrl.adjustHeight( $event )" ' +
                                                 'ng-click="$ctrl.adjustHeight( $event )" />' +
                                             '</textarea>' +
@@ -1007,7 +1021,6 @@
         this.options            = null;
         this.fieldDefinitions   = null;
         this.fields             = [];
-        this.selectedLanguages  = [];
         this.locales            = [];
         this.originalLocales    = [];
         this.heightElement      = null;
@@ -1125,9 +1138,16 @@
     JBFormLocaleComponentController.prototype.toggleLanguage = function(event, language){
         if(event) event.preventDefault();
         var langs = this.getSelectedLanguages();
-        if(language.selected && langs.length == 1) return;
-        language.selected = language.selected !== true;
-        this.$timeout(this.adjustAllHeights.bind(this));
+        if(language){
+            if(language.selected && langs.length == 1) return;
+            language.selected = language.selected !== true;
+        }
+        this.reassignLanguages().then(this.adjustAllHeights.bind(this));
+    };
+
+    JBFormLocaleComponentController.prototype.reassignLanguages = function(){
+        this.selectedLanguages = this.getSelectedLanguages();
+        return this.$timeout();
     };
 
     JBFormLocaleComponentController.prototype.isSelected = function(language){
@@ -1160,6 +1180,9 @@
      *
      * @note: In the select call we need to set the related table name and select all fields plus the languages. Currently
      * we are not able to properly identify locales.
+     *
+     * In some situations, it seems like the update of the field defintions is not propagated properly to the view.
+     * Therefore it is necessary to toggle the languages again!
      * @todo: trigger error state
      */
     JBFormLocaleComponentController.prototype.handleOptionsData = function(data){
@@ -1167,14 +1190,15 @@
         if(!spec) return console.error('No OPTIONS data found in locale component.');
 
         this.options    = spec;
-        return this.loadFields().then(function(fields){
-            this.$timeout(function(){
-                this.fieldDefinitions = this.filterFields(fields);
-                this.fields = Object.keys(this.fieldDefinitions);
-            }.bind(this));
-        }.bind(this), function(error){
-            console.error(error);
-        });
+        return this.loadFields()
+                    .then(function(fields){
+                            this.fieldDefinitions = this.filterFields(fields);
+                            this.fields = Object.keys(this.fieldDefinitions);
+                            return this.ensureLanguageIsSelected();
+                        }.bind(this)
+                    , function(error){
+                        console.error(error);
+                    });
     };
 
     /**
@@ -1183,7 +1207,8 @@
      */
     JBFormLocaleComponentController.prototype.loadFields = function(){
         var url = '/' + this.getLocaleProperty();
-        if(this.fieldDefinitions) return this.$q.when(this.fieldDefinitions);
+        // The options call is now cached in the api
+        //if(this.fieldDefinitions) return this.$q.when(this.fieldDefinitions);
         return this.api.getOptions(url).then(function(fields){
             return fields.properties;
         }.bind(this), function(error){
@@ -1238,6 +1263,8 @@
 
         var   calls     = [];
 
+        if(this.isReadonly) return calls;
+
         this.locales.forEach(function(locale, id){
 
             var   originalLocale    = this.originalLocales[id]
@@ -1274,15 +1301,20 @@
     };
 
     JBFormLocaleComponentController.prototype.handleGetData = function(data){
-        var locales             = data[this.getLocaleProperty()];
+        var locales             = (data) ? data[this.getLocaleProperty()] : data;
         if(locales){
             this.originalLocales    = this.normalizeModel(locales);
             this.locales            = angular.copy(this.originalLocales);
         }
-        if(this.getSelectedLanguages().length === 0) {
-            return this.$timeout(function(){ this.toggleLanguage(null, this.supportedLanguages[0]);}.bind(this));
+        this.ensureLanguageIsSelected().then(this.adjustAllHeights.bind(this));
+    };
+
+    JBFormLocaleComponentController.prototype.ensureLanguageIsSelected = function(){
+        if(!this.selectedLanguages) this.selectedLanguages = [];
+        if(this.selectedLanguages.length === 0) {
+            return this.toggleLanguage(null, this.supportedLanguages[0]);
         }
-        this.$timeout(this.adjustAllHeights.bind(this));
+        return this.$timeout();
     };
 
     JBFormLocaleComponentController.prototype.getFields = function(){
@@ -1326,6 +1358,7 @@
      * @todo: use the registration system to detect all the input fields and let them validate themselves?
      */
     JBFormLocaleComponentController.prototype.isValid = function(){
+        if(this.isReadonly) return true;
         return this.locales.reduce(function(localeValidity, locale, index){
             if(angular.isUndefined(locale)) return localeValidity;
             if(angular.isUndefined(this.originalLocales[index]) && this._localeIsEmpty(locale)) return localeValidity;
@@ -1354,106 +1387,128 @@
  */
 (function (undefined) {
 
-	'use strict';
+    'use strict';
 
-	var _module = angular.module('jb.formComponents');
+    var _module = angular.module('jb.formComponents');
+    /*
+     Get these fuckers from the options call.
 
-	function createBaseDirective(controller){
-		return function() {
-			return {
-				controller: controller
-				, controllerAs: '$ctrl'
-				, bindToController: true
-				, link: {
-					pre: function (scope, element, attrs, ctrl) {
-						ctrl.preLink(scope, element, attrs);
-					}
-					, post: function (scope, element, attrs, ctrl) {
-						ctrl.postLink(scope, element, attrs);
-					}
-				}
-				, scope: {
-					  'propertyName'    : '@for'
-					, 'entityName'      : '@entity'
-					, 'relationName'    : '@relation'
-					, 'label'           : '@'
-					, 'showLabel'		: '<?'
-					, 'suggestion'      : '@suggestionTemplate'
-					, 'searchField'     : '@'
-					, 'changeHandler'   : '&'
+     , deletable             : '<?relationIsDeletable'
+     , creatable             : '<?relationIsCreatable' */
+
+    function createBaseDirective(controller){
+        return function() {
+            return {
+                  controller        : controller
+                , controllerAs      : '$ctrl'
+                , bindToController  : true
+                , link: {
+                    pre: function (scope, element, attrs, ctrl) {
+                        ctrl.preLink(scope, element, attrs);
+                    }
+                    , post: function (scope, element, attrs, ctrl) {
+                        ctrl.hasLabel = attrs.hasOwnProperty('label');
+                        ctrl.postLink(scope, element, attrs);
+                    }
+                }
+                , scope: {
+                      'propertyName'    : '@for'
+                    , 'entityName'      : '@entity'
+                    , 'relationName'    : '@relation'
+
+                    , 'label'           : '@'
+                    , 'showLabel'		: '<?'
+
+                    , 'suggestion'      : '@suggestionTemplate'
+                    , 'searchField'     : '@'
+                    , 'changeHandler'   : '&'
                     , 'filters'         : '<'
-					, 'interactive'		: '<isInteractive'
-				}
-			};
-		};
-	}
 
-	_module.directive('jbFormReferenceComponent' , [createBaseDirective('JBFormReferenceController')]);
-	_module.directive('jbFormRelationComponent'  , [createBaseDirective('JBFormRelationController')]);
+                    , 'isInteractive'		: '<?relationIsInteractive'
+                    , 'disableRemoveButton'	: '<?relationDisableRemoveButton'
+                    , 'disableNewButton'	: '<?relationDisableNewButton'
+                    , 'disableEditButton'   : '<?relationDisableEditButton'
 
-	/**
-	 * Controller which handles the reference to an entity. Currently used as super-controller, but we should change that.
-	 *
-	 * @param $scope
-	 * @param $attrs
-	 * @param $compile
-	 * @param $templateCache
-	 * @param componentsService
-	 * @param relationService
-	 * @constructor
-	 */
-	function JBFormReferenceController($scope, $attrs, $compile, $templateCache, componentsService, relationService) {
-		this.subcomponentsService   = componentsService;
-		this.options                = null;
-		this.originalData           = [];
-		this.suggestion             = '';
-		this.relationService        = relationService;
-		this.$scope                 = $scope;
-		this.$compile               = $compile;
-		this.$templateCache         = $templateCache;
-		this.element                = null;
-		this.currentData            = [];
-		this.referencedPropertyName = null;
+                    , 'isReadonly'          : '<?relationIsReadonly'
+
+                    , 'resultCount'         : '<?relationResultCount'
+                }
+            };
+        };
+    }
+
+    _module.directive('jbFormReferenceComponent' , [createBaseDirective('JBFormReferenceController')]);
+    _module.directive('jbFormRelationComponent'  , [createBaseDirective('JBFormRelationController')]);
+
+    /**
+     * Controller which handles the reference to an entity. Currently used as super-controller, but we should change that.
+     *
+     * @param $scope
+     * @param $attrs
+     * @param $compile
+     * @param $templateCache
+     * @param componentsService
+     * @param relationService
+     * @constructor
+     */
+    function JBFormReferenceController($scope, $attrs, $compile, $templateCache, componentsService, relationService) {
+        this.subcomponentsService   = componentsService;
+        this.options                = null;
+        this.originalData           = [];
+        this.suggestion             = '';
+        this.relationService        = relationService;
+        this.$scope                 = $scope;
+        this.$compile               = $compile;
+        this.$templateCache         = $templateCache;
+        this.element                = null;
+        this.currentData            = [];
+        this.referencedPropertyName = null;
         this.relationTypes          = ['hasOne'];
         this.rendered               = false;
         this.isWatchingForCallback  = false;
-	}
+        this.isMultiSelect          = false;
+        this.parentOptions          = null;
+    }
 
-	JBFormReferenceController.prototype.preLink = function () {};
+    JBFormReferenceController.prototype.preLink = function () {};
 
-	JBFormReferenceController.prototype.postLink = function (scope, element, attrs) {
-	    if(angular.isUndefined(this.showLabel)) this.showLabel = true;
-		this.subcomponentsService.registerComponent(scope, this);
-		this.element = element;
-	};
+    JBFormReferenceController.prototype.postLink = function (scope, element, attrs) {
+        if(angular.isUndefined(this.showLabel)) this.showLabel = true;
+        this.subcomponentsService.registerComponent(scope, this);
+        this.element = element;
+    };
 
-	JBFormReferenceController.prototype.registerAt = function (parent) {
-		parent.registerOptionsDataHandler(this.handleOptionsData.bind(this));
-		parent.registerGetDataHandler(this.handleGetData.bind(this));
-	};
+    JBFormReferenceController.prototype.displayLabel = function(){
+        return this.hasLabel && this.showLabel !== false;
+    };
 
-	JBFormReferenceController.prototype.unregisterAt = function (parent) {
-		parent.unregisterOptionsDataHandler(this.handleOptionsData);
-		parent.unregisterGetDataHandler(this.handleGetData);
-	};
+    JBFormReferenceController.prototype.registerAt = function (parent) {
+        parent.registerOptionsDataHandler(this.handleOptionsData.bind(this));
+        parent.registerGetDataHandler(this.handleGetData.bind(this));
+    };
 
-	JBFormReferenceController.prototype.getEndpoint = function () {
-		return this.entityName;
-	};
+    JBFormReferenceController.prototype.unregisterAt = function (parent) {
+        parent.unregisterOptionsDataHandler(this.handleOptionsData);
+        parent.unregisterGetDataHandler(this.handleGetData);
+    };
 
-	// @todo: catch it if the options are not found
-	// @todo: make this method abstract and implement it for the reference as well as the relation
+    JBFormReferenceController.prototype.getEndpoint = function () {
+        return this.entityName;
+    };
 
-	JBFormReferenceController.prototype.handleGetData = function (data) {
-		this.currentData = [];
-		if (data && data[this.relationName]) {
-			var selectedData = data[this.relationName];
-			if(!angular.isArray(selectedData)){
-				selectedData = [selectedData];
-			}
-			this.currentData = selectedData;
-		}
-		this.originalData = angular.copy(this.currentData);
+    // @todo: catch it if the options are not found
+    // @todo: make this method abstract and implement it for the reference as well as the relation
+
+    JBFormReferenceController.prototype.handleGetData = function (data) {
+        this.currentData = [];
+        if (data && data[this.relationName]) {
+            var selectedData = data[this.relationName];
+            if(!angular.isArray(selectedData)){
+                selectedData = [selectedData];
+            }
+            this.currentData = selectedData;
+        }
+        this.originalData = angular.copy(this.currentData);
         if(!this.isWatchingForCallback){
             this.$scope.$watch(
                   function(){ return this.currentData; }.bind(this)
@@ -1462,214 +1517,207 @@
                 }.bind(this));
             this.isWatchingForCallback = true;
         }
-		console.log('BackofficeReferenceComponentController: Model updated (updateData) to %o', this.currentData);
-	};
+        console.log('BackofficeReferenceComponentController: Model updated (updateData) to %o', this.currentData);
+    };
 
-	// @todo: make this method abstract and implement it for reference as well as relation
-	JBFormReferenceController.prototype.getSpec = function(data){
-		var relations = (data && data.relations) ? data.relations : [];
+    // @todo: make this method abstract and implement it for reference as well as relation
+    JBFormReferenceController.prototype.getSpec = function(data){
+
+        var   relations = (data && data.relations) ? data.relations : []
+            , relation;
 
         if(!relations.length) return;
 
-        for(var i= 0; i<relations.length; i++){
-            var current = relations[i];
-            if(this.relationTypes.indexOf(current.type) === -1) continue;
-            if(current.property && this.propertyName === current.property)              return current;
-            if(current.remote.resource && this.entityName === current.remote.resource)  return current;
-            if(current.name && this.relationName === current.name)                      return current;
+        for(var i=0; i<relations.length; i++){
+            relation = relations[i];
+            if(this.relationTypes.indexOf(relation.type) === -1)                continue;
+            if(relation.property && this.propertyName === relation.property)    return relation;
+            if(relation.name && this.relationName === relation.name)            return relation;
+            if(relation.remote.resource && this.entityName === relation.name)   return relation;
         }
 
-	};
+        return;
+    };
 
-	JBFormReferenceController.prototype.handleOptionsData = function (data) {
-
+    JBFormReferenceController.prototype.handleOptionsData = function (data) {
         if(this.rendered === true) return;
 
-        var fieldSpec = this.getSpec(data);
+        var   fieldSpec    = this.getSpec(data);
 
-		if (!angular.isDefined(fieldSpec)) {
-			return console.error(
-				'JBFormReferenceController: No options data found for name %o referencing entity %o.'
-				, this.propertyName
-				, this.entityName);
-		}
-		this.propertyName           = fieldSpec.property;
-		this.entityName             = fieldSpec.remote.resource;
-		this.relationName           = fieldSpec.name;
-		this.referencedPropertyName = fieldSpec.remote.property;
-		this.options                = fieldSpec;
+        if (!angular.isDefined(fieldSpec)) {
+            return console.error(
+                'JBFormRelationComponent: No options data found for name %o referencing entity %o or relation %o.'
+                , this.propertyName
+                , this.entityName
+                , this.relationName);
+        }
+        this.parentOptions = data;
+        if(this.adaptToSpec(fieldSpec)) {
+            return this.renderComponent();
+        }
+    };
 
-		// Now we've got all the necessary information to render the component (this is hacky stuff).
-		return this.renderComponent();
-	};
-	JBFormReferenceController.prototype.isMultiSelect = function(){
-		return false;
-	};
-	/**
-	 * Renders the current directive by modifying the template and recompiling the content of the current component.
-	 *
-	 * This is a rather hacky way of injecting the content but sadly the 'relation-input' directive does not properly
-	 * access/evaluate all of its parameters and therefore not all values are correctly interpreted if inserted using
-	 * bindings within the template.
-	 */
-	JBFormReferenceController.prototype.renderComponent = function(){
-		// This happens synchronously, and is therefore not a problem
-		var template = angular.element(this.$templateCache.get('referenceComponentTemplate.html'));
-		template
-			.find( '[relation-input]')
-			.attr( 'relation-entity-endpoint'	, this.getEndpoint() )
-			.attr( 'relation-interactive'		, '$ctrl.isInteractive()' )
-			// deleteable is evaluated by the directive, nevertheless i don't like that since it is likely to break.
-			.attr( 'deletable', '$ctrl.isDeletable()' )
-			.attr( 'relation-entity-search-field', this.getSearchField() )
-			.attr( 'relation-suggestion-template', this.getSuggestionTemplate() )
-			.attr( 'multi-select', this.isMultiSelect() )
-            .attr( 'filters', '$ctrl.filters' )
-			.attr( 'ng-model', '$ctrl.currentData' );
+    JBFormReferenceController.prototype.adaptToSpec = function(fieldSpec) {
+        this.propertyName           = fieldSpec.property;
+        this.entityName             = fieldSpec.remote.resource;
+        this.relationName           = fieldSpec.name;
+        this.referencedPropertyName = fieldSpec.remote.property;
+        this.options                = fieldSpec;
 
-		this.$compile( template )( this.$scope );
-		this.element.prepend( template );
+        return true;
+    };
+
+    /**
+     * Renders the current directive by modifying the template and recompiling the content of the current component.
+     *
+     * This is a rather hacky way of injecting the content but sadly the 'relation-input' directive does not properly
+     * access/evaluate all of its parameters and therefore not all values are correctly interpreted if inserted using
+     * bindings within the template.
+     */
+    JBFormReferenceController.prototype.renderComponent = function(){
+        // This happens synchronously, and is therefore not a problem
+        var template = angular.element(this.$templateCache.get('referenceComponentTemplate.html'));
+        this.$compile( template )( this.$scope );
+        this.element.prepend( template );
         this.rendered = true;
-	};
+    };
 
-	JBFormReferenceController.prototype.addModelTransformations = function(template){
-		return template.attr('sanitize-model', true);
-	};
+    JBFormReferenceController.prototype.addModelTransformations = function(template){
+        return template.attr('sanitize-model', true);
+    };
 
-	JBFormReferenceController.prototype.isInteractive = function(){
-	    console.info(this.interactive);
-		return angular.isDefined(this.interactive) ? this.interactive : true;
-	};
+    JBFormReferenceController.prototype.isInteractive = function(){
+        console.info(this.interactive);
+        return angular.isDefined(this.interactive) ? this.interactive : true;
+    };
 
-	JBFormReferenceController.prototype.isDeletable = function(){
-		return true;
-	};
+    JBFormReferenceController.prototype.isDeletable = function(){
+        return this.options && !this.isRequired() && this.options.permissions && this.options.permissions.deleteRelation === true;
+    };
 
-	JBFormReferenceController.prototype.getLabel = function () {
-		if (this.label) return this.label;
-		return this.propertyName;
-	};
+    JBFormReferenceController.prototype.isCreatable = function(){
+        return this.options && this.options.permissions && this.options.permissions.createRelation === true;
+    };
 
-	JBFormReferenceController.prototype.getSelectFields = function () {
-		var   selectFields   = this.relationService.extractSelectFields(this.getSuggestionTemplate())
-			, prefixedFields;
+    JBFormReferenceController.prototype.getLabel = function () {
+        if (this.label) return this.label;
+        return this.propertyName;
+    };
 
-		prefixedFields = selectFields.map(function (field) {
-			return [this.relationName, field].join('.');
-		}, this);
+    JBFormReferenceController.prototype.getSelectFields = function () {
+        var   selectFields   = this.relationService.extractSelectFields(this.getSuggestionTemplate())
+            , prefixedFields;
+
+        prefixedFields = selectFields.map(function (field) {
+            return [this.relationName, field].join('.');
+        }, this);
 
         if(this.propertyName) prefixedFields.unshift(this.propertyName);
 
-		return prefixedFields;
-	};
+        return prefixedFields;
+    };
 
-	JBFormReferenceController.prototype.isRequired = function () {
-		if (!this.options) return true;
-		return this.options.nullable === true;
-	};
+    JBFormReferenceController.prototype.isRequired = function () {
+        if (!this.options) return true;
+        return this.options.nullable === true;
+    };
 
-	JBFormReferenceController.prototype.isMultiSelect = function () {
-		return false;
-	};
+    JBFormReferenceController.prototype.getSuggestionTemplate = function () {
+        return this.suggestion;
+    };
 
-	JBFormReferenceController.prototype.getSuggestionTemplate = function () {
-		return this.suggestion;
-	};
+    JBFormReferenceController.prototype.getSearchField = function(){
+        return this.searchField;
+    };
 
-	JBFormReferenceController.prototype.getSearchField = function(){
-		return this.searchField;
-	};
+    JBFormReferenceController.prototype.isValid = function(){
+        if(this.isRequired()) return this.currentData.length > 0;
+        return true;
+    };
 
-	JBFormReferenceController.prototype.isValid = function(){
-		if(this.isRequired()) return this.currentData.length > 0;
-		return true;
-	};
+    JBFormReferenceController.prototype.getSaveCalls = function(){
 
-	JBFormReferenceController.prototype.getSaveCalls = function(){
+        var   currentModel      = this.currentData[0]
+            , originalModel     = this.originalData[0]
+            , currentProperty
+            , originalProperty;
 
-		var   currentModel      = this.currentData[0]
-			, originalModel     = this.originalData[0]
-			, currentProperty
-			, originalProperty;
+        if(currentModel) currentProperty = currentModel[this.referencedPropertyName];
+        if(originalModel) originalProperty = originalModel[this.referencedPropertyName];
+        /**
+         * This check is sufficient to detect if:
+         *   - the reference was removed (currentProperty === undefined)
+         *   - the reference has changed
+         *   - the reference was added   (originalProperty === undefined)
+         */
+        if(originalProperty !== currentProperty){
+            var saveCall = {
+                data: {}
+            };
+            /**
+             * Set the original propertyName, i.e. the foreign key property (e.g id_city).
+             * @note: To reset the property we have to pass the empty string.
+             */
+            saveCall.data[this.propertyName] = angular.isDefined(currentProperty) ? currentProperty : '';
+            return [saveCall];
+        }
 
-		if(currentModel) currentProperty = currentModel[this.referencedPropertyName];
-		if(originalModel) originalProperty = originalModel[this.referencedPropertyName];
-		/**
-		 * This check is sufficient to detect if:
-		 *   - the reference was removed (currentProperty === undefined)
-		 *   - the reference has changed
-		 *   - the reference was added   (originalProperty === undefined)
-		 */
-		if(originalProperty !== currentProperty){
-			var saveCall = {
-				data: {}
-			};
-			/**
-			 * Set the original propertyName, i.e. the foreign key property (e.g id_city).
-			 * @note: To reset the property we have to pass the empty string.
-			 */
-			saveCall.data[this.propertyName] = angular.isDefined(currentProperty) ? currentProperty : '';
-			return [saveCall];
-		}
+        return [];
+    };
 
-		return [];
-	};
-
-	function JBFormRelationController($scope, $attrs, $compile, $templateCache, componentsService, relationService){
-		JBFormReferenceController.call(this, $scope, $attrs, $compile, $templateCache, componentsService, relationService);
+    function JBFormRelationController($scope, $attrs, $compile, $templateCache, componentsService, relationService){
+        JBFormReferenceController.call(this, $scope, $attrs, $compile, $templateCache, componentsService, relationService);
         this.relationTypes = ['hasMany', 'hasManyAndBelongsToMany'];
-	}
+        this.isMultiSelect = true;
+    }
 
-	/**
-	 *
-	 * @type {JBFormReferenceController}
-	 */
-	JBFormRelationController.prototype = Object.create(JBFormReferenceController.prototype);
-	JBFormRelationController.prototype.constructor = JBFormRelationController;
-	JBFormRelationController.prototype.isMultiSelect = function(){
-		return true;
-	};
+    /**
+     *
+     * @type {JBFormReferenceController}
+     */
+    JBFormRelationController.prototype = Object.create(JBFormReferenceController.prototype);
+    JBFormRelationController.prototype.constructor = JBFormRelationController;
 
-	/**
-	 * @todo: this might be implemented as a post-save call to ensure that the original entity was saved
+    /**
+     * @todo: this might be implemented as a post-save call to ensure that the original entity was saved
      * @todo: remove the workaround for content data on delete requests
-	 * @returns {*}
-	 */
-	JBFormRelationController.prototype.getSaveCalls = function(){
+     * @returns {*}
+     */
+    JBFormRelationController.prototype.getSaveCalls = function(){
 
-		var   currentProperties  = this.mapProperties(this.currentData, this.propertyName)
-			, calls;
+        var   currentProperties  = this.mapProperties(this.currentData, this.propertyName)
+            , calls;
 
-		// check for items that are present in the original data and the current data
-		calls = this.originalData.reduce(function(removeCalls, item){
-			var value = item[this.propertyName];
-			if(angular.isDefined(currentProperties[value])){
-				// defined in both
-				delete currentProperties[value];
-			} else {
-				// otherwise it is only defined in the the originalData and is therefore removed
-				removeCalls.push({
-					method    : 'DELETE'
-					, url       : {
-						  path       : [ this.relationName, value].join('/')
-						, mainEntity : 'append'
-					}
-				});
-			}
-			return removeCalls;
-		}.bind(this), []);
-		// newly added items are all the items that remain in the current properties map
-		Object.keys(currentProperties).forEach(function(value){
-			calls.push({
-				  method    : 'POST'
-				, url       : {
-					  path       : [ this.relationName, value].join('/')
-					, mainEntity : 'append'
-				}
-			});
-		}, this);
-		return calls;
-	};
+        // check for items that are present in the original data and the current data
+        calls = this.originalData.reduce(function(removeCalls, item){
+            var value = item[this.propertyName];
+            if(angular.isDefined(currentProperties[value])){
+                // defined in both
+                delete currentProperties[value];
+            } else {
+                // otherwise it is only defined in the the originalData and is therefore removed
+                removeCalls.push({
+                    method    : 'DELETE'
+                    , url       : {
+                          path       : [ this.relationName, value].join('/')
+                        , mainEntity : 'append'
+                    }
+                });
+            }
+            return removeCalls;
+        }.bind(this), []);
+        // newly added items are all the items that remain in the current properties map
+        Object.keys(currentProperties).forEach(function(value){
+            calls.push({
+                  method    : 'POST'
+                , url       : {
+                      path       : [ this.relationName, value].join('/')
+                    , mainEntity : 'append'
+                }
+            });
+        }, this);
+        return calls;
+    };
 
     JBFormRelationController.prototype.getSelectFields = function () {
         var   selectFields   = this.relationService.extractSelectFields(this.getSuggestionTemplate())
@@ -1681,59 +1729,124 @@
 
         return prefixedFields;
     };
-	/**
-	 * Creates a map between the value of a specific property and the item within a collection of items (assuming that
-	 * the properties are unique).
-	 *
-	 * @param collection
-	 * @param property
-	 * @returns {{values: Array, map: {}}}
-	 */
-	JBFormRelationController.prototype.mapProperties = function(collection, property){
-		return collection.reduce(function(map, item){
-			map[item[property]] = item;
-			return map;
-		}, {});
-	};
+    /**
+     * Creates a map between the value of a specific property and the item within a collection of items (assuming that
+     * the properties are unique).
+     *
+     * @param collection
+     * @param property
+     * @returns {{values: Array, map: {}}}
+     */
+    JBFormRelationController.prototype.mapProperties = function(collection, property){
+        return collection.reduce(function(map, item){
+            map[item[property]] = item;
+            return map;
+        }, {});
+    };
 
-	_module.controller('JBFormReferenceController', [
-		  '$scope'
-		, '$attrs'
-		, '$compile'
-		, '$templateCache'
-		, 'JBFormComponentsService'
-		, 'RelationInputService'
-		, JBFormReferenceController
-	]);
+    JBFormRelationController.prototype.rateSpec = function(relation){
+        var rating = 0;
+        if(this.relationTypes.indexOf(relation.type) === -1)                return rating;
+        //if(relation.property && this.propertyName === relation.property)    rating++;
+        if(relation.name && this.relationName === relation.name)            		   rating++;
+        if(relation.remote.resource && this.entityName === relation.remote.resource)   rating++;
 
-	_module.controller('JBFormRelationController', [
-		  '$scope'
-		, '$attrs'
-		, '$compile'
-		, '$templateCache'
-		, 'JBFormComponentsService'
-		, 'RelationInputService'
-		, JBFormRelationController
-	]);
+        return rating;
+    };
 
-	_module.run(['$templateCache', function ($templateCache) {
-		$templateCache.put('referenceComponentTemplate.html',
-			'<div class="form-group">' +
-			    '<label jb-form-label-component ' +
-						'label-identifier="{{$ctrl.getLabel()}}" ' +
-						'is-required="$ctrl.isRequired()" ' +
-						'is-valid="$ctrl.isValid()" ' +
-						'ng-if="$ctrl.showLabel">' +
-				'</label>' +
-			    '<div relation-input class="relation-select" ng-class="{ \'col-md-9\' : $ctrl.showLabel , \'col-md-12\' : !$ctrl.showLabel }"></div>' +
-			'</div>');
-	}]);
+    JBFormRelationController.prototype.getSpec = function(data){
+
+        var   relations = (data && data.relations) ? data.relations : []
+            , ratedSpecs
+            , maxRating = 0;
+
+        if(!relations.length) return;
+
+        ratedSpecs = relations.reduce(function(ratings, relation){
+            var rating = this.rateSpec(relation);
+            if(!ratings[rating]) ratings[rating] = [];
+            ratings[rating].push(relation);
+            maxRating = Math.max(maxRating, rating);
+            return ratings;
+        }.bind(this), {});
+
+        if(maxRating === 0) return;
+        return ratedSpecs[maxRating];
+    };
+
+    JBFormRelationController.prototype.adaptToSpec = function(fieldSpecs) {
+
+        if(fieldSpecs.length !== 1){
+            console.error(
+                  'JBFormRelationController: the relation to entity %o using accessor (relation) %o does not seem to be unique and has multiple possible relations %o'
+                , this.entityName
+                , this.relationName
+                , fieldSpecs
+            );
+            return false
+        }
+
+        return JBFormReferenceController.prototype.adaptToSpec.call(this, fieldSpecs[0]);
+    };
+
+    _module.controller('JBFormReferenceController', [
+          '$scope'
+        , '$attrs'
+        , '$compile'
+        , '$templateCache'
+        , 'JBFormComponentsService'
+        , 'RelationInputService'
+        , JBFormReferenceController
+    ]);
+
+    _module.controller('JBFormRelationController', [
+          '$scope'
+        , '$attrs'
+        , '$compile'
+        , '$templateCache'
+        , 'JBFormComponentsService'
+        , 'RelationInputService'
+        , JBFormRelationController
+    ]);
+
+    _module.run(['$templateCache', function ($templateCache) {
+        $templateCache.put('referenceComponentTemplate.html',
+            '<div class="form-group">' +
+                '<label jb-form-label-component ' +
+                        'label-identifier="{{$ctrl.getLabel()}}" ' +
+                        'is-required="$ctrl.isRequired()" ' +
+                        'is-valid="$ctrl.isValid()" ' +
+                        'ng-if="$ctrl.displayLabel()">' +
+                '</label>' +
+                '<div class="relation-select" ' +
+                        'relation-input ' +
+                        'ng-class="{ \'col-md-9\' : $ctrl.displayLabel() , \'col-md-12\' : !$ctrl.displayLabel() }" ' +
+                        'ng-model="$ctrl.currentData" ' +
+                        'relation-entity-endpoint="{{$ctrl.entityName}}" ' +
+                        'relation-suggestion-template="{{$ctrl.suggestion}}" ' +
+                        'relation-search-field="{{$ctrl.searchField}}" ' +
+
+                        'relation-disable-remove-button="$ctrl.disableRemoveButton" ' +
+                        'relation-disable-new-button="$ctrl.disableNewButton" ' +
+                        'relation-disable-edit-button="$ctrl.disableEditButton" ' +
+
+                        'relation-is-deletable="$ctrl.isDeletable()" ' +
+                        'relation-is-creatable="$ctrl.isCreatable()" ' +
+
+                        'relation-result-count="$ctrl.resultCount " ' +
+                        'relation-is-readonly="$ctrl.isReadonly" ' +
+                        'relation-is-multi-select="$ctrl.isMultiSelect" ' +
+                        'relation-filter="$ctrl.filters" ' +
+                        'relation-is-interactive="$ctrl.isInteractive"> ' +
+                '</div>' +
+            '</div>');
+    }]);
 })();
 (function(undefined){
     "use strict";
     var _module = angular.module('jb.formComponents');
 
-    function JBFormRepeatingViewController(componentsService, $compile, $scope, $timeout){
+    function JBFormRepeatingViewController(componentsService, $compile, $scope, $timeout, $q){
         this.componentsService  = componentsService;
         this.componentsRegistry = null;
         this.$compile           = $compile;
@@ -1741,15 +1854,19 @@
         this.type               = 'JBFormRepeating';
         this.optionData         = null;
         this.$timeout           = $timeout;
+        this.$q                 = $q;
         this.entities           = [undefined];
     }
 
     JBFormRepeatingViewController.prototype.preLink = function(scope){
         // listens to all events coming from within
+        // todo: the unregistration is triggered for all elements if we change the amount of entities (so the view might be empty)
         this.componentsRegistry = this.componentsService.registryFor(scope);
         this.componentsRegistry.listen();
-        this.componentsRegistry.onUnregistration(function(component, index){
-            this.entities.splice(index, 1);
+        scope.$on('removeElement', function(event, index){
+            event.stopPropagation();
+            if(this.isReadonly === true) return;
+            this.removeElement(index);
         }.bind(this));
     };
 
@@ -1762,18 +1879,22 @@
     };
 
     JBFormRepeatingViewController.prototype.getSaveCalls = function(){
+        if(this.isReadonly === true) return [];
         return this.componentsRegistry.getSaveCalls();
     };
 
     JBFormRepeatingViewController.prototype.afterSaveTasks = function(id){
+        if(this.isReadonly === true) return;
         return this.componentsRegistry.afterSaveTasks(id);
     };
 
     JBFormRepeatingViewController.prototype.beforeSaveTasks = function(entity){
+        if(this.isReadonly === true) return;
         return this.componentsRegistry.beforeSaveTasks(entity);
     };
 
     JBFormRepeatingViewController.prototype.isValid = function(){
+        if(this.isReadonly === true) return true;
         return this.componentsRegistry.isValid();
     };
 
@@ -1804,38 +1925,62 @@
     // @todo: do we need to trigger two digests to be sure that all sub views are unlinked?
     JBFormRepeatingViewController.prototype.handleGetData = function(data){
         return this.$timeout(function(){
-            this.entities.splice(0);
-        }.bind(this), 0)
-            .then(function(){
-                if(data){
-                    return this.$timeout(function(){
-                        var   content = data[this.entityName] || [];
-                        content.forEach(function(entry){
-                            this.entities.push(entry);
-                        }, this);
-                    }.bind(this), 0)
+                if(data && data[this.entityName]){
+                    this.entities = data[this.entityName];
+                } else {
+                    this.entities = [];
                 }
             }.bind(this))
             .then(function(){
-                return this.$timeout(function() {
-                    this.componentsRegistry
-                        .optionsDataHandler(this.optionData)
-                        .then(function(success) {
-                            return this.componentsRegistry.distributeIndexed(data);
-                            //return value;
-                        }.bind(this)
-                        , function(error) {
-                            console.error(error);
-                        });
-                }.bind(this), 0);
+                this.distributeOptionsAndData(this.optionData, data, 0);
             }.bind(this));
     };
 
-    JBFormRepeatingViewController.prototype.addElement = function(){
+    JBFormRepeatingViewController.prototype.addElement = function(index){
+
+        if(this.isReadonly) return;
+
         this.entities.push({});
-        this.$timeout(function(){
-            return this.componentsRegistry.optionsDataHandler(this.optionData);
-        }.bind(this));
+
+        //todo: if we distribute the data like this, the lower form view adapters reset their entity, fix this.
+        var data = {};
+        data[this.entityName] = this.entities;
+
+        return this.distributeOptionsAndData(this.optionData, data, this.entities.length - 1);
+    };
+
+    JBFormRepeatingViewController.prototype.distributeOptionsAndData = function(options, data, startIndex){
+        return this.$timeout(function() {
+            this.componentsRegistry
+                .optionsDataHandler(options)
+                .then(function(success) {
+                        return this.componentsRegistry.distributeIndexedFrom(data, startIndex);
+                    }.bind(this)
+                    , function(error) {
+                        console.error(error);
+                    });
+        }.bind(this))
+    };
+
+    JBFormRepeatingViewController.prototype.removeElement = function(index){
+
+        if(this.isReadonly) return;
+
+        var   component   = this.componentsRegistry.componentAt(index)
+            , basePromise = this.$q.when()
+            , self        = this;
+
+        return basePromise
+            .then(function(success){
+                self.entities.splice(index, 1);
+            })
+            .then(function(success){
+                return self.$timeout(function(){
+                    return self.componentsRegistry.optionsDataHandler(self.optionData);
+                });
+            }.bind(this)).catch(function(error){
+                console.error(error);
+            });
     };
 
     _module.controller('JBFormRepeatingViewController', [
@@ -1843,6 +1988,7 @@
         , '$compile'
         , '$scope'
         , '$timeout'
+        , '$q'
         , JBFormRepeatingViewController
     ]);
 
@@ -1860,6 +2006,18 @@
 
                 , post: function(scope, element, attrs, ctrl){
 
+                    var   hasReadonlyFlag = attrs.hasOwnProperty('isReadonly')
+                        , readonlyGetter;
+
+                    if(hasReadonlyFlag){
+                        readonlyGetter = $parse(attrs.isReadonly);
+                        scope.$watch(function(){
+                            return readonlyGetter(scope.$parent);
+                        }, function(isReadonly){
+                            ctrl.isReadonly = isReadonly === true;
+                        });
+                    }
+
                     attrs.$observe('entityName', function(newValue){
                         ctrl.entityName = newValue;
                     });
@@ -1871,17 +2029,15 @@
 
                     ctrl.postLink(scope);
 
-                    scope.addElement = function(event){
-                        if(event){
-                            event.preventDefault();
-                            event.stopPropagation();
-                        }
-                        ctrl.addElement();
+                    scope.addElement = function(event, index){
+                        if(event) event.preventDefault();
+                        return ctrl.addElement(index);
                     };
 
-                    /*var button = angular.element('<div class="container clearfix"><button class="btn btn-sm btn-default pull-right" ng-click="addElement($event)">{{ $ctrl.buttonText | translate }}</button></div>');
-                    element.append(button);
-                    $compile(button)(scope);*/
+                    scope.removeElement = function(event, index){
+                        if(event) event.preventDefault();
+                        return ctrl.removeElement(index);
+                    };
                 }
             }
         }
@@ -1891,17 +2047,45 @@
 
     'use strict';
 
+    // Bind to form components module.
     var _module = angular.module('jb.formComponents');
 
-    function JBFormViewAdapterReferenceStrategy(formView){
+    /**
+     * Helper function to properly extract the parent id from the options data.
+     */
+
+    function getParentId(optionsData, entity){
+        var   keys  = optionsData.primaryKeys
+            , key   = keys[0];
+
+        if(keys.length !== 1) throw Error('The entity used in a form view needs to have a single field primary key');
+        return entity[key];
+    }
+
+    function JBFormViewAdapterReferenceStrategy(formView, $q, api, scope){
         this.formView           = formView;
         this.optionsData        = null;
         this.initialId          = null;
         this.parentOptionsData  = null;
         this.isDeleted          = false;
+        this.$q                 = $q;
+        this.parentId           = null;
+        this.setupListeners(scope);
     }
 
+    /**
+     * Since the Reference is not made for the use in repeating views, we do not emit the corresponding event to parent scopes.
+     *
+     * @param scope
+     */
+    JBFormViewAdapterReferenceStrategy.prototype.setupListeners = function(scope){
+        scope.$on('removedDetailView', function(event){
+            event.stopPropagation();
+        });
+    };
+
     JBFormViewAdapterReferenceStrategy.prototype.handleOptionsData = function(data){
+        this.parentOptionsData  = data;
         this.optionsData        = this.formView.getSpecFromOptionsData(data);
         return this.formView.getOptionsData();
     };
@@ -1910,7 +2094,9 @@
         return this.formView.makeSaveRequest();
     };
 
-    JBFormViewAdapterReferenceStrategy.prototype.afterSaveTasks = function(){};
+    JBFormViewAdapterReferenceStrategy.prototype.afterSaveTasks = function(id){
+        return id;
+    };
 
     JBFormViewAdapterReferenceStrategy.prototype.getReferencingFieldName = function(){
         return this.optionsData.property;
@@ -1920,10 +2106,16 @@
      * @param data
      */
     JBFormViewAdapterReferenceStrategy.prototype.handleGetData = function(data){
-        var   id      = data[this.getReferencingFieldName()]
-            , content = data[this.formView.getEntityName()];
 
-        this.initialId = id;
+        var   id, content;
+
+        if(data){
+            id      = data[this.getReferencingFieldName()];
+            content = data[this.formView.getEntityName()];
+            this.parentId   = getParentId(this.parentOptionsData, data);
+        }
+
+        this.initialId  = id;
         this.formView.setEntityId(id);
         return this.formView.distributeData(content);
     };
@@ -1943,16 +2135,6 @@
 
     JBFormViewAdapterReferenceStrategy.prototype.getSaveCalls = function(){
 
-        if(this.isDeleted && !this.formView.isNew()) {
-            return [{
-                  method    : 'delete'
-                , url       : {
-                      path          : [this.formView.getEntityName(), this.formView.getEntityId()].join('/')
-                    , mainEntity    : 'append'
-                }
-            }]
-        }
-
         var   calls    = this.formView.generateSaveCalls()
             , call     = {};
 
@@ -1963,9 +2145,19 @@
         return [ call ].concat(calls);
     };
 
-    JBFormViewAdapterReferenceStrategy.prototype.storeDeleteRequest = function(){
-        this.isDeleted = true;
+    JBFormViewAdapterReferenceStrategy.prototype.deleteRelation = function(){
+        if(this.formView.isNew() || !this.parentId) return;
+
+        var endpoint = [
+            this.optionsData.name
+            , this.formView.getEntityId()
+            , this.parentOptionsData.resource
+            , this.initialParentId
+        ].join('/');
+
+        return this.api.delete(endpoint);
     };
+
 
     /**
      * Inverse Reference (belongs to) handling for nested form views.
@@ -1975,7 +2167,7 @@
      * @param formView
      * @constructor
      */
-    function JBFormViewAdapterInverseReferenceStrategy(formView){
+    function JBFormViewAdapterInverseReferenceStrategy(formView, $q, api, scope){
         this.formView           = formView;
         this.optionsData        = null;
         this.initialParentId    = null;
@@ -1983,13 +2175,29 @@
         this.parentOptionsData  = null;
         this.itemIndex          = 0;
         this.isDeleted          = false;
+        this.$q                 = $q;
+        this.api                = api;
+        this.hadData            = false;
         this.initialize(formView);
+        this.setupListeners(scope);
     }
+
+    JBFormViewAdapterInverseReferenceStrategy.prototype.setupListeners = function(scope) {
+        scope.$on('deletedDetailView', function(event) {
+            var currentScope = event.currentScope;
+            event.stopPropagation();
+            currentScope.$parent.$emit('removeElement', this.itemIndex);
+        }.bind(this));
+    };
 
     /**
      * This one should add the save call at the form-view.
      * @todo: add a validator which checks if the reference to the parent form-view is required!
      * @todo: check this, there are cases where the parent id might be the same (if we create a new sub entity in relation to a parent)
+     *
+     * This is a more secure way of setting up the relation because the related entity might need the id to be saved.
+     * Therefore we cannot set it using the default endpoint.
+     *
      * @param formView
      */
     JBFormViewAdapterInverseReferenceStrategy.prototype.initialize = function(formView){
@@ -2009,7 +2217,7 @@
     };
 
     JBFormViewAdapterInverseReferenceStrategy.prototype.handleOptionsData = function(data){
-        this.optionsData = this.formView.getSpecFromOptionsData(data);
+        this.optionsData        = this.formView.getSpecFromOptionsData(data);
         this.parentOptionsData  = data;
         return this.formView.getOptionsData();
     };
@@ -2020,12 +2228,12 @@
      */
     JBFormViewAdapterInverseReferenceStrategy.prototype.afterSaveTasks = function(id){
         this.parentId = id;
-        return this.formView.makeSaveRequest();
+        return this.formView.makeSaveRequest().then(function(){
+            return id;
+        });
     };
 
-    JBFormViewAdapterInverseReferenceStrategy.prototype.beforeSaveTasks = function(){
-
-    };
+    JBFormViewAdapterInverseReferenceStrategy.prototype.beforeSaveTasks = function(){};
 
     JBFormViewAdapterInverseReferenceStrategy.prototype.getReferencingFieldName = function(){
         return this.optionsData.remote.property;
@@ -2039,16 +2247,15 @@
 
         var   content = (data) ? data[this.formView.getEntityName()] : data
             , id
-            , parentId
-            , parentIdKey;
+            , parentId;
 
         if(angular.isDefined(index)) this.itemIndex = index;
 
         if(content){
             if(content.length) content = this.getEntityFromData(content);
-            parentIdKey = this.formView.getIdFieldFrom(this.parentOptionsData);
+            this.hadData = true;
+            parentId    = getParentId(this.parentOptionsData, data);
             id          = this.formView.getOwnId(content);
-            parentId    = data[ parentIdKey ];
         }
 
         this.initialParentId = parentId;
@@ -2077,11 +2284,16 @@
         return [];
     };
 
-    JBFormViewAdapterInverseReferenceStrategy.prototype.storeDeleteRequest = function(){
-        this.isDeleted = true;
+    JBFormViewAdapterInverseReferenceStrategy.prototype.getEndpoint = function(parentId){
+        return [
+            this.optionsData.name
+            , this.formView.getEntityId()
+            , this.parentOptionsData.resource
+            , parentId
+        ].join('/');
     };
 
-    function JBFormViewMappingStrategy(formView){
+    function JBFormViewMappingStrategy(formView, $q, api, scope){
         this.formView           = formView;
         this.optionsData        = null;
         this.initialParentId    = null;
@@ -2089,11 +2301,24 @@
         this.parentOptionsData  = null;
         this.rootEntity         = null;
         this.itemIndex          = 0;
-        this.initialize(formView);
+        this.$q                 = $q;
+        this.api                = api;
+        this.hadData            = false;
+        this.setupListeners(scope);
     }
 
-    JBFormViewMappingStrategy.prototype.initialize = function(formView){
-        var self = this;
+    JBFormViewMappingStrategy.prototype.setupListeners = function(scope){
+        scope.$on('deletedDetailView', function(event){
+            var currentScope = event.currentScope;
+            event.stopPropagation();
+            this.deleteRelation()
+                .then(function(){
+                    currentScope.$parent.$emit('removeElement', this.itemIndex);
+                }.bind(this),
+                function(error){
+                    console.error(error);
+                });
+        }.bind(this));
     };
 
     JBFormViewMappingStrategy.prototype.handleOptionsData = function(data){
@@ -2103,24 +2328,30 @@
         return this.formView.getOptionsData();
     };
 
-    JBFormViewMappingStrategy.prototype.getReferencingFieldName = function(){
-        return this.optionsData.remote.property;
-    };
-
+    /**
+     * 1. Extract the data from the get call (usually invoked by a components registry passing in an index)
+     * 2. Get the id from the parent entity (used to create the mapping)
+     * 3. Get the id from the child entity
+     * 4. Set the id on the detail view
+     * 5. Distribute the data
+     *
+     * @todo: use the accessor name to extract the data instead of the entity name
+     * @param data
+     * @param index
+     */
     JBFormViewMappingStrategy.prototype.handleGetData = function(data, index){
 
         var   content = (data) ? data[this.formView.getEntityName()] : data
             , id
-            , parentId
-            , parentIdKey;
+            , parentId;
 
         if(angular.isDefined(index)) this.itemIndex = index;
 
         if(content){
             if(content.length) content = this.getEntityFromData(content);
-            parentIdKey = this.formView.getIdFieldFrom(this.parentOptionsData);
-            id          = this.formView.getOwnId(content);
-            parentId    = data[ parentIdKey ];
+            this.hadData    = true;
+            parentId        = getParentId(this.parentOptionsData, data);
+            id              = this.formView.getOwnId(content);
         }
 
         this.initialParentId = parentId;
@@ -2129,43 +2360,60 @@
         return this.formView.distributeData(content);
     };
 
+    JBFormViewMappingStrategy.prototype.getEntityFromData = function(data){
+        return data[this.itemIndex];
+    };
+
     JBFormViewMappingStrategy.prototype.isValid = function(){
-        // add the referenced property name to the selects
         return this.formView.isValid();
     };
 
+    /**
+     * @todo: take the relation name instead of the entity name
+     * @returns {Array}
+     */
     JBFormViewMappingStrategy.prototype.getSelectFields = function(){
-        var   selects = this.formView.getSelectParameters().map(function (select) {
+        return this.formView.getSelectParameters().map(function (select) {
             return [this.formView.getEntityName(), select].join('.');
         }.bind(this));
-        return selects;
     };
 
     JBFormViewMappingStrategy.prototype.afterSaveTasks = function(id){
-        /*this.parentId = id;
-        return this.formView.makeSaveRequest();*/
+        this.parentId = id;
+        return this.formView
+                .makeSaveRequest()
+                .then(function(){
+                    return this.createRelation(id);
+                }.bind(this))
+                .then(function(){
+                    return id;
+                });
     };
 
-    JBFormViewMappingStrategy.prototype.beforeSaveTasks = function(){
-        return this.formView.makeSaveRequest();
+    JBFormViewMappingStrategy.prototype.createRelation = function(parentId){
+        // the relation already existed
+        if(this.hadData)  return this.$q.when();
+        return this.api.post(this.getEndpoint(parentId));
     };
+
+    JBFormViewMappingStrategy.prototype.getEndpoint = function(parentId){
+        return [
+              this.optionsData.name
+            , this.formView.getEntityId()
+            , this.parentOptionsData.resource
+            , parentId
+        ].join('/');
+    };
+
+    JBFormViewMappingStrategy.prototype.beforeSaveTasks = function(){};
 
     JBFormViewMappingStrategy.prototype.getSaveCalls = function(){
-        //if(this.deleteRequest) return [this.deleteRequest];
         return [];
     };
 
-    JBFormViewMappingStrategy.prototype.storeDeleteRequest = function(){
-        if(!this.formView.isNew()){
-            this.deleteRequest = {
-                method: 'delete'
-                , url: {
-                    path       : [ this.formView.getEntityName(), this.formView.getEntityId() ].join('/')
-                    , mainEntity : 'append'
-                }
-            };
-        }
-        this.formView.unlink();
+    JBFormViewMappingStrategy.prototype.deleteRelation = function() {
+        if(!this.initialParentId || this.formView.isNew() || !this.hadData) return this.$q.when();
+        return this.api.delete(this.getEndpoint(this.initialParentId));
     };
 
     /**
@@ -2177,11 +2425,13 @@
      * @constructor
      */
 
-    function JBFormViewAdapter($q, formView){
+    function JBFormViewAdapter($q, formView, api, scope){
         this.optionsData    = null;
         this.$q             = $q;
         this.formView       = formView;
         this.strategy       = null;
+        this.api            = api;
+        this.scope          = scope;
     }
 
     JBFormViewAdapter.prototype.getSaveCalls = function(){
@@ -2207,7 +2457,10 @@
     JBFormViewAdapter.prototype.handleOptionsData = function(data){
         // the extraction of the options data works as long as there is no alias!
         var spec = this.formView.getSpecFromOptionsData(data);
-        if(!spec) return console.error('No options data found for form-view %o', this.formView);
+        if(!spec) {
+            debugger;
+            return console.error('No options data found for form-view %o', this.formView);
+        }
 
         this.strategy = this.createViewAdapterStrategy(spec);
         return this.strategy.handleOptionsData(data);
@@ -2216,12 +2469,12 @@
     JBFormViewAdapter.prototype.createViewAdapterStrategy = function(options){
         switch(options.type){
             case 'hasManyAndBelongsToMany':
-                return new JBFormViewMappingStrategy(this.formView);
+                return new JBFormViewMappingStrategy(this.formView, this.$q, this.api, this.scope);
             case 'hasMany':
-                return new JBFormViewAdapterInverseReferenceStrategy(this.formView);
+                return new JBFormViewAdapterInverseReferenceStrategy(this.formView, this.$q, this.api, this.scope);
             case 'hasOne':
             default:
-                return new JBFormViewAdapterReferenceStrategy(this.formView);
+                return new JBFormViewAdapterReferenceStrategy(this.formView, this.$q, this.api, this.scope);
         }
     };
 
@@ -2253,20 +2506,17 @@
         return this.strategy.getSelectFields();
     };
 
-    JBFormViewAdapter.prototype.storeDeleteRequest = function(){
-        return this.strategy.storeDeleteRequest();
-    };
-
     JBFormViewAdapter.prototype.isValid = function(){
         return this.formView.isReadonly || (this.strategy && this.strategy.isValid());
     };
 
     _module.factory('JBFormViewAdapterService', [
           '$q'
-        , function($q){
+        , 'APIWrapperService'
+        , function($q, api){
             return {
-                getAdapter : function(formView){
-                    return new JBFormViewAdapter($q, formView);
+                getAdapter : function(formView, scope){
+                    return new JBFormViewAdapter($q, formView, api, scope);
                 }
             }
         }]);
@@ -2608,9 +2858,14 @@ angular
                 self.setEntityId(undefined);
 
                 self.isRoot             = attrs.hasOwnProperty('isRoot');
+                self.restrictDelete     = attrs.hasOwnProperty('restrictDelete');
                 self.hasEntityName      = attrs.hasOwnProperty('entityName');
                 self.hasEntityId        = attrs.hasOwnProperty('entityId');
                 self.hasReadonlyFlag    = attrs.hasOwnProperty('isReadonly');
+
+                if(attrs.hasOwnProperty('nonInteractive')){
+                    self.isNonInteractive = true;
+                }
 
                 if (self.hasEntityName) {
 
@@ -2653,9 +2908,10 @@ angular
                 }
 
 
-                // register myself as a component to possible parents
-                self.adapter = self.adapterService.getAdapter(this);
-                self.componentsService.registerComponent(scope, self.adapter);
+                if(!self.isRoot){
+                    self.adapter = self.adapterService.getAdapter(this, scope);
+                    self.componentsService.registerComponent(scope, self.adapter);
+                }
 
                 // @todo: store the promises otherwise and chain them as soon as the option handler is invoked (to make shure all data is available)
                 $q.all(promises).then(function () {
@@ -2699,7 +2955,7 @@ angular
             self.internallyHandleOptionsData = function (data) {
                 self.optionData = data;
 
-                if(data.permissions.update === false){
+                if(data.permissions.update === false || self.isReadonly){
                     data.properties.forEach(function(property){
                         property.readonly = true;
                     });
@@ -2812,7 +3068,7 @@ angular
                     , select    = self.getSelectParameters();
 
                 console.log('DetailView: Get Data from %o with select %o', url, select);
-
+                if(self.isNew()) return $q.when(undefined);
                 return APIWrapperService.request({
                     url: url
                     , headers: {select: select}
@@ -2862,7 +3118,7 @@ angular
                  };*/
                 if(self.isReadonly) return;
                 return self
-                    .makeSaveRequest(self.registeredComponents, self.getEntityName())
+                    .makeSaveRequest()
                     .then(function (entityId) {
                         // Entity didn't have an ID (was newly created): Redirect to new entity
                         if (self.parseUrl().isNew && !dontNotifyOrRedirect) {
@@ -2906,9 +3162,9 @@ angular
             /**
              * Stores all component's data on server
              */
-            self.makeSaveRequest = function () {
+            self.makeSaveRequest = function (ignoreReadonly) {
                 if (!self.isValid()) return $q.reject(new Error('Not all required fields filled out.'));
-                if(self.isReadonly) return $q.when();
+                if(self.isReadonly && ignoreReadonly !== true) return $q.when(self.getEntityId());
 
                 // Pre-save tasks (upload images)
                 return self.executePreSaveTasks()
@@ -3304,21 +3560,34 @@ angular
                 return $scope.$destroy();
             };
 
+            $scope.$on('reloadViewData', function(event){
+                if(self.isRoot){
+                    console.info('reloadView');
+                    event.stopPropagation();
+                    self.getData();
+                }
+            });
+
             /**
              * Deletes the entity.
              * @todo: the redirection should not be a matter of the detail-view itself, if we have nested detail
              * todo: let the adapter do the delete requests it is aware of the context of the entity and can trigger all the delete requests correctly
              * @param <Boolean> nonInteractive        True if user should not be redirected to main view
              */
-            $scope.delete = function (event, nonInteractive) {
+            $scope.delete = function (event, nonInteractive, refreshView) {
                 if(event){
                     event.preventDefault();
                     event.stopPropagation();
                 }
                 console.log('DetailView: Delete');
 
-                var   confirmed       = false
-                    , confirmMessage = $filter('translate')('web.backoffice.detail.confirmDeletion');
+                var   confirmed         = false
+                    , interactive       = !(angular.isDefined(self.isNonInteractive) ? self.isNonInteractive : nonInteractive)
+                    , confirmMessage    = $filter('translate')('web.backoffice.detail.confirmDeletion');
+
+                if(self.restrictDelete && !self.isRoot){
+                    return $scope.$emit('deletedDetailView', self);
+                }
 
                 confirmMessage += '\n'+self.getEntityName() + '('+self.getEntityId()+')';
                 confirmed = confirm(confirmMessage);
@@ -3326,42 +3595,38 @@ angular
                 if (!confirmed) {
                     return;
                 }
-
+                if(self.isNew() && !self.isRoot){
+                    return $scope.$emit('deletedDetailView', self);
+                }
                 return self
                     .makeDeleteRequest()
                     .then(function (data) {
+                        if(!self.isRoot){
+                           $scope.$emit('deletedDetailView', self);
+                        }
+                        $scope.$emit('notification', {
+                              type      : 'success'
+                            , message   : 'web.backoffice.detail.deleteSuccess'
+                        });
 
-                        // Go to entity's list view
-                        if (!nonInteractive) {
-
-                            $state.go('app.list', {entityName: self.getEntityName()});
-
-                            $rootScope.$broadcast('notification', {
-                                  type      : 'success'
-                                , message   : 'web.backoffice.detail.deleteSuccess'
-                            });
-
+                        if (interactive) {
+                            return $state.go('app.list', {entityName: self.getEntityName() });
                         }
 
-                        // Resolve promise
-                        return true;
+                        if(refreshView){
+                            $scope.$emit('reloadViewData');
+                        }
 
                     }, function (err) {
-
-                        if (!nonInteractive) {
-                            $rootScope.$broadcast('notification', {
-                                  type      : 'error'
-                                , message   : 'web.backoffice.detail.deleteError'
-                                , variables : {
-                                    errorMessage: err
-                                }
-                            });
-                        }
-
+                        $scope.$emit('notification', {
+                            type      : 'error'
+                            , message   : 'web.backoffice.detail.deleteError'
+                            , variables : {
+                                errorMessage: err
+                            }
+                        });
                         return $q.reject(err);
-
                     });
-
             };
 
 
@@ -3371,18 +3636,13 @@ angular
              * todo: only delete the entity directly if it is a root entry, otherwise delegate it to the adapter!
              */
             self.makeDeleteRequest = function () {
-
+                if(self.isReadonly) return $q.when();
                 console.log('DetailView: Make DELETE request');
-                var promise = $q.when();
-                if(!self.isNew()) {
-                    promise = APIWrapperService.request({
+                return APIWrapperService.request({
                         url: '/' + self.getEntityName() + '/' + self.getEntityId()
                         , method: 'DELETE'
-                    });
-                }
-                return promise.then(function(){
-                    return self.unlink();
                 });
+
             };
 
         }]);
@@ -3426,18 +3686,49 @@ angular
             , link : {
                 post: function (scope, element, attrs, ctrl) {
 
-                    var readonlyGetter;
+                    var   readonlyGetter
+                        , showLabelGetter
+                        , hideElementGetter
+                        , modelGetter;
 
-                    attrs.$observe('label', function(newValue){
-                        ctrl.label = newValue;
-                    });
+                    ctrl.hasModel = attrs.hasOwnProperty('inputModel');
+                    if(ctrl.hasModel){
+                        modelGetter = $parse(attrs.inputModel);
+                        scope.$watch(function(){
+                            return modelGetter(scope.$parent);
+                        },
+                        function(newValue){
+                            ctrl.inputModel = newValue;
+                        });
+                    }
+
+                    ctrl.hasLabel = attrs.hasOwnProperty('label');
+                    if(ctrl.hasLabel){
+                        attrs.$observe('label', function(newValue){
+                            ctrl.label = newValue;
+                        });
+                    }
                     attrs.$observe('for', function(newValue){
                         ctrl.name = newValue;
                     });
 
-                    attrs.$observe('showLabel', function(newValue){
-                        ctrl.showLabel = newValue !== 'false';
-                    });
+                    if(attrs.hasOwnProperty('showLabel')){
+                        showLabelGetter = $parse(attrs.showLabel);
+                        scope.$watch(function(){
+                            return showLabelGetter(scope.$parent)
+                        }, function(value){
+                            ctrl.showLabel = value;
+                        });
+                    }
+
+                    if(attrs.hasOwnProperty('inputHidden')){
+                        hideElementGetter = $parse(attrs.inputHidden);
+                        scope.$watch(function(){
+                            return hideElementGetter(scope.$parent)
+                        }, function(value){
+                            ctrl.inputHidden = value;
+                        });
+                    }
 
                     if(attrs.hasOwnProperty('isReadonly')){
                         readonlyGetter = $parse(attrs.isReadonly);
@@ -3502,7 +3793,10 @@ angular
     JBFormAutoInputController.prototype.updateElement = function(fieldSpec){
 
             var   elementType
-                , elementSpec = this.selectOptions(fieldSpec);
+                , elementSpec = this.selectOptions(fieldSpec)
+                , elementTypeDashed
+                , elementTypeTag
+                , newElement;
 
             if (!elementSpec || !elementSpec.type) {
                 console.error('AutoFormElement: fieldSpec %o is missing type for field %o', fieldSpec, this.name);
@@ -3520,14 +3814,21 @@ angular
             console.log('AutoFormElement: Create new %s from %o', elementType, fieldSpec);
 
             // camelCase to camel-case
-            var dashedCasedElementType = elementType.replace(/[A-Z]/g, function (v) {
-                return '-' + v.toLowerCase();
-            });
-            // this is not cool!
-            var newElement = angular.element('<div jb-form-' + dashedCasedElementType + '-input for="{{$ctrl.name}}" label="{{$ctrl.label}}" is-readonly="$ctrl.isReadonly" show-label="$ctrl.showLabel"></div>');
-            // @todo: not sure if we still need to prepend the new element when we actually just inject the registry
+            elementTypeDashed   = elementType.replace(/[A-Z]/g, function (v) { return '-' + v.toLowerCase(); });
+            elementTypeTag      = 'jb-form-' + elementTypeDashed + '_input';
+            newElement          = angular.element('<div>');
+
+            newElement.attr(elementTypeTag  , '');
+            newElement.attr('for'           , '{{$ctrl.name}}');
+            newElement.attr('is-readonly'   , '$ctrl.isReadonly');
+            newElement.attr('ng-hide'       , "$ctrl.inputHidden");
+
+            if(this.hasLabel) newElement.attr('label'       , '{{$ctrl.label}}');
+            if(this.hasModel) newElement.attr('input-model' , '$ctrl.inputModel');
+
             this.registry.unregisterOptionsDataHandler(this.updateElement);
             this.element.replaceWith(newElement);
+            // if we do not replace the element, we might end up in a loop!
             this.$compile(newElement)(this.$scope);
             // now the registry should know all the subcomponents
             // delegate to the options data handlers of the components
@@ -3936,7 +4237,7 @@ angular
      * @returns {boolean}
      */
     JBFormTextInputController.prototype.isValid = function () {
-        if(this.isRequired() && !this.isReadonly) return !!this.value;
+        if(this.isRequired() && !this.isReadonly) return !!this.getValue();
         return true;
     };
 
@@ -3969,7 +4270,16 @@ angular
         this.isReadonly = this.isReadonly === true || spec.readonly === true;
     };
 
-    JBFormTextInputController.prototype.init = function (scope) {
+    JBFormTextInputController.prototype.getValue = function(){
+        return (this.model || {}).value;
+    };
+
+    JBFormTextInputController.prototype.setValue = function(value){
+        if(!this.model) this.model = {};
+        this.model.value = value;
+    };
+
+    JBFormTextInputController.prototype.init = function (scope, element, attrs) {
         this.componentsService.registerComponent(scope, this);
         if(angular.isUndefined(this.showLabel)){
             this.showLabel = true;
@@ -3984,16 +4294,20 @@ angular
     };
 
     JBFormTextInputController.prototype.updateData = function (data) {
-        this.originalData = this.value;
-        this.value = data ? data[this.name] : data;
+        this.originalData = this.getValue();
+        this.setValue(data ? data[this.name] : data);
+    };
+
+    JBFormTextInputController.prototype.displayLabel = function(){
+        return this.hasLabel && this.showLabel !== false;
     };
 
     JBFormTextInputController.prototype.getSaveCalls = function () {
 
-        if (this.originalData === this.value || this.isReadonly) return [];
+        if (this.originalData === this.getValue() || this.isReadonly) return [];
 
         var data = {};
-        data[this.name] = this.value;
+        data[this.name] = this.getValue();
 
         return [{
             data: data
@@ -4015,15 +4329,19 @@ angular
 
             return {
                   scope : {
-                        label       : '@'
-                      , name        : '@for'
+                        name        : '@for'
+                      , label       : '@?'
                       , isReadonly  : '<?'
                       , showLabel   : '<?'
+                      , model       : '=?inputModel'
                   }
                 , controllerAs      : '$ctrl'
                 , bindToController  : true
                 , link: {
                     post: function (scope, element, attrs, ctrl) {
+                        ctrl.model          = {};
+                        ctrl.hasInputModel  = attrs.hasOwnProperty('inputModel');
+                        ctrl.hasLabel       = attrs.hasOwnProperty('label');
                         ctrl.init(scope, element, attrs);
                     }
                     , pre: function(scope, element, attrs, ctrl){
@@ -4032,12 +4350,12 @@ angular
                 }
                 , controller: 'JBFormTextInputController'
                 , template: '<div class="form-group form-group-sm">' +
-                                '<label ng-if="$ctrl.showLabel" jb-form-label-component label-identifier="{{$ctrl.label}}" is-valid="$ctrl.isValid()" is-required="$ctrl.isRequired()"></label>' +
-                                '<div ng-class="{ \'col-md-9\' : $ctrl.showLabel, \'col-md-12\' : !$ctrl.showLabel }" >' +
+                                '<label ng-if="$ctrl.displayLabel()" jb-form-label-component label-identifier="{{$ctrl.label}}" is-valid="$ctrl.isValid()" is-required="$ctrl.isRequired()"></label>' +
+                                '<div ng-class="{ \'col-md-9\' : $ctrl.displayLabel(), \'col-md-12\' : !$ctrl.displayLabel() }" >' +
                                     '<input type="text" ' +
                                             'ng-attr-id="$ctrl.name" ' +
                                             'ng-attrs-required="$ctrl.isRequired()" ' +
-                                            'ng-model="$ctrl.value"' +
+                                            'ng-model="$ctrl.model.value"' +
                                             'ng-disabled="$ctrl.isReadonly"' +
                                             'class="form-control input-sm" />' +
                                 '</div>' +

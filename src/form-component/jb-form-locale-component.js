@@ -14,6 +14,7 @@
                   fieldsExclude : '<'
                 , entityName    : '@entity'
                 , relationName  : '@relation'
+                , isReadonly    : '<'
             }
             , template: '<div class="locale-component container">' +
                             '<!-- LOCALE-COMPONENT: way too many divs in here -->'+
@@ -30,10 +31,10 @@
                                 '</div>'+
                             '</div>' +
                             '<div class="locale-content">' +
-                                '<div class="locale-col" ng-repeat="language in $ctrl.getSelectedLanguages()">' +
+                                '<div class="locale-col" ng-repeat="language in $ctrl.selectedLanguages">' +
                                     '<p>{{ language.code | uppercase }}</p>' +
-                                    '<ul>' +
-                                        '<li ng-repeat="field in $ctrl.getFields()">' +
+                                    '<ul ng-if="$ctrl.fieldDefinitions">' +
+                                        '<li ng-repeat="field in $ctrl.fieldDefinitions">' +
                                             '<label ng-attr-for="locale-{{language.code}}-{{field.name}}" ng-class="{ \'invalid\' : !$ctrl.fieldIsValid($ctrl.locales[ language.id ], field.name)}">' +
                                                 '<span data-translate="web.backoffice.{{$ctrl.entityName}}.{{field.name}}"></span>' +
                                                 '<span class="required-indicator" data-ng-show="field.required">*</span>' +
@@ -41,6 +42,7 @@
                                             '<textarea ng-model="$ctrl.locales[ language.id ][ field.name ]" ' +
                                                 'ng-attr-id="locale-{{language.code}}-{{field.name}}"' +
                                                 'class="form-control" ' +
+                                                'ng-disabled="$ctrl.isReadonly"' +
                                                 'ng-keyup="$ctrl.adjustHeight( $event )" ' +
                                                 'ng-click="$ctrl.adjustHeight( $event )" />' +
                                             '</textarea>' +
@@ -80,7 +82,6 @@
         this.options            = null;
         this.fieldDefinitions   = null;
         this.fields             = [];
-        this.selectedLanguages  = [];
         this.locales            = [];
         this.originalLocales    = [];
         this.heightElement      = null;
@@ -198,9 +199,16 @@
     JBFormLocaleComponentController.prototype.toggleLanguage = function(event, language){
         if(event) event.preventDefault();
         var langs = this.getSelectedLanguages();
-        if(language.selected && langs.length == 1) return;
-        language.selected = language.selected !== true;
-        this.$timeout(this.adjustAllHeights.bind(this));
+        if(language){
+            if(language.selected && langs.length == 1) return;
+            language.selected = language.selected !== true;
+        }
+        this.reassignLanguages().then(this.adjustAllHeights.bind(this));
+    };
+
+    JBFormLocaleComponentController.prototype.reassignLanguages = function(){
+        this.selectedLanguages = this.getSelectedLanguages();
+        return this.$timeout();
     };
 
     JBFormLocaleComponentController.prototype.isSelected = function(language){
@@ -233,6 +241,9 @@
      *
      * @note: In the select call we need to set the related table name and select all fields plus the languages. Currently
      * we are not able to properly identify locales.
+     *
+     * In some situations, it seems like the update of the field defintions is not propagated properly to the view.
+     * Therefore it is necessary to toggle the languages again!
      * @todo: trigger error state
      */
     JBFormLocaleComponentController.prototype.handleOptionsData = function(data){
@@ -240,14 +251,15 @@
         if(!spec) return console.error('No OPTIONS data found in locale component.');
 
         this.options    = spec;
-        return this.loadFields().then(function(fields){
-            this.$timeout(function(){
-                this.fieldDefinitions = this.filterFields(fields);
-                this.fields = Object.keys(this.fieldDefinitions);
-            }.bind(this));
-        }.bind(this), function(error){
-            console.error(error);
-        });
+        return this.loadFields()
+                    .then(function(fields){
+                            this.fieldDefinitions = this.filterFields(fields);
+                            this.fields = Object.keys(this.fieldDefinitions);
+                            return this.ensureLanguageIsSelected();
+                        }.bind(this)
+                    , function(error){
+                        console.error(error);
+                    });
     };
 
     /**
@@ -256,7 +268,8 @@
      */
     JBFormLocaleComponentController.prototype.loadFields = function(){
         var url = '/' + this.getLocaleProperty();
-        if(this.fieldDefinitions) return this.$q.when(this.fieldDefinitions);
+        // The options call is now cached in the api
+        //if(this.fieldDefinitions) return this.$q.when(this.fieldDefinitions);
         return this.api.getOptions(url).then(function(fields){
             return fields.properties;
         }.bind(this), function(error){
@@ -311,6 +324,8 @@
 
         var   calls     = [];
 
+        if(this.isReadonly) return calls;
+
         this.locales.forEach(function(locale, id){
 
             var   originalLocale    = this.originalLocales[id]
@@ -347,15 +362,20 @@
     };
 
     JBFormLocaleComponentController.prototype.handleGetData = function(data){
-        var locales             = data[this.getLocaleProperty()];
+        var locales             = (data) ? data[this.getLocaleProperty()] : data;
         if(locales){
             this.originalLocales    = this.normalizeModel(locales);
             this.locales            = angular.copy(this.originalLocales);
         }
-        if(this.getSelectedLanguages().length === 0) {
-            return this.$timeout(function(){ this.toggleLanguage(null, this.supportedLanguages[0]);}.bind(this));
+        this.ensureLanguageIsSelected().then(this.adjustAllHeights.bind(this));
+    };
+
+    JBFormLocaleComponentController.prototype.ensureLanguageIsSelected = function(){
+        if(!this.selectedLanguages) this.selectedLanguages = [];
+        if(this.selectedLanguages.length === 0) {
+            return this.toggleLanguage(null, this.supportedLanguages[0]);
         }
-        this.$timeout(this.adjustAllHeights.bind(this));
+        return this.$timeout();
     };
 
     JBFormLocaleComponentController.prototype.getFields = function(){
@@ -399,6 +419,7 @@
      * @todo: use the registration system to detect all the input fields and let them validate themselves?
      */
     JBFormLocaleComponentController.prototype.isValid = function(){
+        if(this.isReadonly) return true;
         return this.locales.reduce(function(localeValidity, locale, index){
             if(angular.isUndefined(locale)) return localeValidity;
             if(angular.isUndefined(this.originalLocales[index]) && this._localeIsEmpty(locale)) return localeValidity;

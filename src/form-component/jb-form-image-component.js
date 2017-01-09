@@ -122,12 +122,16 @@
                     // append and amount of images will grow if we don't reset it to [].
                     self.images = [];
 
+                    // Check if there even is data.
+                    if(!data){
+                        data = {};
+                    }
+
                     // No image set: use empty array
                     // Don't use !angular.isArray( data.image ); it will create [ undefined ] if there's no data.image.
                     if (!data.image) {
                         data.image = [];
                     }
-
 
                     // Image has a hasOne-relation: Is delivered as an object (instead of an array):
                     // Convert to array
@@ -135,10 +139,8 @@
                         data.image = [data.image];
                     }
 
-
                     // Store original data (to only send differences to the server when saving)
                     _originalData = data.image.slice();
-
 
                     // Create self.images from data.image.
                     data.image.forEach(function (image) {

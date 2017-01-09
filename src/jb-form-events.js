@@ -79,7 +79,6 @@
 
     JBFormComponentsRegistry.prototype.getSaveCalls = function(){
         return this.registeredComponents.reduce(function(calls, component){
-            if(!angular.isFunction(component.getSaveCalls)) debugger;
             var subcalls = component.getSaveCalls();
             return calls.concat(subcalls);
         }, []);
@@ -170,14 +169,24 @@
      * @param collection
      */
     JBFormComponentsRegistry.prototype.distributeIndexed = function(data){
-        this.getDataHandlers.forEach(function(handler, index){
-            handler(data, index);
-        });
+        return this.distributeIndexedFrom(data, 0);
     };
 
-    JBFormComponentsRegistry.prototype.registerYourself = function(scope){
-        var targetScope = scope || this.scope;
-        targetScope.$parent.$emit(this.formEvents.registerComponent, this, targetScope);
+    JBFormComponentsRegistry.prototype.distributeIndexedFrom = function(data, startIndex){
+        for(var i = startIndex; i<this.getDataHandlers.length; i++){
+            this.getDataHandlers[i](data, i);
+        }
+    };
+
+    JBFormComponentsRegistry.prototype.componentAt = function(index){
+        return this.registeredComponents[index];
+    };
+
+    JBFormComponentsRegistry.prototype.registerYourself = function(scope, stayOnScope){
+        var   sourceScope = scope || this.scope
+            , targetScope = (stayOnScope === true) ? sourceScope : sourceScope.$parent;
+
+        targetScope.$emit(this.formEvents.registerComponent, this, targetScope);
     };
 
     JBFormComponentsRegistry.prototype.registerAt = function(parent){
@@ -202,8 +211,9 @@
                         var registry = new JBFormComponentsRegistry($q, formEvents, scope);
                         return registry;
                     }
-                    , registerComponent : function(scope, component){
-                        scope.$parent.$emit(formEvents.registerComponent, component, scope);
+                    , registerComponent : function(scope, component, stayOnScope){
+                        var targetScope = (stayOnScope === true) ? scope : scope.$parent;
+                        targetScope.$emit(formEvents.registerComponent, component, scope);
                     }
                 }
             }

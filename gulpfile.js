@@ -5,7 +5,9 @@ var gulp		= require( 'gulp' )
 	, concat	= require( 'gulp-concat' )
 	, order		= require( 'gulp-order' )
 	, gulpPrint	= require( 'gulp-print' )
-	, less		= require( 'gulp-less' );
+	, less		= require( 'gulp-less' )
+	, gulpUtil = require('gulp-util');
+
 
 
 var paths		= {
@@ -30,12 +32,13 @@ gulp.task( 'scripts', function() {
 			, 'jb-form-components.js'
 			, 'jb-form-events.js'
 			, '**/*.js'
+			, '!../dist/**'
 			], { base: './src/' } ) ) // does not seem to work without base –
 		.pipe( gulpPrint() )
-		.pipe( jshint() )
+		.pipe( jshint().on('error' , gulpUtil.log) )
 		.pipe( concat( 'jb-backoffice-forms.js' ) )
         .pipe( gulp.dest( paths.jsDest ) )
-		.pipe( uglify() )
+		.pipe( uglify().on('error', gulpUtil.log ) )
         .pipe( rename( 'jb-backoffice-forms.min.js' ) )
         .pipe( gulp.dest( paths.jsDest ) );
 } );

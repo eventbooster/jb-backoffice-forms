@@ -37,18 +37,49 @@
             , link : {
                 post: function (scope, element, attrs, ctrl) {
 
-                    var readonlyGetter;
+                    var   readonlyGetter
+                        , showLabelGetter
+                        , hideElementGetter
+                        , modelGetter;
 
-                    attrs.$observe('label', function(newValue){
-                        ctrl.label = newValue;
-                    });
+                    ctrl.hasModel = attrs.hasOwnProperty('inputModel');
+                    if(ctrl.hasModel){
+                        modelGetter = $parse(attrs.inputModel);
+                        scope.$watch(function(){
+                            return modelGetter(scope.$parent);
+                        },
+                        function(newValue){
+                            ctrl.inputModel = newValue;
+                        });
+                    }
+
+                    ctrl.hasLabel = attrs.hasOwnProperty('label');
+                    if(ctrl.hasLabel){
+                        attrs.$observe('label', function(newValue){
+                            ctrl.label = newValue;
+                        });
+                    }
                     attrs.$observe('for', function(newValue){
                         ctrl.name = newValue;
                     });
 
-                    attrs.$observe('showLabel', function(newValue){
-                        ctrl.showLabel = newValue !== 'false';
-                    });
+                    if(attrs.hasOwnProperty('showLabel')){
+                        showLabelGetter = $parse(attrs.showLabel);
+                        scope.$watch(function(){
+                            return showLabelGetter(scope.$parent)
+                        }, function(value){
+                            ctrl.showLabel = value;
+                        });
+                    }
+
+                    if(attrs.hasOwnProperty('inputHidden')){
+                        hideElementGetter = $parse(attrs.inputHidden);
+                        scope.$watch(function(){
+                            return hideElementGetter(scope.$parent)
+                        }, function(value){
+                            ctrl.inputHidden = value;
+                        });
+                    }
 
                     if(attrs.hasOwnProperty('isReadonly')){
                         readonlyGetter = $parse(attrs.isReadonly);
@@ -113,7 +144,10 @@
     JBFormAutoInputController.prototype.updateElement = function(fieldSpec){
 
             var   elementType
-                , elementSpec = this.selectOptions(fieldSpec);
+                , elementSpec = this.selectOptions(fieldSpec)
+                , elementTypeDashed
+                , elementTypeTag
+                , newElement;
 
             if (!elementSpec || !elementSpec.type) {
                 console.error('AutoFormElement: fieldSpec %o is missing type for field %o', fieldSpec, this.name);
@@ -131,14 +165,21 @@
             console.log('AutoFormElement: Create new %s from %o', elementType, fieldSpec);
 
             // camelCase to camel-case
-            var dashedCasedElementType = elementType.replace(/[A-Z]/g, function (v) {
-                return '-' + v.toLowerCase();
-            });
-            // this is not cool!
-            var newElement = angular.element('<div jb-form-' + dashedCasedElementType + '-input for="{{$ctrl.name}}" label="{{$ctrl.label}}" is-readonly="$ctrl.isReadonly" show-label="$ctrl.showLabel"></div>');
-            // @todo: not sure if we still need to prepend the new element when we actually just inject the registry
+            elementTypeDashed   = elementType.replace(/[A-Z]/g, function (v) { return '-' + v.toLowerCase(); });
+            elementTypeTag      = 'jb-form-' + elementTypeDashed + '_input';
+            newElement          = angular.element('<div>');
+
+            newElement.attr(elementTypeTag  , '');
+            newElement.attr('for'           , '{{$ctrl.name}}');
+            newElement.attr('is-readonly'   , '$ctrl.isReadonly');
+            newElement.attr('ng-hide'       , "$ctrl.inputHidden");
+
+            if(this.hasLabel) newElement.attr('label'       , '{{$ctrl.label}}');
+            if(this.hasModel) newElement.attr('input-model' , '$ctrl.inputModel');
+
             this.registry.unregisterOptionsDataHandler(this.updateElement);
             this.element.replaceWith(newElement);
+            // if we do not replace the element, we might end up in a loop!
             this.$compile(newElement)(this.$scope);
             // now the registry should know all the subcomponents
             // delegate to the options data handlers of the components

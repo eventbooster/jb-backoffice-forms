@@ -186,9 +186,14 @@
                 self.setEntityId(undefined);
 
                 self.isRoot             = attrs.hasOwnProperty('isRoot');
+                self.restrictDelete     = attrs.hasOwnProperty('restrictDelete');
                 self.hasEntityName      = attrs.hasOwnProperty('entityName');
                 self.hasEntityId        = attrs.hasOwnProperty('entityId');
                 self.hasReadonlyFlag    = attrs.hasOwnProperty('isReadonly');
+
+                if(attrs.hasOwnProperty('nonInteractive')){
+                    self.isNonInteractive = true;
+                }
 
                 if (self.hasEntityName) {
 
@@ -231,9 +236,10 @@
                 }
 
 
-                // register myself as a component to possible parents
-                self.adapter = self.adapterService.getAdapter(this);
-                self.componentsService.registerComponent(scope, self.adapter);
+                if(!self.isRoot){
+                    self.adapter = self.adapterService.getAdapter(this, scope);
+                    self.componentsService.registerComponent(scope, self.adapter);
+                }
 
                 // @todo: store the promises otherwise and chain them as soon as the option handler is invoked (to make shure all data is available)
                 $q.all(promises).then(function () {
@@ -277,7 +283,7 @@
             self.internallyHandleOptionsData = function (data) {
                 self.optionData = data;
 
-                if(data.permissions.update === false){
+                if(data.permissions.update === false || self.isReadonly){
                     data.properties.forEach(function(property){
                         property.readonly = true;
                     });
@@ -390,7 +396,7 @@
                     , select    = self.getSelectParameters();
 
                 console.log('DetailView: Get Data from %o with select %o', url, select);
-
+                if(self.isNew()) return $q.when(undefined);
                 return APIWrapperService.request({
                     url: url
                     , headers: {select: select}
@@ -440,7 +446,7 @@
                  };*/
                 if(self.isReadonly) return;
                 return self
-                    .makeSaveRequest(self.registeredComponents, self.getEntityName())
+                    .makeSaveRequest()
                     .then(function (entityId) {
                         // Entity didn't have an ID (was newly created): Redirect to new entity
                         if (self.parseUrl().isNew && !dontNotifyOrRedirect) {
@@ -484,9 +490,9 @@
             /**
              * Stores all component's data on server
              */
-            self.makeSaveRequest = function () {
+            self.makeSaveRequest = function (ignoreReadonly) {
                 if (!self.isValid()) return $q.reject(new Error('Not all required fields filled out.'));
-                if(self.isReadonly) return $q.when();
+                if(self.isReadonly && ignoreReadonly !== true) return $q.when(self.getEntityId());
 
                 // Pre-save tasks (upload images)
                 return self.executePreSaveTasks()
@@ -882,21 +888,34 @@
                 return $scope.$destroy();
             };
 
+            $scope.$on('reloadViewData', function(event){
+                if(self.isRoot){
+                    console.info('reloadView');
+                    event.stopPropagation();
+                    self.getData();
+                }
+            });
+
             /**
              * Deletes the entity.
              * @todo: the redirection should not be a matter of the detail-view itself, if we have nested detail
              * todo: let the adapter do the delete requests it is aware of the context of the entity and can trigger all the delete requests correctly
              * @param <Boolean> nonInteractive        True if user should not be redirected to main view
              */
-            $scope.delete = function (event, nonInteractive) {
+            $scope.delete = function (event, nonInteractive, refreshView) {
                 if(event){
                     event.preventDefault();
                     event.stopPropagation();
                 }
                 console.log('DetailView: Delete');
 
-                var   confirmed       = false
-                    , confirmMessage = $filter('translate')('web.backoffice.detail.confirmDeletion');
+                var   confirmed         = false
+                    , interactive       = !(angular.isDefined(self.isNonInteractive) ? self.isNonInteractive : nonInteractive)
+                    , confirmMessage    = $filter('translate')('web.backoffice.detail.confirmDeletion');
+
+                if(self.restrictDelete && !self.isRoot){
+                    return $scope.$emit('deletedDetailView', self);
+                }
 
                 confirmMessage += '\n'+self.getEntityName() + '('+self.getEntityId()+')';
                 confirmed = confirm(confirmMessage);
@@ -904,42 +923,38 @@
                 if (!confirmed) {
                     return;
                 }
-
+                if(self.isNew() && !self.isRoot){
+                    return $scope.$emit('deletedDetailView', self);
+                }
                 return self
                     .makeDeleteRequest()
                     .then(function (data) {
+                        if(!self.isRoot){
+                           $scope.$emit('deletedDetailView', self);
+                        }
+                        $scope.$emit('notification', {
+                              type      : 'success'
+                            , message   : 'web.backoffice.detail.deleteSuccess'
+                        });
 
-                        // Go to entity's list view
-                        if (!nonInteractive) {
-
-                            $state.go('app.list', {entityName: self.getEntityName()});
-
-                            $rootScope.$broadcast('notification', {
-                                  type      : 'success'
-                                , message   : 'web.backoffice.detail.deleteSuccess'
-                            });
-
+                        if (interactive) {
+                            return $state.go('app.list', {entityName: self.getEntityName() });
                         }
 
-                        // Resolve promise
-                        return true;
+                        if(refreshView){
+                            $scope.$emit('reloadViewData');
+                        }
 
                     }, function (err) {
-
-                        if (!nonInteractive) {
-                            $rootScope.$broadcast('notification', {
-                                  type      : 'error'
-                                , message   : 'web.backoffice.detail.deleteError'
-                                , variables : {
-                                    errorMessage: err
-                                }
-                            });
-                        }
-
+                        $scope.$emit('notification', {
+                            type      : 'error'
+                            , message   : 'web.backoffice.detail.deleteError'
+                            , variables : {
+                                errorMessage: err
+                            }
+                        });
                         return $q.reject(err);
-
                     });
-
             };
 
 
@@ -949,18 +964,13 @@
              * todo: only delete the entity directly if it is a root entry, otherwise delegate it to the adapter!
              */
             self.makeDeleteRequest = function () {
-
+                if(self.isReadonly) return $q.when();
                 console.log('DetailView: Make DELETE request');
-                var promise = $q.when();
-                if(!self.isNew()) {
-                    promise = APIWrapperService.request({
+                return APIWrapperService.request({
                         url: '/' + self.getEntityName() + '/' + self.getEntityId()
                         , method: 'DELETE'
-                    });
-                }
-                return promise.then(function(){
-                    return self.unlink();
                 });
+
             };
 
         }]);

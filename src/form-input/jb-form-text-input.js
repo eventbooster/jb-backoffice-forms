@@ -22,7 +22,7 @@
      * @returns {boolean}
      */
     JBFormTextInputController.prototype.isValid = function () {
-        if(this.isRequired() && !this.isReadonly) return !!this.value;
+        if(this.isRequired() && !this.isReadonly) return !!this.getValue();
         return true;
     };
 
@@ -55,7 +55,16 @@
         this.isReadonly = this.isReadonly === true || spec.readonly === true;
     };
 
-    JBFormTextInputController.prototype.init = function (scope) {
+    JBFormTextInputController.prototype.getValue = function(){
+        return (this.model || {}).value;
+    };
+
+    JBFormTextInputController.prototype.setValue = function(value){
+        if(!this.model) this.model = {};
+        this.model.value = value;
+    };
+
+    JBFormTextInputController.prototype.init = function (scope, element, attrs) {
         this.componentsService.registerComponent(scope, this);
         if(angular.isUndefined(this.showLabel)){
             this.showLabel = true;
@@ -70,16 +79,20 @@
     };
 
     JBFormTextInputController.prototype.updateData = function (data) {
-        this.originalData = this.value;
-        this.value = data ? data[this.name] : data;
+        this.originalData = this.getValue();
+        this.setValue(data ? data[this.name] : data);
+    };
+
+    JBFormTextInputController.prototype.displayLabel = function(){
+        return this.hasLabel && this.showLabel !== false;
     };
 
     JBFormTextInputController.prototype.getSaveCalls = function () {
 
-        if (this.originalData === this.value || this.isReadonly) return [];
+        if (this.originalData === this.getValue() || this.isReadonly) return [];
 
         var data = {};
-        data[this.name] = this.value;
+        data[this.name] = this.getValue();
 
         return [{
             data: data
@@ -101,15 +114,19 @@
 
             return {
                   scope : {
-                        label       : '@'
-                      , name        : '@for'
+                        name        : '@for'
+                      , label       : '@?'
                       , isReadonly  : '<?'
                       , showLabel   : '<?'
+                      , model       : '=?inputModel'
                   }
                 , controllerAs      : '$ctrl'
                 , bindToController  : true
                 , link: {
                     post: function (scope, element, attrs, ctrl) {
+                        ctrl.model          = {};
+                        ctrl.hasInputModel  = attrs.hasOwnProperty('inputModel');
+                        ctrl.hasLabel       = attrs.hasOwnProperty('label');
                         ctrl.init(scope, element, attrs);
                     }
                     , pre: function(scope, element, attrs, ctrl){
@@ -118,12 +135,12 @@
                 }
                 , controller: 'JBFormTextInputController'
                 , template: '<div class="form-group form-group-sm">' +
-                                '<label ng-if="$ctrl.showLabel" jb-form-label-component label-identifier="{{$ctrl.label}}" is-valid="$ctrl.isValid()" is-required="$ctrl.isRequired()"></label>' +
-                                '<div ng-class="{ \'col-md-9\' : $ctrl.showLabel, \'col-md-12\' : !$ctrl.showLabel }" >' +
+                                '<label ng-if="$ctrl.displayLabel()" jb-form-label-component label-identifier="{{$ctrl.label}}" is-valid="$ctrl.isValid()" is-required="$ctrl.isRequired()"></label>' +
+                                '<div ng-class="{ \'col-md-9\' : $ctrl.displayLabel(), \'col-md-12\' : !$ctrl.displayLabel() }" >' +
                                     '<input type="text" ' +
                                             'ng-attr-id="$ctrl.name" ' +
                                             'ng-attrs-required="$ctrl.isRequired()" ' +
-                                            'ng-model="$ctrl.value"' +
+                                            'ng-model="$ctrl.model.value"' +
                                             'ng-disabled="$ctrl.isReadonly"' +
                                             'class="form-control input-sm" />' +
                                 '</div>' +

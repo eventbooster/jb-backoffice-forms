@@ -2,7 +2,7 @@
     "use strict";
     var _module = angular.module('jb.formComponents');
 
-    function JBFormRepeatingViewController(componentsService, $compile, $scope, $timeout){
+    function JBFormRepeatingViewController(componentsService, $compile, $scope, $timeout, $q){
         this.componentsService  = componentsService;
         this.componentsRegistry = null;
         this.$compile           = $compile;
@@ -10,15 +10,19 @@
         this.type               = 'JBFormRepeating';
         this.optionData         = null;
         this.$timeout           = $timeout;
+        this.$q                 = $q;
         this.entities           = [undefined];
     }
 
     JBFormRepeatingViewController.prototype.preLink = function(scope){
         // listens to all events coming from within
+        // todo: the unregistration is triggered for all elements if we change the amount of entities (so the view might be empty)
         this.componentsRegistry = this.componentsService.registryFor(scope);
         this.componentsRegistry.listen();
-        this.componentsRegistry.onUnregistration(function(component, index){
-            this.entities.splice(index, 1);
+        scope.$on('removeElement', function(event, index){
+            event.stopPropagation();
+            if(this.isReadonly === true) return;
+            this.removeElement(index);
         }.bind(this));
     };
 
@@ -31,18 +35,22 @@
     };
 
     JBFormRepeatingViewController.prototype.getSaveCalls = function(){
+        if(this.isReadonly === true) return [];
         return this.componentsRegistry.getSaveCalls();
     };
 
     JBFormRepeatingViewController.prototype.afterSaveTasks = function(id){
+        if(this.isReadonly === true) return;
         return this.componentsRegistry.afterSaveTasks(id);
     };
 
     JBFormRepeatingViewController.prototype.beforeSaveTasks = function(entity){
+        if(this.isReadonly === true) return;
         return this.componentsRegistry.beforeSaveTasks(entity);
     };
 
     JBFormRepeatingViewController.prototype.isValid = function(){
+        if(this.isReadonly === true) return true;
         return this.componentsRegistry.isValid();
     };
 
@@ -73,38 +81,62 @@
     // @todo: do we need to trigger two digests to be sure that all sub views are unlinked?
     JBFormRepeatingViewController.prototype.handleGetData = function(data){
         return this.$timeout(function(){
-            this.entities.splice(0);
-        }.bind(this), 0)
-            .then(function(){
-                if(data){
-                    return this.$timeout(function(){
-                        var   content = data[this.entityName] || [];
-                        content.forEach(function(entry){
-                            this.entities.push(entry);
-                        }, this);
-                    }.bind(this), 0)
+                if(data && data[this.entityName]){
+                    this.entities = data[this.entityName];
+                } else {
+                    this.entities = [];
                 }
             }.bind(this))
             .then(function(){
-                return this.$timeout(function() {
-                    this.componentsRegistry
-                        .optionsDataHandler(this.optionData)
-                        .then(function(success) {
-                            return this.componentsRegistry.distributeIndexed(data);
-                            //return value;
-                        }.bind(this)
-                        , function(error) {
-                            console.error(error);
-                        });
-                }.bind(this), 0);
+                this.distributeOptionsAndData(this.optionData, data, 0);
             }.bind(this));
     };
 
-    JBFormRepeatingViewController.prototype.addElement = function(){
+    JBFormRepeatingViewController.prototype.addElement = function(index){
+
+        if(this.isReadonly) return;
+
         this.entities.push({});
-        this.$timeout(function(){
-            return this.componentsRegistry.optionsDataHandler(this.optionData);
-        }.bind(this));
+
+        //todo: if we distribute the data like this, the lower form view adapters reset their entity, fix this.
+        var data = {};
+        data[this.entityName] = this.entities;
+
+        return this.distributeOptionsAndData(this.optionData, data, this.entities.length - 1);
+    };
+
+    JBFormRepeatingViewController.prototype.distributeOptionsAndData = function(options, data, startIndex){
+        return this.$timeout(function() {
+            this.componentsRegistry
+                .optionsDataHandler(options)
+                .then(function(success) {
+                        return this.componentsRegistry.distributeIndexedFrom(data, startIndex);
+                    }.bind(this)
+                    , function(error) {
+                        console.error(error);
+                    });
+        }.bind(this))
+    };
+
+    JBFormRepeatingViewController.prototype.removeElement = function(index){
+
+        if(this.isReadonly) return;
+
+        var   component   = this.componentsRegistry.componentAt(index)
+            , basePromise = this.$q.when()
+            , self        = this;
+
+        return basePromise
+            .then(function(success){
+                self.entities.splice(index, 1);
+            })
+            .then(function(success){
+                return self.$timeout(function(){
+                    return self.componentsRegistry.optionsDataHandler(self.optionData);
+                });
+            }.bind(this)).catch(function(error){
+                console.error(error);
+            });
     };
 
     _module.controller('JBFormRepeatingViewController', [
@@ -112,6 +144,7 @@
         , '$compile'
         , '$scope'
         , '$timeout'
+        , '$q'
         , JBFormRepeatingViewController
     ]);
 
@@ -129,6 +162,18 @@
 
                 , post: function(scope, element, attrs, ctrl){
 
+                    var   hasReadonlyFlag = attrs.hasOwnProperty('isReadonly')
+                        , readonlyGetter;
+
+                    if(hasReadonlyFlag){
+                        readonlyGetter = $parse(attrs.isReadonly);
+                        scope.$watch(function(){
+                            return readonlyGetter(scope.$parent);
+                        }, function(isReadonly){
+                            ctrl.isReadonly = isReadonly === true;
+                        });
+                    }
+
                     attrs.$observe('entityName', function(newValue){
                         ctrl.entityName = newValue;
                     });
@@ -140,17 +185,15 @@
 
                     ctrl.postLink(scope);
 
-                    scope.addElement = function(event){
-                        if(event){
-                            event.preventDefault();
-                            event.stopPropagation();
-                        }
-                        ctrl.addElement();
+                    scope.addElement = function(event, index){
+                        if(event) event.preventDefault();
+                        return ctrl.addElement(index);
                     };
 
-                    /*var button = angular.element('<div class="container clearfix"><button class="btn btn-sm btn-default pull-right" ng-click="addElement($event)">{{ $ctrl.buttonText | translate }}</button></div>');
-                    element.append(button);
-                    $compile(button)(scope);*/
+                    scope.removeElement = function(event, index){
+                        if(event) event.preventDefault();
+                        return ctrl.removeElement(index);
+                    };
                 }
             }
         }
