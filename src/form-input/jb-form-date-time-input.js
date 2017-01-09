@@ -109,7 +109,7 @@
                     label       : '@'
                   , name        : '@for'
                   , showLabel   : '<'
-                  , isReadonly  : '<'
+                  , isReadonly  : '<?'
               }
             , controller        : 'JBFormDateTimeInputController'
             , bindToController  : true

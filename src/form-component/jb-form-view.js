@@ -282,12 +282,11 @@
              */
             self.internallyHandleOptionsData = function (data) {
                 self.optionData = data;
+                // todo: modifying data from cache is always a dumb ass idea!
+                (data.properties || []).forEach(function(property){
+                    property.readonly = !!(data.permissions.update === false || self.isReadonly);
+                });
 
-                if(data.permissions.update === false || self.isReadonly){
-                    data.properties.forEach(function(property){
-                        property.readonly = true;
-                    });
-                }
                 return self.componentsRegistry.optionsDataHandler(data);
             };
 

@@ -2954,12 +2954,11 @@ angular
              */
             self.internallyHandleOptionsData = function (data) {
                 self.optionData = data;
+                // todo: modifying data from cache is always a dumb ass idea!
+                (data.properties || []).forEach(function(property){
+                    property.readonly = !!(data.permissions.update === false || self.isReadonly);
+                });
 
-                if(data.permissions.update === false || self.isReadonly){
-                    data.properties.forEach(function(property){
-                        property.readonly = true;
-                    });
-                }
                 return self.componentsRegistry.optionsDataHandler(data);
             };
 
@@ -3734,10 +3733,9 @@ angular
                         readonlyGetter = $parse(attrs.isReadonly);
                         scope.$watch(function(){
                             return readonlyGetter(scope.$parent);
-                        },
-                        function(newValue){
+                        },  function(newValue){
                             ctrl.isReadonly = newValue;
-                        })
+                        });
                     }
 
                     ctrl.init(scope, element, attrs);
@@ -3815,7 +3813,7 @@ angular
 
             // camelCase to camel-case
             elementTypeDashed   = elementType.replace(/[A-Z]/g, function (v) { return '-' + v.toLowerCase(); });
-            elementTypeTag      = 'jb-form-' + elementTypeDashed + '_input';
+            elementTypeTag      = 'jb-form-' + elementTypeDashed + '-input';
             newElement          = angular.element('<div>');
 
             newElement.attr(elementTypeTag  , '');
@@ -3827,7 +3825,7 @@ angular
             if(this.hasModel) newElement.attr('input-model' , '$ctrl.inputModel');
 
             this.registry.unregisterOptionsDataHandler(this.updateElement);
-            this.element.replaceWith(newElement);
+            this.element.append(newElement);
             // if we do not replace the element, we might end up in a loop!
             this.$compile(newElement)(this.$scope);
             // now the registry should know all the subcomponents
@@ -4059,7 +4057,7 @@ angular
                     label       : '@'
                   , name        : '@for'
                   , showLabel   : '<'
-                  , isReadonly  : '<'
+                  , isReadonly  : '<?'
               }
             , controller        : 'JBFormDateTimeInputController'
             , bindToController  : true

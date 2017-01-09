@@ -85,10 +85,9 @@
                         readonlyGetter = $parse(attrs.isReadonly);
                         scope.$watch(function(){
                             return readonlyGetter(scope.$parent);
-                        },
-                        function(newValue){
+                        },  function(newValue){
                             ctrl.isReadonly = newValue;
-                        })
+                        });
                     }
 
                     ctrl.init(scope, element, attrs);
@@ -166,7 +165,7 @@
 
             // camelCase to camel-case
             elementTypeDashed   = elementType.replace(/[A-Z]/g, function (v) { return '-' + v.toLowerCase(); });
-            elementTypeTag      = 'jb-form-' + elementTypeDashed + '_input';
+            elementTypeTag      = 'jb-form-' + elementTypeDashed + '-input';
             newElement          = angular.element('<div>');
 
             newElement.attr(elementTypeTag  , '');
@@ -178,7 +177,7 @@
             if(this.hasModel) newElement.attr('input-model' , '$ctrl.inputModel');
 
             this.registry.unregisterOptionsDataHandler(this.updateElement);
-            this.element.replaceWith(newElement);
+            this.element.append(newElement);
             // if we do not replace the element, we might end up in a loop!
             this.$compile(newElement)(this.$scope);
             // now the registry should know all the subcomponents
