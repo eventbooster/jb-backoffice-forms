@@ -20,7 +20,7 @@
         , _module = angular.module('jb.formComponents');
 
     _module.value(typeKey, {
-          'text'    : 'text'
+        'text'    : 'text'
         , 'number'  : 'text'
         , 'string'  : 'text'
         , 'boolean' : 'checkbox'
@@ -31,9 +31,7 @@
     _module.directive('jbFormAutoInput', ['$compile', '$parse', function ($compile, $parse) {
 
         return {
-              controllerAs      : '$ctrl'
-            , bindToController  : true
-            , restrict          : 'E'
+              restrict          : 'E'
             , link : {
                 post: function (scope, element, attrs, ctrl) {
 
@@ -46,10 +44,16 @@
                     if(ctrl.hasModel){
                         modelGetter = $parse(attrs.inputModel);
                         scope.$watch(function(){
-                            return modelGetter(scope.$parent);
-                        },
-                        function(newValue){
-                            ctrl.inputModel = newValue;
+                                return modelGetter(scope.$parent);
+                            },
+                            function(newValue){
+                                if(newValue){
+                                    debugger;
+                                }
+                                ctrl.inputModel = newValue;
+                            });
+                        scope.$watch(function(){
+                            return ctrl.inputModel.value;
                         });
                     }
 
@@ -138,51 +142,56 @@
     /**
      * @todo: switch into an error state if there is no spec or corresponding type
      * @todo: think about a more angularish version of this procedure, since it is super messy!
+     * @todo: remove the dependency to the controller name, since it couples the controller to the markup
      * @param fieldSpec
      */
     JBFormAutoInputController.prototype.updateElement = function(fieldSpec){
 
-            var   elementType
-                , elementSpec = this.selectOptions(fieldSpec)
-                , elementTypeDashed
-                , elementTypeTag
-                , newElement;
+        var   elementType
+            , elementSpec = this.selectOptions(fieldSpec)
+            , elementTypeDashed
+            , elementTypeTag
+            , newElement;
 
-            if (!elementSpec || !elementSpec.type) {
-                console.error('AutoFormElement: fieldSpec %o is missing type for field %o', fieldSpec, this.name);
-                return;
-            }
+        if (!elementSpec || !elementSpec.type) {
+            console.error('AutoFormElement: fieldSpec %o is missing type for field %o', fieldSpec, this.name);
+            return;
+        }
 
-            elementType = this.fieldTypes[elementSpec.type];
+        elementType = this.fieldTypes[elementSpec.type];
 
-            if (!elementType) {
-                console.error('AutoFormElement: Unknown type %o', fieldSpec.type);
-                console.error('AutoFormElement: elementType missing for element %o', this.element);
-                return;
-            }
+        if (!elementType) {
+            console.error('AutoFormElement: Unknown type %o', fieldSpec.type);
+            console.error('AutoFormElement: elementType missing for element %o', this.element);
+            return;
+        }
 
-            console.log('AutoFormElement: Create new %s from %o', elementType, fieldSpec);
+        console.log('AutoFormElement: Create new %s from %o', elementType, fieldSpec);
 
-            // camelCase to camel-case
-            elementTypeDashed   = elementType.replace(/[A-Z]/g, function (v) { return '-' + v.toLowerCase(); });
-            elementTypeTag      = 'jb-form-' + elementTypeDashed + '-input';
-            newElement          = angular.element('<div>');
+        /**
+         * Lets improve this by replacing the element and its attributes by the original.
+         * The compiling will then resolve the values as they were before.
+         */
+        // camelCase to camel-case
+        elementTypeDashed   = elementType.replace(/[A-Z]/g, function (v) { return '-' + v.toLowerCase(); });
+        elementTypeTag      = 'jb-form-' + elementTypeDashed + '-input';
+        newElement          = angular.element('<div>');
 
-            newElement.attr(elementTypeTag  , '');
-            newElement.attr('for'           , '{{$ctrl.name}}');
-            newElement.attr('is-readonly'   , '$ctrl.isReadonly');
-            newElement.attr('ng-hide'       , "$ctrl.inputHidden");
+        newElement.attr(elementTypeTag  , '');
+        newElement.attr('for'           , this.$attrs.for);
+        newElement.attr('is-readonly'   , this.$attrs.isReadonly);
+        newElement.attr('ng-hide'       , this.$attrs.inputHidden);
 
-            if(this.hasLabel) newElement.attr('label'       , '{{$ctrl.label}}');
-            if(this.hasModel) newElement.attr('input-model' , '$ctrl.inputModel');
+        if(this.hasLabel) newElement.attr('label'       , this.$attrs.label);
+        if(this.hasModel) newElement.attr('input-model' , this.$attrs.inputModel);
 
-            this.registry.unregisterOptionsDataHandler(this.updateElement);
-            this.element.append(newElement);
-            // if we do not replace the element, we might end up in a loop!
-            this.$compile(newElement)(this.$scope);
-            // now the registry should know all the subcomponents
-            // delegate to the options data handlers of the components
-            return this.registry.optionsDataHandler(fieldSpec);
+        this.registry.unregisterOptionsDataHandler(this.updateElement);
+        this.element.replaceWith(newElement);
+        // if we do not replace the element, we might end up in a loop!
+        this.$compile(newElement)(this.$scope);
+        // now the registry should know all the subcomponents
+        // delegate to the options data handlers of the components
+        return this.registry.optionsDataHandler(fieldSpec);
     };
 
     _module.controller('JBFormAutoInputController', [

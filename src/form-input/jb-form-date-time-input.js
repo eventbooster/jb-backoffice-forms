@@ -3,16 +3,16 @@
 
     'use strict';
 
-    var JBFormDateTimeInputController = function ($scope, $attrs, componentsService) {
-        this.$attrs = $attrs;
-        this.$scope = $scope;
-        this.subcomponentsService = componentsService;
+    function pad(nr) {
+        return nr < 10 ? '0' + nr : nr;
+    }
 
+    var JBFormDateTimeInputController = function (componentsService) {
+
+        this.subcomponentsService   = componentsService;
         this.originalData = undefined;
-        this.date = undefined;
-
-        this.time = false;
         this.required = true;
+
     };
 
     JBFormDateTimeInputController.prototype.getSelectFields = function(){
@@ -28,19 +28,24 @@
         return true;
     };
 
-    JBFormDateTimeInputController.prototype.updateData = function (data) {
-        var value = (data) ? data[this.name] : data;
-        this.date = (value) ? new Date(value) : undefined;
-        this.originalData = this.date;
+    JBFormDateTimeInputController.prototype.setValue = function(value) {
+        if(!this.model) this.model = {};
+        this.model.value = value;
     };
 
-    function pad(nr) {
-        return nr < 10 ? '0' + nr : nr;
-    }
+    JBFormDateTimeInputController.prototype.getValue = function() {
+        return (this.model || {}).value;
+    };
+
+    JBFormDateTimeInputController.prototype.updateData = function (data) {
+        var value = (data) ? data[this.name] : data;
+        this.setValue(value ? new Date(value) : undefined);
+        this.originalData = this.getValue();
+    };
 
     JBFormDateTimeInputController.prototype.getSaveCalls = function () {
 
-        var   currentDate   = this.date
+        var   currentDate   = this.getValue()
             , originalDate  = this.originalData
             , call          = { data: {}}
             , dateString = '';
@@ -63,9 +68,10 @@
 
     JBFormDateTimeInputController.prototype.init = function (scope) {
         this.subcomponentsService.registerComponent(scope, this);
-        if(angular.isUndefined(this.showLabel)){
-            this.showLabel = true;
-        }
+    };
+
+    JBFormDateTimeInputController.prototype.displayLabel = function(){
+        return this.hasLabel && this.showLabel !== false;
     };
 
     JBFormDateTimeInputController.prototype.registerAt = function (parent) {
@@ -106,27 +112,30 @@
 
         return {
               scope : {
-                    label       : '@'
-                  , name        : '@for'
-                  , showLabel   : '<'
+                    name        : '@for'
+                  , label       : '@?'
+                  , showLabel   : '<?'
                   , isReadonly  : '<?'
+                  , model       : '=?inputModel'
               }
             , controller        : 'JBFormDateTimeInputController'
             , bindToController  : true
             , controllerAs      : '$ctrl'
             , link: function (scope, element, attrs, ctrl) {
-                ctrl.init(scope, element, attrs);
+                  ctrl.hasLabel = attrs.hasOwnProperty('label');
+                  ctrl.hasModel = attrs.hasOwnProperty('inputModel');
+                  ctrl.init(scope, element, attrs);
             }
             , template:
                 '<div class="form-group form-group-sm">' +
-                    '<label ng-if="$ctrl.showLabel" jb-form-label-component label-identifier="{{$ctrl.label}}" is-required="$ctrl.isRequired()" is-valid="$ctrl.isValid()"></label>' +
-                    '<div ng-class="{\'col-md-9\' : $ctrl.showLabel, \'col-md-12\': !ctrl.showLabel }">' +
+                    '<label ng-if="$ctrl.displayLabel()" jb-form-label-component label-identifier="{{$ctrl.label}}" is-required="$ctrl.isRequired()" is-valid="$ctrl.isValid()"></label>' +
+                    '<div ng-class="{\'col-md-9\' : $ctrl.displayLabel(), \'col-md-12\': !ctrl.displayLabel() }">' +
                         '<div class="row">' +
                             '<div ng-if="$ctrl.showDate" ng-class="{ \'col-md-6\': $ctrl.showTime, \'col-md-12\': !$ctrl.showTime }">' +
-                                '<input type="date" class="form-control input-sm input-date" data-ng-model="$ctrl.date" ng-disabled="$ctrl.isReadonly">' +
+                                '<input type="date" class="form-control input-sm input-date" data-ng-model="$ctrl.model.value" ng-disabled="$ctrl.isReadonly">' +
                             '</div>' +
                             '<div ng-if="$ctrl.showTime" ng-class="{ \'col-md-6\': $ctrl.showDate, \'col-md-12\': !$ctrl.showDate }">' +
-                                '<input type="time" class="form-control input-sm input-time" data-ng-model="$ctrl.date" ng-disabled="$ctrl.isReadonly"/>' +
+                                '<input type="time" class="form-control input-sm input-time" data-ng-model="$ctrl.model.value" ng-disabled="$ctrl.isReadonly"/>' +
                             '</div>' +
                         '</div>' +
                     '</div>' +
@@ -135,10 +144,11 @@
 
     }]);
 
-    _module.controller('JBFormDateTimeInputController', [
-        '$scope',
-        '$attrs',
-        'JBFormComponentsService',
-        JBFormDateTimeInputController]);
+    _module.controller(
+          'JBFormDateTimeInputController'
+        , [
+              'JBFormComponentsService'
+            , JBFormDateTimeInputController
+        ]);
 
 })();

@@ -27,6 +27,7 @@
                     }
                     , post: function (scope, element, attrs, ctrl) {
                         ctrl.hasLabel = attrs.hasOwnProperty('label');
+                        ctrl.hasModel = attrs.hasOwnProperty('relationInputModel');
                         ctrl.postLink(scope, element, attrs);
                     }
                 }
@@ -35,7 +36,7 @@
                     , 'entityName'      : '@entity'
                     , 'relationName'    : '@relation'
 
-                    , 'label'           : '@'
+                    , 'label'           : '@?'
                     , 'showLabel'		: '<?'
 
                     , 'suggestion'      : '@suggestionTemplate'
@@ -47,6 +48,7 @@
                     , 'disableRemoveButton'	: '<?relationDisableRemoveButton'
                     , 'disableNewButton'	: '<?relationDisableNewButton'
                     , 'disableEditButton'   : '<?relationDisableEditButton'
+                    , 'model'               : '=?relationModel'
 
                     , 'isReadonly'          : '<?relationIsReadonly'
 

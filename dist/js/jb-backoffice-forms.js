@@ -1408,6 +1408,7 @@
                     }
                     , post: function (scope, element, attrs, ctrl) {
                         ctrl.hasLabel = attrs.hasOwnProperty('label');
+                        ctrl.hasModel = attrs.hasOwnProperty('relationInputModel');
                         ctrl.postLink(scope, element, attrs);
                     }
                 }
@@ -1416,7 +1417,7 @@
                     , 'entityName'      : '@entity'
                     , 'relationName'    : '@relation'
 
-                    , 'label'           : '@'
+                    , 'label'           : '@?'
                     , 'showLabel'		: '<?'
 
                     , 'suggestion'      : '@suggestionTemplate'
@@ -1428,6 +1429,7 @@
                     , 'disableRemoveButton'	: '<?relationDisableRemoveButton'
                     , 'disableNewButton'	: '<?relationDisableNewButton'
                     , 'disableEditButton'   : '<?relationDisableEditButton'
+                    , 'model'               : '=?relationModel'
 
                     , 'isReadonly'          : '<?relationIsReadonly'
 
@@ -3668,7 +3670,7 @@ angular
         , _module = angular.module('jb.formComponents');
 
     _module.value(typeKey, {
-          'text'    : 'text'
+        'text'    : 'text'
         , 'number'  : 'text'
         , 'string'  : 'text'
         , 'boolean' : 'checkbox'
@@ -3679,9 +3681,7 @@ angular
     _module.directive('jbFormAutoInput', ['$compile', '$parse', function ($compile, $parse) {
 
         return {
-              controllerAs      : '$ctrl'
-            , bindToController  : true
-            , restrict          : 'E'
+              restrict          : 'E'
             , link : {
                 post: function (scope, element, attrs, ctrl) {
 
@@ -3694,10 +3694,16 @@ angular
                     if(ctrl.hasModel){
                         modelGetter = $parse(attrs.inputModel);
                         scope.$watch(function(){
-                            return modelGetter(scope.$parent);
-                        },
-                        function(newValue){
-                            ctrl.inputModel = newValue;
+                                return modelGetter(scope.$parent);
+                            },
+                            function(newValue){
+                                if(newValue){
+                                    debugger;
+                                }
+                                ctrl.inputModel = newValue;
+                            });
+                        scope.$watch(function(){
+                            return ctrl.inputModel.value;
                         });
                     }
 
@@ -3786,51 +3792,56 @@ angular
     /**
      * @todo: switch into an error state if there is no spec or corresponding type
      * @todo: think about a more angularish version of this procedure, since it is super messy!
+     * @todo: remove the dependency to the controller name, since it couples the controller to the markup
      * @param fieldSpec
      */
     JBFormAutoInputController.prototype.updateElement = function(fieldSpec){
 
-            var   elementType
-                , elementSpec = this.selectOptions(fieldSpec)
-                , elementTypeDashed
-                , elementTypeTag
-                , newElement;
+        var   elementType
+            , elementSpec = this.selectOptions(fieldSpec)
+            , elementTypeDashed
+            , elementTypeTag
+            , newElement;
 
-            if (!elementSpec || !elementSpec.type) {
-                console.error('AutoFormElement: fieldSpec %o is missing type for field %o', fieldSpec, this.name);
-                return;
-            }
+        if (!elementSpec || !elementSpec.type) {
+            console.error('AutoFormElement: fieldSpec %o is missing type for field %o', fieldSpec, this.name);
+            return;
+        }
 
-            elementType = this.fieldTypes[elementSpec.type];
+        elementType = this.fieldTypes[elementSpec.type];
 
-            if (!elementType) {
-                console.error('AutoFormElement: Unknown type %o', fieldSpec.type);
-                console.error('AutoFormElement: elementType missing for element %o', this.element);
-                return;
-            }
+        if (!elementType) {
+            console.error('AutoFormElement: Unknown type %o', fieldSpec.type);
+            console.error('AutoFormElement: elementType missing for element %o', this.element);
+            return;
+        }
 
-            console.log('AutoFormElement: Create new %s from %o', elementType, fieldSpec);
+        console.log('AutoFormElement: Create new %s from %o', elementType, fieldSpec);
 
-            // camelCase to camel-case
-            elementTypeDashed   = elementType.replace(/[A-Z]/g, function (v) { return '-' + v.toLowerCase(); });
-            elementTypeTag      = 'jb-form-' + elementTypeDashed + '-input';
-            newElement          = angular.element('<div>');
+        /**
+         * Lets improve this by replacing the element and its attributes by the original.
+         * The compiling will then resolve the values as they were before.
+         */
+        // camelCase to camel-case
+        elementTypeDashed   = elementType.replace(/[A-Z]/g, function (v) { return '-' + v.toLowerCase(); });
+        elementTypeTag      = 'jb-form-' + elementTypeDashed + '-input';
+        newElement          = angular.element('<div>');
 
-            newElement.attr(elementTypeTag  , '');
-            newElement.attr('for'           , '{{$ctrl.name}}');
-            newElement.attr('is-readonly'   , '$ctrl.isReadonly');
-            newElement.attr('ng-hide'       , "$ctrl.inputHidden");
+        newElement.attr(elementTypeTag  , '');
+        newElement.attr('for'           , this.$attrs.for);
+        newElement.attr('is-readonly'   , this.$attrs.isReadonly);
+        newElement.attr('ng-hide'       , this.$attrs.inputHidden);
 
-            if(this.hasLabel) newElement.attr('label'       , '{{$ctrl.label}}');
-            if(this.hasModel) newElement.attr('input-model' , '$ctrl.inputModel');
+        if(this.hasLabel) newElement.attr('label'       , this.$attrs.label);
+        if(this.hasModel) newElement.attr('input-model' , this.$attrs.inputModel);
 
-            this.registry.unregisterOptionsDataHandler(this.updateElement);
-            this.element.append(newElement);
-            // if we do not replace the element, we might end up in a loop!
-            this.$compile(newElement)(this.$scope);
-            // now the registry should know all the subcomponents
-            // delegate to the options data handlers of the components
-            return this.registry.optionsDataHandler(fieldSpec);
+        this.registry.unregisterOptionsDataHandler(this.updateElement);
+        this.element.replaceWith(newElement);
+        // if we do not replace the element, we might end up in a loop!
+        this.$compile(newElement)(this.$scope);
+        // now the registry should know all the subcomponents
+        // delegate to the options data handlers of the components
+        return this.registry.optionsDataHandler(fieldSpec);
     };
 
     _module.controller('JBFormAutoInputController', [
@@ -3850,15 +3861,22 @@ angular
      * Auto checkbox input.
      */
 
-    var JBFormCheckboxInputController = function ($scope, $attrs, componentsService) {
-
-        this.$attrs = $attrs;
-        this.$scope = $scope;
+    var JBFormCheckboxInputController = function (componentsService) {
         this.subcomponentsService = componentsService;
     };
 
     JBFormCheckboxInputController.prototype.updateData = function (data) {
-        this.originalData = this.$scope.data.value = data[this.name];
+        this.setValue(data[this.name]);
+        this.originalData = this.getValue();
+    };
+
+    JBFormCheckboxInputController.prototype.setValue = function(value){
+        if(!this.hasModel) this.model = {};
+        this.model.value = value;
+    };
+
+    JBFormCheckboxInputController.prototype.getValue = function(){
+        return (this.model || {}).value;
     };
 
     JBFormCheckboxInputController.prototype.getSelectFields = function(){
@@ -3866,21 +3884,16 @@ angular
     };
 
     JBFormCheckboxInputController.prototype.getSaveCalls = function () {
-        if (this.originalData === this.$scope.data.value || this.isReadonly) return [];
+        if (this.originalData === this.getValue() || this.isReadonly) return [];
 
         var data = {};
-        data[this.$scope.data.name] = this.$scope.data.value === true;
+        data[this.name] = this.getValue() === true;
         return [{
             data: data
         }];
     };
 
     JBFormCheckboxInputController.prototype.preLink = function (scope, element, attrs) {
-        scope.data = {
-            value: undefined
-            , name: this.name
-            , valid: true
-        };
     };
 
     JBFormCheckboxInputController.prototype.isValid = function () {
@@ -3906,15 +3919,21 @@ angular
         }
     };
 
+    JBFormCheckboxInputController.prototype.displayLabel = function(){
+        return this.hasLabel && this.showLabel !== false;
+    };
+
     var _module = angular.module('jb.formComponents');
     _module.directive('jbFormCheckboxInput', [function () {
 
         return {
             scope : {
-                  label       : '@'
-                , name        : '@for'
+
+                  name        : '@for'
                 , isReadonly  : '<?'
+                , label       : '@?'
                 , showLabel   : '<?'
+                , model       : '=?inputModel'
             }
             , controller        : 'JBFormCheckboxInputController'
             , bindToController  : true
@@ -3924,15 +3943,22 @@ angular
                     ctrl.preLink(scope, element, attrs, ctrl);
                 }
                 , post: function (scope, element, attrs, ctrl) {
+                    ctrl.hasLabel = attrs.hasOwnProperty('label');
+                    ctrl.hasModel = attrs.hasOwnProperty('inputModel');
                     ctrl.init(scope, element, attrs);
                 }
             }
             , template:
                 '<div class="form-group">' +
-                    '<label ng-if="$ctrl.showLabel"jb-form-label-component data-label-identifier="{{$ctrl.label}}" data-is-valid="$ctrl.isValid()" data-is-required="$ctr.isRequired()"></label>' +
-                    '<div ng-class="{ \'col-md-9\' : $ctrl.showLabel, \'col-md-12\' : !$ctrl.showLabel }">' +
+                    '<label ng-if="$ctrl.displayLabel()" ' +
+                            'jb-form-label-component ' +
+                            'label-identifier="{{$ctrl.label}}" ' +
+                            'is-valid="$ctrl.isValid()" ' +
+                            'is-required="$ctr.isRequired()">' +
+                    '</label>' +
+                    '<div ng-class="{ \'col-md-9\' : $ctrl.displayLabel(), \'col-md-12\' : !$ctrl.displayLabel() }">' +
                         '<div class="checkbox">' +
-                            '<input type="checkbox" data-ng-model="data.value"/>' +
+                            '<input type="checkbox" data-ng-model="$ctrl.model.value"/>' +
                         '</div>' +
                     '</div>' +
                 '</div>'
@@ -3941,8 +3967,6 @@ angular
     }]);
 
     _module.controller('JBFormCheckboxInputController', [
-        '$scope',
-        '$attrs',
         'JBFormComponentsService',
         JBFormCheckboxInputController]);
 })();
@@ -3951,16 +3975,16 @@ angular
 
     'use strict';
 
-    var JBFormDateTimeInputController = function ($scope, $attrs, componentsService) {
-        this.$attrs = $attrs;
-        this.$scope = $scope;
-        this.subcomponentsService = componentsService;
+    function pad(nr) {
+        return nr < 10 ? '0' + nr : nr;
+    }
 
+    var JBFormDateTimeInputController = function (componentsService) {
+
+        this.subcomponentsService   = componentsService;
         this.originalData = undefined;
-        this.date = undefined;
-
-        this.time = false;
         this.required = true;
+
     };
 
     JBFormDateTimeInputController.prototype.getSelectFields = function(){
@@ -3976,19 +4000,24 @@ angular
         return true;
     };
 
-    JBFormDateTimeInputController.prototype.updateData = function (data) {
-        var value = (data) ? data[this.name] : data;
-        this.date = (value) ? new Date(value) : undefined;
-        this.originalData = this.date;
+    JBFormDateTimeInputController.prototype.setValue = function(value) {
+        if(!this.model) this.model = {};
+        this.model.value = value;
     };
 
-    function pad(nr) {
-        return nr < 10 ? '0' + nr : nr;
-    }
+    JBFormDateTimeInputController.prototype.getValue = function() {
+        return (this.model || {}).value;
+    };
+
+    JBFormDateTimeInputController.prototype.updateData = function (data) {
+        var value = (data) ? data[this.name] : data;
+        this.setValue(value ? new Date(value) : undefined);
+        this.originalData = this.getValue();
+    };
 
     JBFormDateTimeInputController.prototype.getSaveCalls = function () {
 
-        var   currentDate   = this.date
+        var   currentDate   = this.getValue()
             , originalDate  = this.originalData
             , call          = { data: {}}
             , dateString = '';
@@ -4011,9 +4040,10 @@ angular
 
     JBFormDateTimeInputController.prototype.init = function (scope) {
         this.subcomponentsService.registerComponent(scope, this);
-        if(angular.isUndefined(this.showLabel)){
-            this.showLabel = true;
-        }
+    };
+
+    JBFormDateTimeInputController.prototype.displayLabel = function(){
+        return this.hasLabel && this.showLabel !== false;
     };
 
     JBFormDateTimeInputController.prototype.registerAt = function (parent) {
@@ -4054,27 +4084,30 @@ angular
 
         return {
               scope : {
-                    label       : '@'
-                  , name        : '@for'
-                  , showLabel   : '<'
+                    name        : '@for'
+                  , label       : '@?'
+                  , showLabel   : '<?'
                   , isReadonly  : '<?'
+                  , model       : '=?inputModel'
               }
             , controller        : 'JBFormDateTimeInputController'
             , bindToController  : true
             , controllerAs      : '$ctrl'
             , link: function (scope, element, attrs, ctrl) {
-                ctrl.init(scope, element, attrs);
+                  ctrl.hasLabel = attrs.hasOwnProperty('label');
+                  ctrl.hasModel = attrs.hasOwnProperty('inputModel');
+                  ctrl.init(scope, element, attrs);
             }
             , template:
                 '<div class="form-group form-group-sm">' +
-                    '<label ng-if="$ctrl.showLabel" jb-form-label-component label-identifier="{{$ctrl.label}}" is-required="$ctrl.isRequired()" is-valid="$ctrl.isValid()"></label>' +
-                    '<div ng-class="{\'col-md-9\' : $ctrl.showLabel, \'col-md-12\': !ctrl.showLabel }">' +
+                    '<label ng-if="$ctrl.displayLabel()" jb-form-label-component label-identifier="{{$ctrl.label}}" is-required="$ctrl.isRequired()" is-valid="$ctrl.isValid()"></label>' +
+                    '<div ng-class="{\'col-md-9\' : $ctrl.displayLabel(), \'col-md-12\': !ctrl.displayLabel() }">' +
                         '<div class="row">' +
                             '<div ng-if="$ctrl.showDate" ng-class="{ \'col-md-6\': $ctrl.showTime, \'col-md-12\': !$ctrl.showTime }">' +
-                                '<input type="date" class="form-control input-sm input-date" data-ng-model="$ctrl.date" ng-disabled="$ctrl.isReadonly">' +
+                                '<input type="date" class="form-control input-sm input-date" data-ng-model="$ctrl.model.value" ng-disabled="$ctrl.isReadonly">' +
                             '</div>' +
                             '<div ng-if="$ctrl.showTime" ng-class="{ \'col-md-6\': $ctrl.showDate, \'col-md-12\': !$ctrl.showDate }">' +
-                                '<input type="time" class="form-control input-sm input-time" data-ng-model="$ctrl.date" ng-disabled="$ctrl.isReadonly"/>' +
+                                '<input type="time" class="form-control input-sm input-time" data-ng-model="$ctrl.model.value" ng-disabled="$ctrl.isReadonly"/>' +
                             '</div>' +
                         '</div>' +
                     '</div>' +
@@ -4083,11 +4116,12 @@ angular
 
     }]);
 
-    _module.controller('JBFormDateTimeInputController', [
-        '$scope',
-        '$attrs',
-        'JBFormComponentsService',
-        JBFormDateTimeInputController]);
+    _module.controller(
+          'JBFormDateTimeInputController'
+        , [
+              'JBFormComponentsService'
+            , JBFormDateTimeInputController
+        ]);
 
 })();
 (function(undefined){
@@ -4347,17 +4381,17 @@ angular
                     }
                 }
                 , controller: 'JBFormTextInputController'
-                , template: '<div class="form-group form-group-sm">' +
-                                '<label ng-if="$ctrl.displayLabel()" jb-form-label-component label-identifier="{{$ctrl.label}}" is-valid="$ctrl.isValid()" is-required="$ctrl.isRequired()"></label>' +
-                                '<div ng-class="{ \'col-md-9\' : $ctrl.displayLabel(), \'col-md-12\' : !$ctrl.displayLabel() }" >' +
+                , template: '<div class="form-group form-group-sm"> ' +
+                                '<label ng-if="$ctrl.displayLabel()" jb-form-label-component label-identifier="{{$ctrl.label}}" is-valid="$ctrl.isValid()" is-required="$ctrl.isRequired()"></label> ' +
+                                '<div ng-class="{ \'col-md-9\' : $ctrl.displayLabel(), \'col-md-12\' : !$ctrl.displayLabel() }" > ' +
                                     '<input type="text" ' +
                                             'ng-attr-id="$ctrl.name" ' +
                                             'ng-attrs-required="$ctrl.isRequired()" ' +
-                                            'ng-model="$ctrl.model.value"' +
-                                            'ng-disabled="$ctrl.isReadonly"' +
+                                            'ng-model="$ctrl.model.value" ' +
+                                            'ng-disabled="$ctrl.isReadonly" ' +
                                             'class="form-control input-sm" />' +
-                                '</div>' +
-                            '</div>'
+                                '</div> ' +
+                            '</div> '
             };
 
         }]);

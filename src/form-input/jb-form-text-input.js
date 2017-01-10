@@ -134,17 +134,17 @@
                     }
                 }
                 , controller: 'JBFormTextInputController'
-                , template: '<div class="form-group form-group-sm">' +
-                                '<label ng-if="$ctrl.displayLabel()" jb-form-label-component label-identifier="{{$ctrl.label}}" is-valid="$ctrl.isValid()" is-required="$ctrl.isRequired()"></label>' +
-                                '<div ng-class="{ \'col-md-9\' : $ctrl.displayLabel(), \'col-md-12\' : !$ctrl.displayLabel() }" >' +
+                , template: '<div class="form-group form-group-sm"> ' +
+                                '<label ng-if="$ctrl.displayLabel()" jb-form-label-component label-identifier="{{$ctrl.label}}" is-valid="$ctrl.isValid()" is-required="$ctrl.isRequired()"></label> ' +
+                                '<div ng-class="{ \'col-md-9\' : $ctrl.displayLabel(), \'col-md-12\' : !$ctrl.displayLabel() }" > ' +
                                     '<input type="text" ' +
                                             'ng-attr-id="$ctrl.name" ' +
                                             'ng-attrs-required="$ctrl.isRequired()" ' +
-                                            'ng-model="$ctrl.model.value"' +
-                                            'ng-disabled="$ctrl.isReadonly"' +
+                                            'ng-model="$ctrl.model.value" ' +
+                                            'ng-disabled="$ctrl.isReadonly" ' +
                                             'class="form-control input-sm" />' +
-                                '</div>' +
-                            '</div>'
+                                '</div> ' +
+                            '</div> '
             };
 
         }]);

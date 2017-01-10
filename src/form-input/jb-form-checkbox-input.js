@@ -5,15 +5,22 @@
      * Auto checkbox input.
      */
 
-    var JBFormCheckboxInputController = function ($scope, $attrs, componentsService) {
-
-        this.$attrs = $attrs;
-        this.$scope = $scope;
+    var JBFormCheckboxInputController = function (componentsService) {
         this.subcomponentsService = componentsService;
     };
 
     JBFormCheckboxInputController.prototype.updateData = function (data) {
-        this.originalData = this.$scope.data.value = data[this.name];
+        this.setValue(data[this.name]);
+        this.originalData = this.getValue();
+    };
+
+    JBFormCheckboxInputController.prototype.setValue = function(value){
+        if(!this.hasModel) this.model = {};
+        this.model.value = value;
+    };
+
+    JBFormCheckboxInputController.prototype.getValue = function(){
+        return (this.model || {}).value;
     };
 
     JBFormCheckboxInputController.prototype.getSelectFields = function(){
@@ -21,21 +28,16 @@
     };
 
     JBFormCheckboxInputController.prototype.getSaveCalls = function () {
-        if (this.originalData === this.$scope.data.value || this.isReadonly) return [];
+        if (this.originalData === this.getValue() || this.isReadonly) return [];
 
         var data = {};
-        data[this.$scope.data.name] = this.$scope.data.value === true;
+        data[this.name] = this.getValue() === true;
         return [{
             data: data
         }];
     };
 
     JBFormCheckboxInputController.prototype.preLink = function (scope, element, attrs) {
-        scope.data = {
-            value: undefined
-            , name: this.name
-            , valid: true
-        };
     };
 
     JBFormCheckboxInputController.prototype.isValid = function () {
@@ -61,15 +63,21 @@
         }
     };
 
+    JBFormCheckboxInputController.prototype.displayLabel = function(){
+        return this.hasLabel && this.showLabel !== false;
+    };
+
     var _module = angular.module('jb.formComponents');
     _module.directive('jbFormCheckboxInput', [function () {
 
         return {
             scope : {
-                  label       : '@'
-                , name        : '@for'
+
+                  name        : '@for'
                 , isReadonly  : '<?'
+                , label       : '@?'
                 , showLabel   : '<?'
+                , model       : '=?inputModel'
             }
             , controller        : 'JBFormCheckboxInputController'
             , bindToController  : true
@@ -79,15 +87,22 @@
                     ctrl.preLink(scope, element, attrs, ctrl);
                 }
                 , post: function (scope, element, attrs, ctrl) {
+                    ctrl.hasLabel = attrs.hasOwnProperty('label');
+                    ctrl.hasModel = attrs.hasOwnProperty('inputModel');
                     ctrl.init(scope, element, attrs);
                 }
             }
             , template:
                 '<div class="form-group">' +
-                    '<label ng-if="$ctrl.showLabel"jb-form-label-component data-label-identifier="{{$ctrl.label}}" data-is-valid="$ctrl.isValid()" data-is-required="$ctr.isRequired()"></label>' +
-                    '<div ng-class="{ \'col-md-9\' : $ctrl.showLabel, \'col-md-12\' : !$ctrl.showLabel }">' +
+                    '<label ng-if="$ctrl.displayLabel()" ' +
+                            'jb-form-label-component ' +
+                            'label-identifier="{{$ctrl.label}}" ' +
+                            'is-valid="$ctrl.isValid()" ' +
+                            'is-required="$ctr.isRequired()">' +
+                    '</label>' +
+                    '<div ng-class="{ \'col-md-9\' : $ctrl.displayLabel(), \'col-md-12\' : !$ctrl.displayLabel() }">' +
                         '<div class="checkbox">' +
-                            '<input type="checkbox" data-ng-model="data.value"/>' +
+                            '<input type="checkbox" data-ng-model="$ctrl.model.value"/>' +
                         '</div>' +
                     '</div>' +
                 '</div>'
@@ -96,8 +111,6 @@
     }]);
 
     _module.controller('JBFormCheckboxInputController', [
-        '$scope',
-        '$attrs',
         'JBFormComponentsService',
         JBFormCheckboxInputController]);
 })();
