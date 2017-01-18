@@ -816,7 +816,7 @@
 			
 			// Not set before and after (but not identical due to angular.copy)
 			if( !_originalFocalPoint && !self.image.focalPoint ) {
-				return false;
+				return [];
 			}
 
 			// Same x and y property
