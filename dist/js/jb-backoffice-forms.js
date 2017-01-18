@@ -951,6 +951,8 @@
             , bindToController  : true
             , scope: {
                   fieldsExclude : '<'
+                , languageOrder : '<'
+                , fieldOrder    : '<'
                 , entityName    : '@entity'
                 , relationName  : '@relation'
                 , isReadonly    : '<'
@@ -973,13 +975,13 @@
                                 '<div class="locale-col" ng-repeat="language in $ctrl.selectedLanguages">' +
                                     '<p>{{ language.code | uppercase }}</p>' +
                                     '<ul ng-if="$ctrl.fieldDefinitions">' +
-                                        '<li ng-repeat="field in $ctrl.fieldDefinitions">' +
-                                            '<label ng-attr-for="locale-{{language.code}}-{{field.name}}" ng-class="{ \'invalid\' : !$ctrl.fieldIsValid($ctrl.locales[ language.id ], field.name)}">' +
-                                                '<span data-translate="web.backoffice.{{$ctrl.entityName}}.{{field.name}}"></span>' +
-                                                '<span class="required-indicator" data-ng-show="field.required">*</span>' +
+                                        '<li ng-repeat="fieldName in $ctrl.fields">' +
+                                            '<label ng-attr-for="locale-{{language.code}}-{{fieldName}}" ng-class="{ \'invalid\' : !$ctrl.fieldIsValid($ctrl.locales[ language.id ], fieldName)}">' +
+                                                '<span data-translate="web.backoffice.{{$ctrl.entityName}}.{{fieldName}}"></span>' +
+                                                '<span class="required-indicator" data-ng-show="fieldDefinitions[fieldName].required">*</span>' +
                                             '</label>' +
-                                            '<textarea ng-model="$ctrl.locales[ language.id ][ field.name ]" ' +
-                                                'ng-attr-id="locale-{{language.code}}-{{field.name}}"' +
+                                            '<textarea ng-model="$ctrl.locales[ language.id ][ fieldName ]" ' +
+                                                'ng-attr-id="locale-{{language.code}}-{{fieldName}}"' +
                                                 'class="form-control" ' +
                                                 'ng-disabled="$ctrl.isReadonly"' +
                                                 'ng-keyup="$ctrl.adjustHeight( $event )" ' +
@@ -1020,6 +1022,7 @@
         this.componentsService  = componentsService;
         this.options            = null;
         this.fieldDefinitions   = null;
+        // All fields that will be displayed in the fieldOrder provided
         this.fields             = [];
         this.locales            = [];
         this.originalLocales    = [];
@@ -1030,7 +1033,10 @@
             var lang = angular.copy(item.language);
             lang.selected = false;
             return lang;
-        }, this);
+        }, this).sort(function(a, b) {
+            if (!this.languageOrder || !this.languageOrder.length || !this.languageOrder[a.code] || !this.languageOrder[b.code]) return 0;
+            return this.languageOrder[a.code] < this.languageOrder[b.code] ? -1 : 1;
+        }.bind(this));
         this.element = null;
     }
 
@@ -1193,7 +1199,8 @@
         return this.loadFields()
                     .then(function(fields){
                             this.fieldDefinitions = this.filterFields(fields);
-                            this.fields = Object.keys(this.fieldDefinitions);
+                            var fieldNames = Object.keys(this.fieldDefinitions);
+                            this.fields = this.sortFields(fieldNames);
                             return this.ensureLanguageIsSelected();
                         }.bind(this)
                     , function(error){
@@ -1214,6 +1221,23 @@
         }.bind(this), function(error){
             console.error(error);
         });
+    };
+
+    JBFormLocaleComponentController.prototype.sortFields = function(fields){
+
+        // Check if order is available; if not, don't sort
+        if (!this.fieldOrder || !this.fieldOrder.length) return fields;
+
+        var sortedFields = []
+            , unsortedIndex = this.fieldOrder.length;
+
+        fields.forEach(function(field) {
+            var index = this.fieldOrder.indexOf(field) > -1 ? this.fieldOrder.indexOf(field) : unsortedIndex++;
+            sortedFields[index] = field;
+        }.bind(this));
+    
+        return sortedFields;
+
     };
 
     JBFormLocaleComponentController.prototype.filterFields = function(fields){
