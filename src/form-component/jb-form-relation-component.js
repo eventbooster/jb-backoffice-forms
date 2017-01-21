@@ -265,6 +265,9 @@
 
         if(currentModel) currentProperty = currentModel[this.referencedPropertyName];
         if(originalModel) originalProperty = originalModel[this.referencedPropertyName];
+
+        console.log('JBFormReferenceController: current model is %o, original %o; currentProperty %o, originalProperty %o', currentModel, originalModel, currentProperty, originalProperty);
+
         /**
          * This check is sufficient to detect if:
          *   - the reference was removed (currentProperty === undefined)
@@ -404,7 +407,7 @@
                 , this.relationName
                 , fieldSpecs
             );
-            return false
+            return false;
         }
 
         return JBFormReferenceController.prototype.adaptToSpec.call(this, fieldSpecs[0]);
