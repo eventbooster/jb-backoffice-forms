@@ -3332,6 +3332,7 @@ angular
                         // so that user can be redirected to new entity
                         id = self.getOwnId(mainCallData);
                         if(id){
+                            console.log('DetailView: Entity id is %o', id);
                             self.setEntityId(id);
                         }
 
@@ -4264,7 +4265,7 @@ angular
 
                 }
 
-                return false;
+                return [];
 
             };
 
@@ -5440,7 +5441,13 @@ angular
     * data relates to the menu – use the menu's id get menuItems from this menu
     */ 
     self.handleGetData = function(data) {
-    	self.getData(data.id);
+    	self.data = data;
+    	self.getData(data && data.id? data.id : undefined);
+    };
+
+
+    self.isValid = function() {
+    	return true;
     };
 
 
@@ -5449,6 +5456,9 @@ angular
 	* we can't pass a range argument. The menu might be much longer!
 	*/
 	self.getData = function(menuId) {
+
+		// No menu ID: We're in the 'new' mode. Don't get any data.
+		if (!menuId) return;
 
 		// Create headers
 		var headers = {
@@ -5526,6 +5536,9 @@ angular
 	* Returns data to be stored. There's a special JSON POST call available to store a tree. 
 	*/
 	self.getSaveCalls = function() {
+
+		// When we're in the 'new' mode, don't store tree as it does not exist
+		if (!self.data || !self.data.id) return [];
 		
 		var treeData = element.nestable( 'serialize' );
 		console.log( 'JBFormTreeComponentController: Store data %o', treeData );

@@ -111,7 +111,7 @@ angular
 
                 }
 
-                return false;
+                return [];
 
             };
 

@@ -631,6 +631,7 @@
                         // so that user can be redirected to new entity
                         id = self.getOwnId(mainCallData);
                         if(id){
+                            console.log('DetailView: Entity id is %o', id);
                             self.setEntityId(id);
                         }
 
