@@ -10,7 +10,7 @@ angular
 
 		  controller		: 'JBFormTreeComponentController'
 		, link				: function( scope, element, attrs, ctrl ) {
-			ctrl.init(scope);
+			ctrl.init(scope, element);
 		}
 		, templateUrl		: 'treeTemplate.html'
 		, scope				: {
@@ -19,8 +19,8 @@ angular
 			// If data is stored, filter is passed through POST call to the server; 
 			// { id: 5, children[ { id: 2 } ] } becomes { id: 5, id_menu: 3, children[ { id: 2, id_menu: 3 } ] }
             // @todo: this might not be working due to the isolated scope
-			  filter	    : '=treeComponentFilter'
-			, labelName		: '@treeComponentLabel'
+			  //filter	    : '=treeComponentFilter'
+			labelName		: '@treeComponentLabel'
 			, entityName	: '@for'
 			, maxDepth		: '@'
 		}
@@ -73,32 +73,47 @@ angular
 
 	};
 
+
+
     /*
      * @todo: check what we need!
      */
     self.registerAt = function(parent){
-        parent.registerOptionsDataHandler(self.handleOptionsData);
+        //parent.registerOptionsDataHandler(self.handleOptionsData);
         parent.registerGetDataHandler(self.handleGetData);
     };
+
+
+    /**
+    * We don't really need handleGetData – just use it to get the other data we need.
+    * data relates to the menu – use the menu's id get menuItems from this menu
+    */ 
+    self.handleGetData = function(data) {
+    	self.getData(data.id);
+    };
+
 
 	/**
 	* If we get data through the detailViewController (self.select/registerGetDataHandler)
 	* we can't pass a range argument. The menu might be much longer!
 	*/
-	self.getData = function(parent) {
+	self.getData = function(menuId) {
 
 		// Create headers
 		var headers = {
-			range		: '0-0'
+			range		: '0-1000'
 		};
 
-		if( self.filter ) {
+		console.log('JBFormTreeComponentController: filter items for menuId %o', menuId);
+
+		/*if( self.filter ) {
 			var filter = '';
 			for( var i in self.filter ) {
 				filter = i + '=' + self.filter[ i ];
 			}
 			headers.filter = filter;
-		}
+		}*/
+		headers.filter = 'id_menu=' + menuId;
 
 		// Make GET request
 		APIWrapperService.request( {
@@ -107,11 +122,9 @@ angular
 			, headers		: headers
 		} )
 		.then( function( data ) {
-            debugger;
 			self.updateData( data );
 
 		}, function( err ) {
-                debugger;
 			$rootScope.$broadcast( 'notification', {
 				type				: 'error'
 				, message			: 'web.backoffice.detail.loadingError'
@@ -132,6 +145,8 @@ angular
 	*/
 	self.updateData = function( data ) {
 
+		console.log('JBFormTreeComponentController: data is %o', data);
+
 		self.dataTree = getTree( data );
 		console.log( 'JBFormTreeComponentController: dataTree is %o', self.dataTree );
 
@@ -140,7 +155,6 @@ angular
 		
 			// Add class required for jQuery plugin			
 			element.addClass( 'dd' );
-
 			// Add jQuery plugin
 			element.nestable( {
 				dragClass				: 'dd-dragelement'
@@ -305,7 +319,7 @@ angular
 	);
 
 	$templateCache.put( 'treeTemplate.html',
-		'<ol>' +
+		'<ol class=\'dd-list\'>' +
 			'<li data-ng-repeat=\'branch in treeComponentController.dataTree\' data-ng-include=\'"treeBranchTemplate.html"\' class=\'dd-item\' data-id=\'{{ branch.id }}\'>' +
 			'</li>' +
 		'</ol>'
