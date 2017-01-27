@@ -167,10 +167,11 @@
 
         if (!angular.isDefined(fieldSpec)) {
             return console.error(
-                'JBFormRelationComponent: No options data found for name %o referencing entity %o or relation %o.'
+                'JBFormRelationComponent: No options data found for name %o referencing entity %o or relation %o in data %o.'
                 , this.propertyName
                 , this.entityName
-                , this.relationName);
+                , this.relationName
+                , data);
         }
         this.parentOptions = data;
         if(this.adaptToSpec(fieldSpec)) {
