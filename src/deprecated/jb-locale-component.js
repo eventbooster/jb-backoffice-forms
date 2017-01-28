@@ -8,7 +8,7 @@
 
 
 	angular
-	.module( 'jb.localeComponent', [ 'jb.apiWrapper', 'jb.backofficeShared' ] )
+	.module( 'jb.localeComponent', [ 'jb.apiWrapper' ] )
 	.directive( 'localeComponent', [ function() {
 
 		return {
@@ -32,13 +32,13 @@
 	.controller( 'LocaleComponentController', [
               '$scope'
             , 'APIWrapperService'
-            , 'backofficeFormEvents'
-            , function( $scope, APIWrapperService, formEvents ) {
+            //, 'backofficeFormEvents'
+            , function( $scope, APIWrapperService/*, formEvents*/ ) {
 
 		var   self = this
 			, element;
 
-        this.formEvents = formEvents;
+        //this.formEvents = formEvents;
 
 		// [
 		// 	{
@@ -78,7 +78,7 @@
 			self.setupFieldDefinitionWatcher();
 			self.setupValidityWatcher();
 			self.setupSelectedLanguagesWatcher();
-			$scope.$emit(formEvents.registerComponents, self);
+			//$scope.$emit(formEvents.registerComponents, self);
 		};
 
 
@@ -351,11 +351,13 @@
 
 				$scope.fieldDefinitions.push( {
 					name			: field
-					, required		: !data[ field ].nullable
+					//, required		: !data.relations.find((relation) => relation.name === field)
 					, valid			: true
 				} );
 
 			} );
+
+			console.log('LocaleComponentController: field definitions are %o', $scope.fieldDefinitions);
 
 		};
 

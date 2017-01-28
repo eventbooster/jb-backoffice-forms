@@ -22,10 +22,12 @@
     _module.value(typeKey, {
         'text'    : 'text'
         , 'number'  : 'text'
+        , 'decimal' : 'text'
         , 'string'  : 'text'
         , 'boolean' : 'checkbox'
         , 'datetime': 'date-time'
         , 'date'    : 'date-time'
+        , 'time'    : 'date-time'
     });
 
     _module.directive('jbFormAutoInput', ['$compile', '$parse', function ($compile, $parse) {
@@ -154,15 +156,14 @@
             , newElement;
 
         if (!elementSpec || !elementSpec.type) {
-            console.error('AutoFormElement: fieldSpec %o is missing type for field %o', fieldSpec, this.name);
+            console.error('AutoFormElement: fieldSpec %o has no type for field %o, elementSpec is %o', fieldSpec, this.name, elementSpec);
             return;
         }
 
         elementType = this.fieldTypes[elementSpec.type];
 
         if (!elementType) {
-            console.error('AutoFormElement: Unknown type %o', fieldSpec.type);
-            console.error('AutoFormElement: elementType missing for element %o', this.element);
+            console.error('AutoFormElement: Unknown type %o element %o', fieldSpec, this.element);
             return;
         }
 
