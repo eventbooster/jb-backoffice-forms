@@ -84,6 +84,9 @@
         parent.unregisterGetDataHandler(this.updateData);
     };
 
+    /**
+    * Get spec for current element from options data
+    */
     JBFormDateTimeInputController.prototype.selectSpec = function(data){
         var properties = (data && data.properties) ? data.properties : [];
         if(!properties.length) return ;
@@ -101,10 +104,10 @@
         this.required       = spec.nullable === false;
         this.isReadonly     = this.isReadonly === true || spec.readonly === true;
 
-        /*this.showDate       = spec.type !== 'time';
-        this.showTime       = spec.type === 'datetime' || spec.type === 'time';*/
-        this.showDate = true;
-        this.showTime = true;
+        this.showDate       = spec.type !== 'time';
+        this.showTime       = spec.type === 'datetime' || spec.type === 'time';
+        //this.showDate = true;
+        //this.showTime = true;
     };
 
     var _module = angular.module('jb.formComponents');

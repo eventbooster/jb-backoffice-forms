@@ -13,7 +13,6 @@
 
 'use strict';
 
-
 angular
     .module('jb.backofficeHiddenInput', [])
 
@@ -102,17 +101,17 @@ angular
                         console.log('HiddenInput: Store data %o', saveData);
 
                         return {
-                            url: ''
-                            , data: saveData
+                            //url: ''
+                            data: saveData
                             // Method: PATCH if entity already has an ID, else POST
-                            , method: detailViewController.getEntityId() ? 'PATCH' : 'POST'
+                            //, method: detailViewController.getEntityId() ? 'PATCH' : 'POST'
                         };
 
                     }
 
                 }
 
-                return false;
+                return [];
 
             };
 

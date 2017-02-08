@@ -26,19 +26,19 @@
                     '<div class="row">' +
                         '<label jb-form-label-component data-label-identifier="{{backofficeImageComponent.label}}" data-is-required="false" data-is-valid="true"></label>' +
                         '<div class="col-md-9 backoffice-image-component" >' +
-                            '<div data-file-drop-component data-supported-file-types="[\'image/jpeg\']" data-model="backofficeImageComponent.images" data-error-handler="backofficeImageComponent.handleDropError(error)">' +
+                            '<div data-file-drop-component data-supported-file-types="[\'image/jpeg\', \'image/png\']" data-model="backofficeImageComponent.images" data-error-handler="backofficeImageComponent.handleDropError(error)">' +
                             '<ol class="clearfix">' +
                                 '<li data-ng-repeat="image in backofficeImageComponent.images">' +
                                     '<a href="#" data-ng-click="backofficeImageComponent.openDetailView( $event, image )">' +
                                     // #Todo: Use smaller file
                                         '<img data-ng-attr-src="{{image.url || image.fileData}}"/>' +
-                                        '<button class="remove" data-ng-click="backofficeImageComponent.removeImage($event,image)">&times</button>' +
+                                        '<button type="button" class="remove" data-ng-click="backofficeImageComponent.removeImage($event,image)">&times</button>' +
                                     '</a>' +
                                     '<span class="image-size-info" data-ng-if="!!image.width && !!image.height">{{image.width}}&times;{{image.height}} Pixels</span>' +
                                     '<span class="image-file-size-info" data-ng-if="!!image.fileSize">{{image.fileSize/1000/1000 | number: 1 }} MB</span>' +
                                     '<span class="focal-point-info" data-ng-if="!!image.focalPoint">Focal Point</span>' +
                                 '</li>' +
-                                '<li><button class="add-file-button" data-ng-click="backofficeImageComponent.uploadFile()">+</button></li>' +
+                                '<li><button type="button" class="add-file-button" data-ng-click="backofficeImageComponent.uploadFile()">+</button></li>' +
                             '</ol>' +
                             '<input type="file" multiple/>' +
                         '</div>' +

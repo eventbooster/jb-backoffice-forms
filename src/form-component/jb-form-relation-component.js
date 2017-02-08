@@ -167,10 +167,11 @@
 
         if (!angular.isDefined(fieldSpec)) {
             return console.error(
-                'JBFormRelationComponent: No options data found for name %o referencing entity %o or relation %o.'
+                'JBFormRelationComponent: No options data found for name %o referencing entity %o or relation %o in data %o.'
                 , this.propertyName
                 , this.entityName
-                , this.relationName);
+                , this.relationName
+                , data);
         }
         this.parentOptions = data;
         if(this.adaptToSpec(fieldSpec)) {
@@ -265,6 +266,9 @@
 
         if(currentModel) currentProperty = currentModel[this.referencedPropertyName];
         if(originalModel) originalProperty = originalModel[this.referencedPropertyName];
+
+        console.log('JBFormReferenceController: current model is %o, original %o; currentProperty %o, originalProperty %o', currentModel, originalModel, currentProperty, originalProperty);
+
         /**
          * This check is sufficient to detect if:
          *   - the reference was removed (currentProperty === undefined)
@@ -404,7 +408,7 @@
                 , this.relationName
                 , fieldSpecs
             );
-            return false
+            return false;
         }
 
         return JBFormReferenceController.prototype.adaptToSpec.call(this, fieldSpecs[0]);
