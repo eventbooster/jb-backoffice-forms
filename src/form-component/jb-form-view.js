@@ -434,7 +434,8 @@
 
       self.concatSelectParameters = function(parameters){
         var fieldMap = (parameters || []).reduce(function(fields, field){
-          fields[field] = true;
+          if(field) fields[field] = true;
+          return fields;
         }, {});
         return Object.keys(fieldMap)
       };

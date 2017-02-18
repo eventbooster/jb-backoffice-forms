@@ -12,6 +12,7 @@
         this.subcomponentsService   = componentsService;
         this.originalData = undefined;
         this.required = true;
+        this.spec = null;
 
     };
 
@@ -24,7 +25,8 @@
     };
 
     JBFormDateTimeInputController.prototype.isValid = function () {
-        if(this.isRequired() && !this.isReadonly) return !!this.value && isNaN(this.value.getTime());
+        var value = this.getValue();
+        if(this.isRequired() && !this.isReadonly) return !!value && !isNaN(value.getTime());
         return true;
     };
 
@@ -38,9 +40,23 @@
     };
 
     JBFormDateTimeInputController.prototype.updateData = function (data) {
-        var value = (data) ? data[this.name] : data;
-        this.setValue(value ? new Date(value) : undefined);
+        var dateValue = this.normalizeValue(data[this.name]);
+        this.setValue(dateValue);
         this.originalData = this.getValue();
+    };
+
+    JBFormDateTimeInputController.prototype.normalizeValue = function(value){
+      if(!value) return value;
+      if(this.spec.type === 'time'){
+        var segments = value.split(':');
+        var date = new Date();
+        date.setMilliseconds(0);
+        date.setSeconds(0);
+        date.setHours(segments[0]);
+        date.setMinutes(segments[1]);
+        return date;
+      }
+      return new Date(value);
     };
 
     JBFormDateTimeInputController.prototype.getSaveCalls = function () {
@@ -48,21 +64,30 @@
         var   currentDate   = this.getValue()
             , originalDate  = this.originalData
             , call          = { data: {}}
-            , dateString = '';
+            , dateString    = ''
+            , timeString    = '';
+
         // No date set
         if (!currentDate && !originalDate) return [];
         // Dates are the same
         if (currentDate && originalDate && currentDate.getTime() == originalDate.getTime()) return [];
         // a new date was set
         if (currentDate) {
-            dateString = currentDate.getFullYear()
-                + '-' + pad(currentDate.getMonth() + 1)
-                + '-' + pad(currentDate.getDate())
-                + ' ' + pad(currentDate.getHours())
-                + ':' + pad(currentDate.getMinutes())
-                + ':' + pad(currentDate.getSeconds());
+            if(this.spec.type !== 'time'){
+              dateString = [
+                    currentDate.getFullYear()
+                  , pad(currentDate.getMonth() + 1)
+                  , pad(currentDate.getDate())
+              ].join('-')
+            }
+
+            timeString = [
+                pad(currentDate.getHours())
+              , pad(currentDate.getMinutes())
+              , pad(currentDate.getSeconds())
+            ].join(':')
         } // else, date was deleted
-        call.data[this.name] = dateString;
+        call.data[this.name] = dateString+' '+timeString;
         return [call];
     };
 
@@ -101,8 +126,9 @@
 
         if (!spec) return console.error('JBFormDateTimeInputController: No field spec for %o', this.name);
 
-        this.required       = spec.nullable === false;
-        this.isReadonly     = this.isReadonly === true || spec.readonly === true;
+        this.spec       = spec;
+        this.required   = spec.nullable === false;
+        this.isReadonly = this.isReadonly === true || spec.readonly === true;
 
         this.showDate       = spec.type !== 'time';
         this.showTime       = spec.type === 'datetime' || spec.type === 'time';
@@ -112,7 +138,6 @@
 
     var _module = angular.module('jb.formComponents');
     _module.directive('jbFormDateTimeInput', [function () {
-
         return {
               scope : {
                     name        : '@for'
@@ -130,7 +155,7 @@
                   ctrl.init(scope, element, attrs);
             }
             , template:
-                '<div class="form-group form-group-sm">' +
+                '<div class="form-group form-group-sm jb-form-date-time-input" ng-class="{\'invalid\' : !$ctrl.isValid()}">' +
                     '<label ng-if="$ctrl.displayLabel()" jb-form-label-component label-identifier="{{$ctrl.label}}" is-required="$ctrl.isRequired()" is-valid="$ctrl.isValid()"></label>' +
                     '<div ng-class="{\'col-md-9\' : $ctrl.displayLabel(), \'col-md-12\': !ctrl.displayLabel() }">' +
                         '<div class="row">' +
