@@ -1433,6 +1433,7 @@
                     , post: function (scope, element, attrs, ctrl) {
                         ctrl.hasLabel = attrs.hasOwnProperty('label');
                         ctrl.hasModel = attrs.hasOwnProperty('relationInputModel');
+                        ctrl.enableFulltext = attrs.hasOwnProperty('relationEnableFulltextSearch');
                         ctrl.postLink(scope, element, attrs);
                     }
                 }
@@ -1456,6 +1457,7 @@
                     , 'model'               : '=?relationModel'
 
                     , 'isReadonly'          : '<?relationIsReadonly'
+                    , 'enableFulltextSearch': '<?relationEnableFulltextSearch'
 
                     , 'resultCount'         : '<?relationResultCount'
                 }
@@ -1862,6 +1864,7 @@
 
                         'relation-is-deletable="$ctrl.isDeletable()" ' +
                         'relation-is-creatable="$ctrl.isCreatable()" ' +
+                        'relation-enable-fulltext-search="$ctrl.enableFulltext" ' +
 
                         'relation-result-count="$ctrl.resultCount " ' +
                         'relation-is-readonly="$ctrl.isReadonly" ' +
