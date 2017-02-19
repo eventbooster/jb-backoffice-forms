@@ -7,14 +7,14 @@
         return nr < 10 ? '0' + nr : nr;
     }
 
-    var JBFormDateTimeInputController = function (componentsService) {
+    function JBFormDateTimeInputController(componentsService) {
 
         this.subcomponentsService   = componentsService;
         this.originalData = undefined;
         this.required = true;
         this.spec = null;
 
-    };
+    }
 
     JBFormDateTimeInputController.prototype.getSelectFields = function(){
         return [this.name];
@@ -47,7 +47,7 @@
 
     JBFormDateTimeInputController.prototype.normalizeValue = function(value){
       if(!value) return value;
-      if(this.spec.type === 'time'){
+      if(this.isTimeOnly()){
         var segments = value.split(':');
         var date = new Date();
         date.setMilliseconds(0);
@@ -57,6 +57,10 @@
         return date;
       }
       return new Date(value);
+    };
+
+    JBFormDateTimeInputController.prototype.isTimeOnly = function() {
+      return this.spec && this.spec.type === 'time';
     };
 
     JBFormDateTimeInputController.prototype.getSaveCalls = function () {
@@ -73,7 +77,7 @@
         if (currentDate && originalDate && currentDate.getTime() == originalDate.getTime()) return [];
         // a new date was set
         if (currentDate) {
-            if(this.spec.type !== 'time'){
+            if(!this.isTimeOnly()){
               dateString = [
                     currentDate.getFullYear()
                   , pad(currentDate.getMonth() + 1)

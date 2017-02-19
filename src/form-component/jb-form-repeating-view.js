@@ -86,6 +86,7 @@
                 } else {
                     this.entities = [];
                 }
+                this.data = data;
             }.bind(this))
             .then(function(){
                 this.distributeOptionsAndData(this.optionData, data, 0);
@@ -96,7 +97,7 @@
 
         if(this.isReadonly) return;
 
-        this.entities.push({});
+        this.entities.push({isDummy: true});
 
         //todo: if we distribute the data like this, the lower form view adapters reset their entity, fix this.
         var data = {};

@@ -1960,6 +1960,7 @@
                 } else {
                     this.entities = [];
                 }
+                this.data = data;
             }.bind(this))
             .then(function(){
                 this.distributeOptionsAndData(this.optionData, data, 0);
@@ -1970,7 +1971,7 @@
 
         if(this.isReadonly) return;
 
-        this.entities.push({});
+        this.entities.push({isDummy: true});
 
         //todo: if we distribute the data like this, the lower form view adapters reset their entity, fix this.
         var data = {};
@@ -2283,7 +2284,7 @@
 
         if(content){
             if(content.length) content = this.getEntityFromData(content);
-            this.hadData = true;
+            this.hadData = content.isDummy !== true;
             parentId    = getParentId(this.parentOptionsData, data);
             id          = this.formView.getOwnId(content);
         }
@@ -2379,7 +2380,7 @@
 
         if(content){
             if(content.length) content = this.getEntityFromData(content);
-            this.hadData    = true;
+            this.hadData    = content.isDummy !== true;
             parentId        = getParentId(this.parentOptionsData, data);
             id              = this.formView.getOwnId(content);
         }
@@ -2404,20 +2405,18 @@
      */
     JBFormViewMappingStrategy.prototype.getSelectFields = function(){
         return this.formView.getSelectParameters().map(function (select) {
-            return [this.formView.getEntityName(), select].join('.');
+            return [this.optionsData.name, select].join('.');
         }.bind(this));
     };
 
-    JBFormViewMappingStrategy.prototype.afterSaveTasks = function(id){
-        this.parentId = id;
-        return this.formView
-                .makeSaveRequest()
-                .then(function(){
-                    return this.createRelation(id);
-                }.bind(this))
-                .then(function(){
-                    return id;
-                });
+    JBFormViewMappingStrategy.prototype.afterSaveTasks = function(id) {
+      this.parentId = id;
+      return this.formView
+        .makeSaveRequest()
+        .then(function() {
+          return this.createRelation(id);
+        }.bind(this))
+        .then(function() { return id; });
     };
 
     JBFormViewMappingStrategy.prototype.createRelation = function(parentId){
@@ -2488,7 +2487,6 @@
         // the extraction of the options data works as long as there is no alias!
         var spec = this.formView.getSpecFromOptionsData(data);
         if(!spec) {
-            debugger;
             return console.error('No options data found for form-view %o', this.formView);
         }
 
@@ -3072,9 +3070,9 @@ angular
        * to the getDataHandler of the registry.
        */
       self.distributeData = function (data) {
-                console.log('jbFormView: Distribute data %o', data);
-                if (!data) data = {};
-        self.componentsRegistry.getDataHandler(data);
+          console.log('jbFormView: Distribute data %o', data);
+          if (!data) data = {isDummy:true};
+          self.componentsRegistry.getDataHandler(data);
       };
 
       /**
@@ -3760,9 +3758,6 @@ angular
                                 return modelGetter(scope.$parent);
                             },
                             function(newValue){
-                                if(newValue){
-                                    debugger;
-                                }
                                 ctrl.inputModel = newValue;
                             });
                         scope.$watch(function(){
@@ -4041,14 +4036,14 @@ angular
         return nr < 10 ? '0' + nr : nr;
     }
 
-    var JBFormDateTimeInputController = function (componentsService) {
+    function JBFormDateTimeInputController(componentsService) {
 
         this.subcomponentsService   = componentsService;
         this.originalData = undefined;
         this.required = true;
         this.spec = null;
 
-    };
+    }
 
     JBFormDateTimeInputController.prototype.getSelectFields = function(){
         return [this.name];
@@ -4081,7 +4076,7 @@ angular
 
     JBFormDateTimeInputController.prototype.normalizeValue = function(value){
       if(!value) return value;
-      if(this.spec.type === 'time'){
+      if(this.isTimeOnly()){
         var segments = value.split(':');
         var date = new Date();
         date.setMilliseconds(0);
@@ -4091,6 +4086,10 @@ angular
         return date;
       }
       return new Date(value);
+    };
+
+    JBFormDateTimeInputController.prototype.isTimeOnly = function() {
+      return this.spec && this.spec.type === 'time';
     };
 
     JBFormDateTimeInputController.prototype.getSaveCalls = function () {
@@ -4107,7 +4106,7 @@ angular
         if (currentDate && originalDate && currentDate.getTime() == originalDate.getTime()) return [];
         // a new date was set
         if (currentDate) {
-            if(this.spec.type !== 'time'){
+            if(!this.isTimeOnly()){
               dateString = [
                     currentDate.getFullYear()
                   , pad(currentDate.getMonth() + 1)

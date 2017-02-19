@@ -370,9 +370,9 @@
        * to the getDataHandler of the registry.
        */
       self.distributeData = function (data) {
-                console.log('jbFormView: Distribute data %o', data);
-                if (!data) data = {};
-        self.componentsRegistry.getDataHandler(data);
+          console.log('jbFormView: Distribute data %o', data);
+          if (!data) data = {isDummy:true};
+          self.componentsRegistry.getDataHandler(data);
       };
 
       /**

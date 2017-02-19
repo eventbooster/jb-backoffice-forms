@@ -49,9 +49,6 @@
                                 return modelGetter(scope.$parent);
                             },
                             function(newValue){
-                                if(newValue){
-                                    debugger;
-                                }
                                 ctrl.inputModel = newValue;
                             });
                         scope.$watch(function(){

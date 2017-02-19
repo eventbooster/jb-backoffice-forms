@@ -208,7 +208,7 @@
 
         if(content){
             if(content.length) content = this.getEntityFromData(content);
-            this.hadData = true;
+            this.hadData = content.isDummy !== true;
             parentId    = getParentId(this.parentOptionsData, data);
             id          = this.formView.getOwnId(content);
         }
@@ -304,7 +304,7 @@
 
         if(content){
             if(content.length) content = this.getEntityFromData(content);
-            this.hadData    = true;
+            this.hadData    = content.isDummy !== true;
             parentId        = getParentId(this.parentOptionsData, data);
             id              = this.formView.getOwnId(content);
         }
@@ -329,20 +329,18 @@
      */
     JBFormViewMappingStrategy.prototype.getSelectFields = function(){
         return this.formView.getSelectParameters().map(function (select) {
-            return [this.formView.getEntityName(), select].join('.');
+            return [this.optionsData.name, select].join('.');
         }.bind(this));
     };
 
-    JBFormViewMappingStrategy.prototype.afterSaveTasks = function(id){
-        this.parentId = id;
-        return this.formView
-                .makeSaveRequest()
-                .then(function(){
-                    return this.createRelation(id);
-                }.bind(this))
-                .then(function(){
-                    return id;
-                });
+    JBFormViewMappingStrategy.prototype.afterSaveTasks = function(id) {
+      this.parentId = id;
+      return this.formView
+        .makeSaveRequest()
+        .then(function() {
+          return this.createRelation(id);
+        }.bind(this))
+        .then(function() { return id; });
     };
 
     JBFormViewMappingStrategy.prototype.createRelation = function(parentId){
@@ -413,7 +411,6 @@
         // the extraction of the options data works as long as there is no alias!
         var spec = this.formView.getSpecFromOptionsData(data);
         if(!spec) {
-            debugger;
             return console.error('No options data found for form-view %o', this.formView);
         }
 
