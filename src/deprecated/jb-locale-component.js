@@ -8,7 +8,7 @@
 
 
 	angular
-	.module( 'jb.localeComponent', [ 'jb.apiWrapper' ] )
+	.module( 'jb.localeComponent', [ 'jb.apiWrapper', 'jb.backofficeShared' ] )
 	.directive( 'localeComponent', [ function() {
 
 		return {

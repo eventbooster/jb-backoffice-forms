@@ -17,7 +17,7 @@
 
 	angular
 
-	.module( 'jb.backofficeShared' )
+	.module( 'jb.backofficeShared', [] )
 
 	.directive( 'languageMenuComponent', [ function() {
 

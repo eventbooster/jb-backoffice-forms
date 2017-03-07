@@ -158,6 +158,7 @@
     };
 
     JBFormComponentsRegistry.prototype.getDataHandler = function(data){
+        console.log('JBFormComponentsRegistry: Send data to %o handlers, are %o', this.getDataHandlers.length, this.getDataHandlers);
         this.getDataHandlers.forEach(function(handler){
             handler(data);
         });
