@@ -22,6 +22,7 @@
     _module.value(typeKey, {
         'text'    : 'text'
         , 'number'  : 'text'
+        , 'integer' : 'text'
         , 'decimal' : 'text'
         , 'string'  : 'text'
         , 'boolean' : 'checkbox'

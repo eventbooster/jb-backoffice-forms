@@ -411,7 +411,7 @@
         // the extraction of the options data works as long as there is no alias!
         var spec = this.formView.getSpecFromOptionsData(data);
         if(!spec) {
-            return console.error('No options data found for form-view %o', this.formView);
+            return console.error('No options data found for form-view %o in %o', this.formView.entityName, this.formView);
         }
 
         this.strategy = this.createViewAdapterStrategy(spec);

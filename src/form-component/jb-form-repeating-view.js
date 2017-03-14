@@ -98,6 +98,7 @@
         if(this.isReadonly) return;
 
         this.entities.push({isDummy: true});
+        console.log('JBFormRepeatingViewController: Added element, entities are %o', this.entities);
 
         //todo: if we distribute the data like this, the lower form view adapters reset their entity, fix this.
         var data = {};
@@ -187,6 +188,7 @@
                     ctrl.postLink(scope);
 
                     scope.addElement = function(event, index){
+                        console.log('jbFormRepeatingView: Add element');
                         if(event) event.preventDefault();
                         return ctrl.addElement(index);
                     };
