@@ -947,7 +947,7 @@
 			$scope.$on('reloadViewData', function(event){
 				if(self.isRoot){
 					console.info('reloadView');
-					event.stopPropagation();
+					if (event && event.stopPropagation) event.stopPropagation();
 					self.getData();
 				}
 			});

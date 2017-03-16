@@ -38,7 +38,15 @@
 					  'propertyName'    : '@for'
 					, 'entityName'      : '@entity'
 					, 'relationName'    : '@relation'
+					/**
+					* Must be a filter, e.g. identifier='event'. First match will be taken.
+					*/
 					, 'defaultValue'    : '@'
+
+					/**
+					* Service name, if available. Used to prefix url (e.g. shop.inventory)
+					*/
+					, 'serviceName'		: '@'
 
 					, 'label'           : '@?'
 					, 'showLabel'		: '<?'
@@ -116,6 +124,14 @@
 	};
 
 
+	JBFormReferenceController.prototype.getEntityUrl = function() {
+		var url = (this.serviceName ? this.serviceName + '.' : '');
+		url += this.entityName;
+		console.log('JBFormReferenceController: url is %o', url);
+		return url;
+	};
+
+
 	/**
 	* Request default value, if set. Then call getDataHandler – but only if it isn't set.
 	*/
@@ -150,7 +166,8 @@
 				// called
 				self.defaultValueData = result;
 
-				// handleGetData was already called: Update currentData as changes are being watched
+				// handleGetData was already called (sets isWatchingForCallback)
+				// Update currentData as changes are being watched
 				if (self.isWatchingForCallback) {
 					this.currentData = this.defaultValueData;
 				}
@@ -180,9 +197,9 @@
 		parent.unregisterGetDataHandler(this.handleGetData);
 	};
 
-	JBFormReferenceController.prototype.getEndpoint = function () {
+	/*JBFormReferenceController.prototype.getEndpoint = function () {
 		return this.entityName;
-	};
+	};*/
 
 	// @todo: catch it if the options are not found
 	// @todo: make this method abstract and implement it for the reference as well as the relation
@@ -555,7 +572,7 @@
 						'relation-input ' +
 						'ng-class="{ \'col-md-9\' : $ctrl.displayLabel() , \'col-md-12\' : !$ctrl.displayLabel() }" ' +
 						'ng-model="$ctrl.currentData" ' +
-						'relation-entity-endpoint="{{$ctrl.entityName}}" ' +
+						'relation-entity-endpoint="{{$ctrl.getEntityUrl()}}" ' +
 						'relation-suggestion-template="{{$ctrl.suggestion}}" ' +
 						'relation-search-field="{{$ctrl.searchField}}" ' +
 

@@ -24,6 +24,7 @@
         , 'number'  : 'text'
         , 'integer' : 'text'
         , 'decimal' : 'text'
+        , 'interval': 'text'
         , 'string'  : 'text'
         , 'boolean' : 'checkbox'
         , 'datetime': 'date-time'
