@@ -148,6 +148,7 @@
                   , label       : '@?'
                   , showLabel   : '<?'
                   , isReadonly  : '<?'
+                  , isUtc       : '='
                   , model       : '=?inputModel'
               }
             , controller        : 'JBFormDateTimeInputController'

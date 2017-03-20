@@ -127,7 +127,7 @@
 	JBFormReferenceController.prototype.getEntityUrl = function() {
 		var url = (this.serviceName ? this.serviceName + '.' : '');
 		url += this.entityName;
-		console.log('JBFormReferenceController: url is %o', url);
+		//console.log('JBFormReferenceController: url is %o', url);
 		return url;
 	};
 
