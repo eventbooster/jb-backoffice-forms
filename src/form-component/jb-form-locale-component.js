@@ -17,7 +17,7 @@
 				, entityName    : '@entity'
 				, relationName  : '@relation'
 				, isReadonly    : '<'
-				, model			: '=inputModel'
+				, model			: '=?inputModel'
 			}
 			, template: '<div class="locale-component container">' +
 							'<!-- LOCALE-COMPONENT: way too many divs in here -->'+
