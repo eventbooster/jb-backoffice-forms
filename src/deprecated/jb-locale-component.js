@@ -19,7 +19,7 @@
 			, templateUrl		: 'localeComponentTemplate.html'
 			, scope				: {
 				  fields		: '='
-				, model			: '='
+				, model			: '?='
 				, entityName	: '=' // For translation
 				, tableName		: '='
 				// Sets validity of the component on the parent scope
