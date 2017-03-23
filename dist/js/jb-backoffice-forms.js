@@ -242,6 +242,8 @@
  */
 (function () {
 
+    /* global angular */
+
     'use strict';
 
     var _module = angular.module('jb.formComponents');
@@ -258,7 +260,7 @@
                 , scope: {
                       'propertyName'    : '@for'
                     , 'pathField'       : '@' // Field that has to be selected to get the image's path, e.g. path or bucket.url
-                    , 'imageModel'      : '=model'
+                    , 'images'          : '=?imageModel'
                     , 'label'           : '@'
                 }
                 , template: '' +
@@ -1467,7 +1469,7 @@
 					, 'disableRemoveButton'	: '<?relationDisableRemoveButton'
 					, 'disableNewButton'	: '<?relationDisableNewButton'
 					, 'disableEditButton'   : '<?relationDisableEditButton'
-					, 'model'               : '=?relationModel'
+					, 'currentData'         : '=?relationModel'
 
 					, 'isReadonly'          : '<?relationIsReadonly'
 					, 'enableFulltextSearch': '<?relationEnableFulltextSearch'

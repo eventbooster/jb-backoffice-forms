@@ -60,7 +60,7 @@
 					, 'disableRemoveButton'	: '<?relationDisableRemoveButton'
 					, 'disableNewButton'	: '<?relationDisableNewButton'
 					, 'disableEditButton'   : '<?relationDisableEditButton'
-					, 'model'               : '=?relationModel'
+					, 'currentData'         : '=?relationModel'
 
 					, 'isReadonly'          : '<?relationIsReadonly'
 					, 'enableFulltextSearch': '<?relationEnableFulltextSearch'
