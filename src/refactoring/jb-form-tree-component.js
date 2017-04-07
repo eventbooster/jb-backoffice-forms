@@ -238,8 +238,6 @@ angular
 
 			}
 
-			console.error(originalTreeData, cleanBranch);
-
 			// Children: Recursively call cleanTreeData
 			if( branch.children ) {
 				cleanBranch.children = [];

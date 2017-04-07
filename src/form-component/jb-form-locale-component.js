@@ -86,12 +86,26 @@
 		this.fieldDefinitions   = null;
 		// All fields that will be displayed in the fieldOrder provided
 		this.fields             = [];
-		this.locales            = this.model || [];
+
+		// See this.normalizeModel!
+		var defaultLocale		= [];
+		// Fill default locales with data we'd get from the server when data is already available. 
+		// Needed to fix https://github.com/joinbox/eventbooster-issues/issues/659 as we need to have an id_language
+		// in every object of this.locales
+		(sessionService.get('supported-languages', 'local') || []).forEach(function(language) {
+			defaultLocale[language.language.id] = {
+				id_language: language.language.id
+			};
+		});
+
+		this.locales            = this.model || defaultLocale;
+		this.model				= this.locales;
+
 		this.originalLocales    = JSON.parse(JSON.stringify(this.locales));
 		this.heightElement      = null;
 		this.heightElementInitialized = false;
 		this.boAPI              = boAPIWrapper;
-		this.supportedLanguages = (sessionService.get('supported-languages', 'local') || []).map(function(item, index){
+		this.supportedLanguages = (sessionService.get('supported-languages', 'local') || []).map(function(item){
 			var lang = angular.copy(item.language);
 			lang.selected = false;
 			return lang;
@@ -411,6 +425,12 @@
 		}, this);
 	};
 
+	/**
+	* Whoooaaaa, that is crazy!
+	* this.locales and this.model is an array where every language is placed at the language's id.
+	* If we have de with id 3 and fr with id 7, this.locales will look like
+	* [null, null, null, {de…}, null, null, null, {fr}]
+	*/
 	JBFormLocaleComponentController.prototype.normalizeModel = function(data){
 		return data.reduce(function(map, item){
 			map[item.language.id] = item;
