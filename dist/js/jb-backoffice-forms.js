@@ -5922,7 +5922,7 @@ angular
 		var treeData = element.nestable( 'serialize' );
 		console.log( 'JBFormTreeComponentController: Store data %o', treeData );
 
-		var cleanedTreeData = self.cleanTreeData( treeData );
+		var cleanedTreeData = self.cleanTreeData( treeData, self.data.id );
 		console.log( 'JBFormTreeComponentController: Cleaned data %o, got %o', treeData, cleanedTreeData );
 
 		return {
@@ -5945,7 +5945,7 @@ angular
 	* originalTreeData, as serialized by nestable('serialize') is an object with keys 0, 1, 2, 3… 
 	* and not an array.
 	*/
-	self.cleanTreeData = function( originalTreeData, cleaned ) {
+	self.cleanTreeData = function( originalTreeData, menuId, cleaned ) {
 
 		if( !cleaned ) {
 			cleaned = [];
@@ -5957,6 +5957,8 @@ angular
 
 			var cleanBranch = {};
 			cleanBranch.id = branch.id;
+			// See https://github.com/joinbox/eventbooster-issues/issues/708
+			cleanBranch.id_menu = menuId;
 
 			// If filter was set, add it to the data that will be sent to the server. 
 			if( self.filter ) {
@@ -5967,10 +5969,12 @@ angular
 
 			}
 
+			console.error(originalTreeData, cleanBranch);
+
 			// Children: Recursively call cleanTreeData
 			if( branch.children ) {
 				cleanBranch.children = [];
-				self.cleanTreeData( branch.children, cleanBranch.children );
+				self.cleanTreeData( branch.children, menuId, cleanBranch.children );
 			}
 
 			cleaned.push( cleanBranch );
