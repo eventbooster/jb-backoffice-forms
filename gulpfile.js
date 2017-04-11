@@ -1,6 +1,7 @@
 var gulp		= require( 'gulp' )
 	, jshint	= require( 'gulp-jshint' )
-	, uglify	= require( 'gulp-uglify' )
+	, uglifyJs 	= require('uglify-js-harmony')
+	, uglify	= require( 'gulp-uglify/minifier' )
 	, rename	= require( 'gulp-rename' )
 	, concat	= require( 'gulp-concat' )
 	, order		= require( 'gulp-order' )
@@ -38,7 +39,7 @@ gulp.task( 'scripts', function() {
 		.pipe( jshint().on('error' , gulpUtil.log) )
 		.pipe( concat( 'jb-backoffice-forms.js' ) )
         .pipe( gulp.dest( paths.jsDest ) )
-		.pipe( uglify().on('error', gulpUtil.log ) )
+		.pipe( uglify({}, uglifyJs).on('error', gulpUtil.log ) )
         .pipe( rename( 'jb-backoffice-forms.min.js' ) )
         .pipe( gulp.dest( paths.jsDest ) );
 } );

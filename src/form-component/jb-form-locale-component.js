@@ -367,8 +367,15 @@
 
 		this.locales.forEach(function(locale, id){
 
-			var   originalLocale    = this.originalLocales[id]
-				, localeExisted     = angular.isDefined(originalLocale);
+			var originalLocale    = this.originalLocales[id];
+
+			// If originalLocale has at least one field, it was pre-existing, use PATCH (instead of POST)
+			var localeExisted = false;
+			if (originalLocale) {
+				localeExisted = Object.keys(originalLocale).some((key) => {
+					return this.fields.indexOf(key) > -1;
+				});
+			}
 
 			// Locale exists (means it was created by the angular binding or was already present)
 			if(locale) {
