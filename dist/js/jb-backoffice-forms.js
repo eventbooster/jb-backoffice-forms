@@ -955,10 +955,19 @@
 				  fieldsExclude : '<'
 				, languageOrder : '<'
 				, fieldOrder    : '<'
+				// Is mainly used to get the remote table's name (from the OPTIONS call) 
+				// and to display the correct label
 				, entityName    : '@entity'
 				, relationName  : '@relation'
 				, isReadonly    : '<'
 				, model			: '=?inputModel'
+				// Instead of looking up the name of the remote table through entityName,
+				// we can directly pass in the remote table's name (e.g. venueLocale)
+				, remoteName	: '@'
+				// If the remote (and maybe the current) entity are on a service, we need to make
+				// the OPTIONS call to remoteService.remoteName while the selects only use the
+				// remoteName
+				, remoteService	: '@'
 			}
 			, template: '<div class="locale-component container">' +
 							'<!-- LOCALE-COMPONENT: way too many divs in here -->'+
@@ -1023,7 +1032,7 @@
 		this.$q                 = $q;
 		this.$timeout           = $timeout;
 		this.componentsService  = componentsService;
-		this.options            = null;
+		//this.options            = null;
 		this.fieldDefinitions   = null;
 		// All fields that will be displayed in the fieldOrder provided
 		this.fields             = [];
@@ -1209,10 +1218,16 @@
 	 * @todo: trigger error state
 	 */
 	JBFormLocaleComponentController.prototype.handleOptionsData = function(data){
-		var spec = this.selectSpec(data);
-		if(!spec) return console.error('No OPTIONS data found in locale component.');
 
-		this.options    = spec;
+		// Get remote table's name from the options call
+		if (!this.remoteName) {
+			var spec = this.selectSpec(data);
+			console.error(spec, spec.via.resource);
+			this.remoteName = spec.via.resource;
+		}
+
+		if(!this.remoteName) return console.error('Could not get remote table\'s name in locale component.');
+
 		return this.loadFields()
 					.then(function(fields){
 							this.fieldDefinitions = this.filterFields(fields);
@@ -1230,7 +1245,7 @@
 	 * @returns {*}
 	 */
 	JBFormLocaleComponentController.prototype.loadFields = function(){
-		var url = '/' + this.getLocaleProperty();
+		var url = '/' + (this.remoteService ? this.remoteService + '.' : '') + this.getLocaleProperty();
 		// The options call is now cached in the api
 		//if(this.fieldDefinitions) return this.$q.when(this.fieldDefinitions);
 		return this.api.getOptions(url).then(function(fields){
@@ -1345,7 +1360,8 @@
 	 * Returns the name of the property we need to select the localization table on the base entity.
 	 */
 	JBFormLocaleComponentController.prototype.getLocaleProperty = function(){
-		return this.options.via.resource;
+		return this.remoteName;
+		//return this.options.via.resource;
 	};
 
 	JBFormLocaleComponentController.prototype.handleGetData = function(data){
