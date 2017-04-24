@@ -963,11 +963,11 @@
 				, model			: '=?inputModel'
 				// Instead of looking up the name of the remote table through entityName,
 				// we can directly pass in the remote table's name (e.g. venueLocale)
-				, remoteName	: '@'
+				//, remoteName	: '@'
 				// If the remote (and maybe the current) entity are on a service, we need to make
 				// the OPTIONS call to remoteService.remoteName while the selects only use the
 				// remoteName
-				, remoteService	: '@'
+				//, remoteService	: '@'
 			}
 			, template: '<div class="locale-component container">' +
 							'<!-- LOCALE-COMPONENT: way too many divs in here -->'+
@@ -1219,12 +1219,16 @@
 	 */
 	JBFormLocaleComponentController.prototype.handleOptionsData = function(data){
 
+		//console.error(data);
+
 		// Get remote table's name from the options call
-		if (!this.remoteName) {
-			var spec = this.selectSpec(data);
-			console.error(spec, spec.via.resource);
-			this.remoteName = spec.via.resource;
-		}
+		var spec = this.selectSpec(data);
+		//console.error(data, spec, spec.via.resource);
+		this.remoteName = spec.via.resource;
+		this.remoteService = spec.via.service;
+
+		this.languageName = spec.remote.resource;
+		this.languageService = spec.remote.service;
 
 		if(!this.remoteName) return console.error('Could not get remote table\'s name in locale component.');
 
@@ -1346,7 +1350,7 @@
 					}, {});
 
 					call.url            = {};
-					call.url.path       = 'language/'+id;
+					call.url.path       = (this.languageService && this.languageService !== 'legacy' ? (this.languageService + '.') : '') + this.languageName + '/' + id;
 					call.url.mainEntity = 'prepend';
 
 					call.method = method;
@@ -1414,12 +1418,13 @@
 	JBFormLocaleComponentController.prototype.getSelectFields = function(){
 
 		var   localeTableName   = this.getLocaleProperty()
-			, languageSelector  = [localeTableName, 'language', '*'].join('.')
+			, languageSelector  = [
+				localeTableName
+				, this.languageService ? this.languageService + ':' + this.languageName : this.languageName
+				, '*'
+			].join('.')
 			, selects           = [];
 
-		/*selects =  this.fields.map(function(field){default
-			return [localeTableName, field].join('.');
-		}, this);*/
 		selects.push([localeTableName, '*'].join('.'));
 		selects.push(languageSelector);
 		return selects;
@@ -1787,6 +1792,8 @@
 	JBFormReferenceController.prototype.getSelectFields = function () {
 		var   selectFields   = this.relationService.extractSelectFields(this.getSuggestionTemplate())
 			, prefixedFields;
+
+		//console.error(this);
 
 		prefixedFields = selectFields.map(function (field) {
 			return [this.relationName, field].join('.');

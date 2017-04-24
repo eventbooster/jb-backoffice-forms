@@ -336,6 +336,8 @@
 		var   selectFields   = this.relationService.extractSelectFields(this.getSuggestionTemplate())
 			, prefixedFields;
 
+		//console.error(this);
+
 		prefixedFields = selectFields.map(function (field) {
 			return [this.relationName, field].join('.');
 		}, this);
