@@ -23,6 +23,7 @@
                     , 'pathField'       : '@' // Field that has to be selected to get the image's path, e.g. path or bucket.url
                     , 'images'          : '=?imageModel'
                     , 'label'           : '@'
+                    , 'serviceName'     : '@'
                 }
                 , template: '' +
                     '<div class="row">' +
@@ -225,7 +226,9 @@
                  */
                 self.getSelectFields = function () {
 
-                    return [self.propertyName + '.*', self.propertyName + '.' + self.pathField, self.propertyName + '.mimeType.*'];
+                    var prefix = (this.serviceName ? this.serviceName + ':' : '') + self.propertyName;
+                    //return [prefix + '.*', prefix + '.' + self.pathField, prefix + '.mimeType.*'];
+                    return [prefix + '.*', prefix + '.' + self.pathField, prefix + '.mimeType.*'];
 
                 };
 

@@ -125,7 +125,7 @@
 
 
 	JBFormReferenceController.prototype.getEntityUrl = function() {
-		var url = (this.serviceName ? this.serviceName + '.' : '');
+		var url = (this.serviceName && this.serviceName !== 'legacy') ? this.serviceName + '.' : '';
 		url += this.entityName;
 		//console.log('JBFormReferenceController: url is %o', url);
 		return url;
@@ -339,7 +339,12 @@
 		//console.error(this);
 
 		prefixedFields = selectFields.map(function (field) {
-			return [this.relationName, field].join('.');
+
+			var prefixed = '';
+			if (this.serviceName) prefixed += this.serviceName + ':';
+			prefixed += this.relationName + '.' + field;
+			return prefixed;
+
 		}, this);
 
 		if(this.propertyName) prefixedFields.unshift(this.propertyName);
@@ -469,7 +474,7 @@
 		return calls;
 	};
 
-	JBFormRelationController.prototype.getSelectFields = function () {
+	/*JBFormRelationController.prototype.getSelectFields = function () {
 		var   selectFields   = this.relationService.extractSelectFields(this.getSuggestionTemplate())
 			, prefixedFields;
 
@@ -478,7 +483,7 @@
 		}, this);
 
 		return prefixedFields;
-	};
+	};*/
 	/**
 	 * Creates a map between the value of a specific property and the item within a collection of items (assuming that
 	 * the properties are unique).
