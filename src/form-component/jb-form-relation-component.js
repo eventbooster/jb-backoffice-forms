@@ -324,7 +324,9 @@
 	};
 
 	JBFormReferenceController.prototype.isCreatable = function(){
-		return this.options && this.options.permissions && this.options.permissions.createRelation === true;
+		// When data is missing, assume creatability
+		if (!this.options || !this.options.permissions) return true;
+		return this.options.permissions.createRelation === true;
 	};
 
 	JBFormReferenceController.prototype.getLabel = function () {
@@ -454,7 +456,7 @@
 				removeCalls.push({
 					method    : 'DELETE'
 					, url       : {
-						  path       : [ this.relationName, value].join('/')
+						  path       : (this.serviceName && this.serviceName !== 'legacy' ? this.serviceName + '.' : '') + [ this.relationName, value].join('/')
 						, mainEntity : 'append'
 					}
 				});
@@ -466,7 +468,7 @@
 			calls.push({
 				  method    : 'POST'
 				, url       : {
-					  path       : [ this.relationName, value].join('/')
+					  path       : (this.serviceName && this.serviceName !== 'legacy' ? this.serviceName + '.' : '') + this.relationName + '/' + value
 					, mainEntity : 'append'
 				}
 			});
