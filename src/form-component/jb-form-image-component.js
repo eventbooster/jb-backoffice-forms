@@ -163,7 +163,7 @@
 
                     var focalPoint;
                     try {
-                        focalPoint = JSON.parse(originalObject.focalPoint);
+                        if (originalObject.focalPoint) focalPoint = JSON.parse(originalObject.focalPoint);
                     }
                     catch (e) {
                         // Doesn't _really_ matter.
@@ -175,12 +175,12 @@
                         // URL of the image itself
                         url: originalObject[self.pathField]
                         // URL of the entity; needed to crop image
-                        , entityUrl: '/image/' + originalObject.id
+                        , entityUrl: '/' + (self.serviceName ? self.serviceName + '.' : '') + 'image/' + originalObject.id
                         , focalPoint: focalPoint
-                        , width: originalObject.width
-                        , height: originalObject.height
-                        , fileSize: originalObject.size
-                        , mimeType: originalObject.mimeType.mimeType
+                        , width: originalObject.width || '–'
+                        , height: originalObject.height || '–'
+                        , fileSize: originalObject.size || '–'
+                        , mimeType: originalObject.mimeType ? originalObject.mimeType.mimeType : '–'
                         , id: originalObject.id // Needed to save the file (see self.getSaveCalls)
                     };
 
@@ -227,8 +227,7 @@
                 self.getSelectFields = function () {
 
                     var prefix = (this.serviceName ? this.serviceName + ':' : '') + self.propertyName;
-                    //return [prefix + '.*', prefix + '.' + self.pathField, prefix + '.mimeType.*'];
-                    return [prefix + '.*', prefix + '.' + self.pathField, prefix + '.mimeType.*'];
+                    return [prefix + '.*', prefix + '.' + self.pathField/*, prefix + '.mimeType.*'*/];
 
                 };
 
@@ -380,7 +379,7 @@
                         , data: {
                             image: image.file
                         }
-                        , url: '/image'
+                        , url: `/${ self.serviceName ? self.serviceName + '.' : '' }image`
                     })
 
                         .then(function (data) {
