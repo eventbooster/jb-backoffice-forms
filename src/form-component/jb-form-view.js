@@ -785,16 +785,27 @@
 				// Default: empty array, if not found
 				var saveCall = false;
 				calls.some(function (call) {
+
 					// Check if URL is the same. Normally use === comparator.
 					// But if URL is not set, it might be false or '', therefore
 					// use == comparator.
 					var sameUrl = call.url === url || ( !call.url && !url )
 						, sameMethod = call.method.toLowerCase() === method.toLowerCase();
+
+					// URL may be an object with properties:
+					// - path
+					// - mainEntity (append|prepend)
+					// Cannot be easily compared with == as reference is different
+					if (typeof call.url === 'object' && typeof url === 'object') {
+						sameUrl = call.url.mainEntity.toLowerCase() === url.mainEntity.toLowerCase() && call.url.path.toLowerCase() === url.path.toLowerCase();
+					}
+
 					if (sameMethod && sameUrl) {
 						saveCall = call;
 						return true;
 					}
 				});
+
 				return saveCall;
 
 			};
