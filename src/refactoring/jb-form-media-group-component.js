@@ -11,31 +11,33 @@
 	.directive( 'jbFormMediaGroupComponent', [ function() {
 
 		return {
-			require				: [ 'backofficeMediaGroupComponent', '^detailView' ]
-			, controller		: 'JBFormMediaGroupComponentController'
+			//require				: 'JBFormMediaGroupComponentController'
+			controller		: 'JBFormMediaGroupComponentController'
 			, controllerAs		: 'backofficeMediaGroupComponent'
 			, bindToController	: true
 			, templateUrl		: 'backofficeMediaGroupComponentTemplate.html'
 			, link				: function( scope, element, attrs, ctrl ) {
-				ctrl[ 0 ].init( element, ctrl[ 1 ] );
+				ctrl.init( element );
 			}
 			, scope: {
 				'propertyName'		: '@for'
+				, serviceName		: '@'
 			}
 
 		};
 
 	} ] )
 
-	.controller( 'JBFormMediaGroupComponentController', [ '$scope', '$rootScope', '$q', 'APIWrapperService', function( $scope, $rootScope, $q, APIWrapperService ) {
+	.controller( 'JBFormMediaGroupComponentController', [ '$scope', '$rootScope', '$q', 'APIWrapperService', 'JBFormComponentsService', function( $scope, $rootScope, $q, APIWrapperService, componentsService ) {
 
 		var self = this
 			, _element
 			, _detailViewController
+			, _componentsService = componentsService
 
 			, _originalData = []
 
-			, _selectFields = [ '*', 'video.*', 'video.videoType.*', 'image.*', 'mediumGroup_medium.*', 'mediumGroup.*' ];
+			, _selectFields = [ '*', 'video.*', 'video.videoType.*', 'image.*', 'group_medium.*', 'group.*' ];
 
 
 		self.media = [];
@@ -50,13 +52,14 @@
 
 
 
-		self.init = function( el, detailViewCtrl ) {
+		self.init = function( el ) {
 
 			_element = el;
-			_detailViewController = detailViewCtrl;
 
-			_detailViewController.registerOptionsDataHandler( self.updateOptionsData );
-			_detailViewController.registerGetDataHandler( self.updateData );
+			//_detailViewController.registerOptionsDataHandler( self.updateOptionsData );
+			//_detailViewController.registerGetDataHandler( self.updateData );
+
+			_componentsService.registerComponent($scope, this);
 
 			self.setupAddMediumModelWatcher();
 
@@ -65,13 +68,20 @@
 		};
 
 
+		self.registerAt = function(parent) {
+			parent.registerOptionsDataHandler(self.updateOptionsData.bind(self));
+			parent.registerGetDataHandler(self.updateData.bind(self));
+		};
+
+
 		/**
-		* Sort media by their sortOrder (stored on mediumGroup_medium[0].sortOrder)
+		* Sort media by their sortOrder (stored on group_medium[0].sortOrder)
 		*/
 		function sortMedia( a, b ) {
 
-			var aOrder 		= a.mediumGroup_medium[ 0 ].sortOrder
-				, bOrder 	= b.mediumGroup_medium[ 0 ].sortOrder;
+			// #TODO: Don't use index 0, it may belong to another group_medium
+			var aOrder 		= a.group_medium[ 0 ].sortOrder
+				, bOrder 	= b.group_medium[ 0 ].sortOrder;
 
 			return aOrder < bOrder ? -1 : 1;
 
@@ -91,7 +101,7 @@
 				try {
 					self.media = media.sort( sortMedia );
 				} catch( err ) {
-					console.error( 'JBFormMediaGroupComponentController: Properties mediumGroup_medium, it\'s items or sortOrder missing' );
+					console.error( 'JBFormMediaGroupComponentController: Properties group_medium, it\'s items or sortOrder missing' );
 					self.media = media;
 				}
 
@@ -163,10 +173,10 @@
 			}
 
 			APIWrapperService.request( {
-				url				: '/' + self.propertyName + '/' + mediumId
+				url				: '/' + (self.serviceName ? self.serviceName + '.' : '') + self.propertyName + '/' + mediumId
 				, method		: 'GET'
 				, headers		: {
-					select		: self.getSelectFields()
+					select		: '*,video.*,video.videoType.*,image.*,group.*,group_medium.*'
 				}
 			} )
 			.then( function( data ) {
@@ -197,7 +207,7 @@
 		*/
 		self.updateOptionsData = function( data ) {
 
-			_detailViewController.register( self );
+			//_detailViewController.register( self );
 
 		};
 
@@ -209,7 +219,7 @@
 		self.getSelectFields = function() {
 
 			return _selectFields.map( function( item ) {
-				return self.propertyName + '.' + item;
+				return (self.serviceName ? self.serviceName + ':' : '') + self.propertyName + '.' + item;
 			} );
 
 		};
@@ -258,7 +268,7 @@
 			deleted.forEach( function( item ) {
 				calls.push( {
 					method		: 'DELETE'
-					, url		: self.propertyName + '/' + item
+					, url		: (self.serviceName ? self.serviceName + '.' : '') + self.propertyName + '/' + item
 				} );
 			} );
 
@@ -267,7 +277,7 @@
 			created.forEach( function( item ) {
 				calls.push( {
 					method		: 'POST'
-					, url		: self.propertyName + '/' + item
+					, url		: (self.serviceName ? self.serviceName + '.' : '') + self.propertyName + '/' + item
 				} );
 			} );
 
@@ -287,8 +297,8 @@
 			var highestSortOrder = -1;
 			self.media.forEach( function( medium ) {
 
-				if( medium.mediumGroup_medium && medium.mediumGroup_medium.length ) {
-					highestSortOrder = Math.max( highestSortOrder, medium.mediumGroup_medium[ 0 ].sortOrder );
+				if( medium.group_medium && medium.group_medium.length ) {
+					highestSortOrder = Math.max( highestSortOrder, medium.group_medium[ 0 ].sortOrder );
 				}
 
 			} );
@@ -302,7 +312,7 @@
 		/**
 		* Store order. All media must first have been saved (getSaveCalls was called earlier)
 		*/
-		self.afterSaveTasks = function() {
+		self.afterSaveTasks = function(entityId) {
 
 
 			// No (relevant) changes? Make a quick check.
@@ -324,7 +334,7 @@
 			self.media.forEach( function( medium ) {
 
 				calls.push( APIWrapperService.request( {
-					url				: '/mediumGroup/' + _detailViewController.getEntityId() + '/medium/' + medium.id
+					url				: '/media.group/' + entityId + '/media.medium/' + medium.id
 					, method		: 'PATCH'
 					, data			: {
 						sortOrder	: ++highestSortOrder
@@ -389,11 +399,14 @@
 				'<div class=\'row\'>' +
 					'<div class=\'col-md-12\'>' +
 
+						'<p>Add Medium:</p>' +
 						'<div class="relation-select" ' +
 							'data-relation-input ' +
-							'data-ng-attr-data-relation-entity-endpoint="{{backofficeMediaGroupComponent.propertyName}}" ' +
+							'data-ng-attr-data-relation-entity-endpoint="{{backofficeMediaGroupComponent.serviceName}}.{{backofficeMediaGroupComponent.propertyName}}" ' +
 							'data-relation-interactive="false" ' +
-							'data-deletable="false" ' +
+							'relation-is-deletable="false" ' +
+							'relation-is-readonly="false"' +
+							'relation-is-creatable="true"' +
 							'data-relation-entity-search-field="title" ' +
 							'data-relation-suggestion-template="[[title]] <img src=\'[[image.url]]\'/>" ' +
 							'data-ng-model="backofficeMediaGroupComponent.addMediumModel" ' +
@@ -403,7 +416,7 @@
 					'</div>' +
 					/*'<div class=\'col-md-3\'>' +
 
-						'<button class="btn btn btn-success" data-ng-attr-ui-sref="app.detail({entityName:\'{{backofficeMediaGroupComponent.propertyName}}\',entityId:\'new\'})">{{ \'web.backoffice.mediumGroup.createMedium\' | translate }}</button>' +
+						'<button class="btn btn btn-success" data-ng-attr-ui-sref="app.detail({entityName:\'{{backofficeMediaGroupComponent.propertyName}}\',entityId:\'new\'})">{{ \'web.backoffice.group.createMedium\' | translate }}</button>' +
 
 					'</div>' +*/
 				'</div>' +
