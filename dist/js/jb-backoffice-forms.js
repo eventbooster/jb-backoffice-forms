@@ -1603,7 +1603,7 @@
 		console.log('JBFormReferenceController: Get default value from entity %o, filter %o', self.entityName, self.defaultValue);
 
 		return this._api.request({
-				url			: self.entityName
+				url			: self.serviceName ? self.serviceName + '.' + self.entityName : self.entityName
 				, headers	: {
 					filter	: self.defaultValue
 				}
