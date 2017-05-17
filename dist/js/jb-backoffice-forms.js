@@ -475,7 +475,6 @@
                  * Store/Delete files that changed.
                  */
                 self.getSaveCalls = function () {
-
                     // Store a signle relation (pretty easy)
                     if (_singleRelation) return _saveSingleRelation();
                     return _saveMultiRelation();
@@ -490,12 +489,20 @@
                  */
                 function _saveSingleRelation() {
 
+                    console.log('jbFormImageComponent: Save single relation. Original %o, current %o', _originalData, self.images);
+
                     // Removed
                     if (_originalData && _originalData.length && ( !self.images || !self.images.length )) {
-
                         var data = {};
                         data[_relationKey] = null;
-                        return [{ data: data }];
+                        console.log('jbFormImageComponent: Image removed, store data %o', data);
+                        return [{
+                            method: 'DELETE'
+                            , url: {
+                                  path       : (self.serviceName && self.serviceName !== 'legacy' ? self.serviceName + '.' : '') + self.propertyName + '/' + _originalData[0].id
+                                , mainEntity : 'append'
+                            }
+                        }];
                     }
 
                     // Added
