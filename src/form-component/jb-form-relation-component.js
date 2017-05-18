@@ -320,7 +320,7 @@
 	};
 
 	JBFormReferenceController.prototype.isDeletable = function(){
-		return this.options && !this.isRequired() && this.options.permissions && this.options.permissions.deleteRelation === true;
+		return this.options && !this.isRequired() && this.options.permissions && (this.options.permissions.deleteRelation === true || this.options.permissions.deleteOneRelation === true);
 	};
 
 	JBFormReferenceController.prototype.isCreatable = function(){
