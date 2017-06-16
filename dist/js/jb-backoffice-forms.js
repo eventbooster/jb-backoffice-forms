@@ -5796,8 +5796,8 @@ angular
 							'relation-is-deletable="false" ' +
 							'relation-is-readonly="false"' +
 							'relation-is-creatable="true"' +
-							'data-relation-entity-search-field="title" ' +
-							'data-relation-suggestion-template="[[title]] <img src=\'[[image.url]]\'/>" ' +
+							'data-relation-search-field="id" ' +
+							'data-relation-suggestion-template="ID: [[id]]<br/><small>[[title]]</small><img src=\'[[image.url]]\'/>" ' +
 							'data-ng-model="backofficeMediaGroupComponent.addMediumModel" ' +
 							'data-multi-select="true">' +
 						'</div>' +
