@@ -232,7 +232,7 @@
 		*/
 		self.getSaveCalls = function() {
 
-			console.error( _originalData );
+			console.log('JBFormMediaGroupComponentController: Original data was %o, is now %o', _originalData, self.media);
 
 			// Get IDs of entities _before_ anything was edited and curent state.
 			var oldIds = _originalData.map( function( item ) {
@@ -314,36 +314,29 @@
 		*/
 		self.afterSaveTasks = function(entityId) {
 
-
-			// No (relevant) changes? Make a quick check.
-			// TBD.
-			/*if( _originalData.length === self.media.length ) {
-
-				var sameOrder = false;
-				_originalData.forEach( function( item, index ) {
-					if( item.sortOrder === )
-				} );
-
-			}*/
-
-
 			var highestSortOrder 	= getHighestSortOrder()
 				, calls 			= [];
 
 			// Update orders
 			self.media.forEach( function( medium ) {
 
-				calls.push( APIWrapperService.request( {
-					url				: '/media.group/' + entityId + '/media.medium/' + medium.id
-					, method		: 'PATCH'
-					, data			: {
-						sortOrder	: ++highestSortOrder
-					}
-				} ) );
-				
+				console.log('JBFormMediaGroupComponentController: Create call for %o', medium);
+				calls.push($q(function(resolve) {
+					var requestConfig = {
+						url				: '/media.group/' + entityId + '/media.medium/' + medium.id
+						, method		: 'PATCH'
+						, data			: {
+							sortOrder	: ++highestSortOrder
+						}
+					};
+					console.log('JBFormMediaGroupComponentController: Executing request %o', requestConfig);
+					APIWrapperService.request(requestConfig).then(resolve);
+				}));				
 			} );
 
-			return $q.all( calls );
+			console.log('JBFormMediaGroupComponentController: after save tasks are %o, media are %o', calls, self.media);
+
+			return $q.all(calls);
 
 		};
 

@@ -113,14 +113,14 @@
     };
 
     JBFormComponentsRegistry.prototype.getAfterSaveTasks = function(id){
-        var calls = this.registeredComponents.reduce(function(subcalls, component){
-            if(angular.isFunction(component.afterSaveTasks)){
-                return subcalls.concat(component.afterSaveTasks(id));
-            }
-            return subcalls;
-        }, []);
+        console.log('JBFormComponentsRegistry: Registered components for afterSaveTasks are %o', this.registeredComponents);
+        var calls = this.registeredComponents
+            .filter(function(component) { return angular.isFunction(component.afterSaveTasks); })
+            .map(function(component) { return component.afterSaveTasks(id); });
+        console.log('JBFormComponentsRegistry: afterSaveTasks are %o, $q is %o', calls, this.$q);
         return this.$q.all(calls).then(function(){
-          return id;
+            console.log('JBFormComponentsRegistry: Done');
+            return id;
         });
     };
 
@@ -5621,7 +5621,7 @@ angular
 		*/
 		self.getSaveCalls = function() {
 
-			console.error( _originalData );
+			console.log('JBFormMediaGroupComponentController: Original data was %o, is now %o', _originalData, self.media);
 
 			// Get IDs of entities _before_ anything was edited and curent state.
 			var oldIds = _originalData.map( function( item ) {
@@ -5703,36 +5703,29 @@ angular
 		*/
 		self.afterSaveTasks = function(entityId) {
 
-
-			// No (relevant) changes? Make a quick check.
-			// TBD.
-			/*if( _originalData.length === self.media.length ) {
-
-				var sameOrder = false;
-				_originalData.forEach( function( item, index ) {
-					if( item.sortOrder === )
-				} );
-
-			}*/
-
-
 			var highestSortOrder 	= getHighestSortOrder()
 				, calls 			= [];
 
 			// Update orders
 			self.media.forEach( function( medium ) {
 
-				calls.push( APIWrapperService.request( {
-					url				: '/media.group/' + entityId + '/media.medium/' + medium.id
-					, method		: 'PATCH'
-					, data			: {
-						sortOrder	: ++highestSortOrder
-					}
-				} ) );
-				
+				console.log('JBFormMediaGroupComponentController: Create call for %o', medium);
+				calls.push($q(function(resolve) {
+					var requestConfig = {
+						url				: '/media.group/' + entityId + '/media.medium/' + medium.id
+						, method		: 'PATCH'
+						, data			: {
+							sortOrder	: ++highestSortOrder
+						}
+					};
+					console.log('JBFormMediaGroupComponentController: Executing request %o', requestConfig);
+					APIWrapperService.request(requestConfig).then(resolve);
+				}));				
 			} );
 
-			return $q.all( calls );
+			console.log('JBFormMediaGroupComponentController: after save tasks are %o, media are %o', calls, self.media);
+
+			return $q.all(calls);
 
 		};
 

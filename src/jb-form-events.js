@@ -96,14 +96,14 @@
     };
 
     JBFormComponentsRegistry.prototype.getAfterSaveTasks = function(id){
-        var calls = this.registeredComponents.reduce(function(subcalls, component){
-            if(angular.isFunction(component.afterSaveTasks)){
-                return subcalls.concat(component.afterSaveTasks(id));
-            }
-            return subcalls;
-        }, []);
+        console.log('JBFormComponentsRegistry: Registered components for afterSaveTasks are %o', this.registeredComponents);
+        var calls = this.registeredComponents
+            .filter(function(component) { return angular.isFunction(component.afterSaveTasks); })
+            .map(function(component) { return component.afterSaveTasks(id); });
+        console.log('JBFormComponentsRegistry: afterSaveTasks are %o, $q is %o', calls, this.$q);
         return this.$q.all(calls).then(function(){
-          return id;
+            console.log('JBFormComponentsRegistry: Done');
+            return id;
         });
     };
 
