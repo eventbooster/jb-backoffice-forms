@@ -124,7 +124,9 @@
     };
 
     JBFormComponentsRegistry.prototype.getSelectFields = function () {
+        console.log('JBFormComponentsRegistry: get select fields for registered component %o', this.registeredComponents);        
         return this.registeredComponents.reduce(function (selects, component) {
+            console.log('JBFormComponentsRegistry: get select fields for component %o', component);
             if (angular.isFunction(component.getSelectFields)) return selects.concat(component.getSelectFields());
             if (angular.isDefined(component.select)) return selects.concat(component.select);
             return selects;

@@ -142,6 +142,7 @@
 
     JBFormComponentsRegistry.prototype.getSelectFields = function () {
         return this.registeredComponents.reduce(function (selects, component) {
+            console.log('JBFormComponentsRegistry: get select fields for component %o', component);
             if (angular.isFunction(component.getSelectFields)) return selects.concat(component.getSelectFields());
             if (angular.isDefined(component.select)) return selects.concat(component.select);
             return selects;
@@ -3279,6 +3280,7 @@ angular
 			 * @returns {Array}
 			 */
 			self.getSelectParameters = function () {
+				console.log('jbFormView: getSelectParameters for %o', self.componentsRegistry);
 				return [this.getOwnIdField()].concat(self.componentsRegistry.getSelectFields());
 			};
 

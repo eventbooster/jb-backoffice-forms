@@ -381,6 +381,7 @@
 			 * @returns {Array}
 			 */
 			self.getSelectParameters = function () {
+				console.log('jbFormView: getSelectParameters for %o', self.componentsRegistry);
 				return [this.getOwnIdField()].concat(self.componentsRegistry.getSelectFields());
 			};
 
