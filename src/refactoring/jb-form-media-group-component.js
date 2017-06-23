@@ -377,11 +377,13 @@
 							'<li data-ng-repeat=\'medium in backofficeMediaGroupComponent.media\' draggable=\'true\'>' +
 								'<div data-ng-if=\'medium.image\'>' +
 									'<button data-ng-click=\'backofficeMediaGroupComponent.removeMedium(medium)\'>&times;</button>' +
-									'<img data-ng-attr-src=\'{{medium.image.url}}\'>' +
+									'<img data-ng-attr-src=\'/b-{{medium.id}}/crop/auto/100\'>' +
+									'<div>ID: {{medium.id}}</div>' +
 								'</div>' +
 								'<div data-ng-if=\'medium.video && medium.video.videoType.identifier === "youtube"\'>' +
 									'<button data-ng-click=\'backofficeMediaGroupComponent.removeMedium(medium)\'>&times;</button>' +
 									'<img data-ng-attr-src=\'http://img.youtube.com/vi/{{medium.video.uri}}/0.jpg\'>' +
+									'<div>ID: {{medium.id}}</div>' +
 								'</div>' +
 							'</li>' +
 						'</ol>' +
@@ -401,7 +403,7 @@
 							'relation-is-readonly="false"' +
 							'relation-is-creatable="true"' +
 							'data-relation-search-field="id" ' +
-							'data-relation-suggestion-template="ID: [[id]]<br/><small>[[title]]</small><img src=\'[[image.url]]\'/>" ' +
+							'data-relation-suggestion-template="ID: [[id]]<br/><small>[[title]]</small><img src=\'/b-[[id]]/crop/auto/100\'/>" ' +
 							'data-ng-model="backofficeMediaGroupComponent.addMediumModel" ' +
 							'data-multi-select="true">' +
 						'</div>' +

@@ -192,10 +192,11 @@ jb-form-repeating-view,
   margin: 0;
 }
 .backoffice-media-group-component ol li {
-  padding: 10px;
-  margin: 0;
+  padding: 5px;
+  margin: 5px;
   display: block;
   float: left;
+  border: 1px solid #ccc;
 }
 .backoffice-media-group-component ol li.drag-over {
   border-right: 3px dotted gray;
@@ -220,7 +221,7 @@ jb-form-repeating-view,
 .backoffice-media-group-component ol li div img {
   max-height: 100px;
   display: block;
-  height: auto;
+  height: 100px;
   width: auto;
 }
 .backoffice-media-group-component .relation-select img {

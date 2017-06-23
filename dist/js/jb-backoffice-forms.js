@@ -141,6 +141,7 @@
     };
 
     JBFormComponentsRegistry.prototype.getSelectFields = function () {
+        console.log('JBFormComponentsRegistry: get select fields for registered component %o', this.registeredComponents);        
         return this.registeredComponents.reduce(function (selects, component) {
             console.log('JBFormComponentsRegistry: get select fields for component %o', component);
             if (angular.isFunction(component.getSelectFields)) return selects.concat(component.getSelectFields());
@@ -5768,11 +5769,13 @@ angular
 							'<li data-ng-repeat=\'medium in backofficeMediaGroupComponent.media\' draggable=\'true\'>' +
 								'<div data-ng-if=\'medium.image\'>' +
 									'<button data-ng-click=\'backofficeMediaGroupComponent.removeMedium(medium)\'>&times;</button>' +
-									'<img data-ng-attr-src=\'{{medium.image.url}}\'>' +
+									'<img data-ng-attr-src=\'/b-{{medium.id}}/crop/auto/100\'>' +
+									'<div>ID: {{medium.id}}</div>' +
 								'</div>' +
 								'<div data-ng-if=\'medium.video && medium.video.videoType.identifier === "youtube"\'>' +
 									'<button data-ng-click=\'backofficeMediaGroupComponent.removeMedium(medium)\'>&times;</button>' +
 									'<img data-ng-attr-src=\'http://img.youtube.com/vi/{{medium.video.uri}}/0.jpg\'>' +
+									'<div>ID: {{medium.id}}</div>' +
 								'</div>' +
 							'</li>' +
 						'</ol>' +
@@ -5792,7 +5795,7 @@ angular
 							'relation-is-readonly="false"' +
 							'relation-is-creatable="true"' +
 							'data-relation-search-field="id" ' +
-							'data-relation-suggestion-template="ID: [[id]]<br/><small>[[title]]</small><img src=\'[[image.url]]\'/>" ' +
+							'data-relation-suggestion-template="ID: [[id]]<br/><small>[[title]]</small><img src=\'/b-[[id]]/crop/auto/100\'/>" ' +
 							'data-ng-model="backofficeMediaGroupComponent.addMediumModel" ' +
 							'data-multi-select="true">' +
 						'</div>' +
