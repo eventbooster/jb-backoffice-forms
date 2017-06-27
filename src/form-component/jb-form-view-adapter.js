@@ -451,11 +451,11 @@
      * 2. belongsTo:    initialize the saving but add a save call which sets the related id
      */
     JBFormViewAdapter.prototype.afterSaveTasks = function(id){
-        return this.strategy.afterSaveTasks(id);
+        return (this.strategy) ? this.strategy.afterSaveTasks(id) : [];
     };
 
     JBFormViewAdapter.prototype.getSelectFields = function(){
-        return this.strategy.getSelectFields();
+        return this.strategy ? this.strategy.getSelectFields() : [];
     };
 
     JBFormViewAdapter.prototype.isValid = function(){
