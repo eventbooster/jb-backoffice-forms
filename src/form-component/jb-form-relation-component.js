@@ -547,6 +547,15 @@
 		return JBFormReferenceController.prototype.adaptToSpec.call(this, fieldSpecs[0]);
 	};
 
+
+	/**
+	* Relations are never required (is that true)?
+	*/
+	JBFormRelationController.prototype.isRequired = function(fieldSpecs) {
+		return false;
+	};
+
+
 	_module.controller('JBFormReferenceController', [
 		  '$scope'
 		, '$attrs'
