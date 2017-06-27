@@ -5779,7 +5779,7 @@ angular
 							'<li data-ng-repeat=\'medium in backofficeMediaGroupComponent.media\' draggable=\'true\'>' +
 								'<div data-ng-if=\'medium.image\'>' +
 									'<button data-ng-click=\'backofficeMediaGroupComponent.removeMedium(medium)\'>&times;</button>' +
-									'<img data-ng-attr-src=\'/b-{{medium.id}}/crop/auto/100\'>' +
+									'<img data-ng-attr-src=\'/b-{{medium.id_image}}/crop/auto/100\'>' +
 									'<div>ID: {{medium.id}}</div>' +
 								'</div>' +
 								'<div data-ng-if=\'medium.video && medium.video.videoType.identifier === "youtube"\'>' +
