@@ -1823,8 +1823,9 @@
 	};
 
 	JBFormReferenceController.prototype.isRequired = function () {
-		if (!this.options) return true;
-		return this.options.nullable === true;
+		const currentParentOption = this.parentOptions && this.parentOptions.properties ? this.parentOptions.properties.find((property) => property.name === this.propertyName) : undefined;
+		if (!currentParentOption) return false;
+		return currentParentOption.nullable !== true;
 	};
 
 	JBFormReferenceController.prototype.getSuggestionTemplate = function () {
