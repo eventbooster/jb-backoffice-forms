@@ -403,7 +403,7 @@
 							'relation-is-readonly="false"' +
 							'relation-is-creatable="true"' +
 							'data-relation-search-field="id" ' +
-							'data-relation-suggestion-template="ID: [[id]]<br/><small>[[title]]</small><img src=\'/b-[[id]]/crop/auto/100\'/>" ' +
+							'data-relation-suggestion-template="ID: [[id]]<br/><small>[[title]]</small><img src=\'/b-[[id_image]]/crop/auto/100\'/>" ' +
 							'data-ng-model="backofficeMediaGroupComponent.addMediumModel" ' +
 							'data-multi-select="true">' +
 						'</div>' +
