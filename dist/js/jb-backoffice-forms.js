@@ -1943,7 +1943,7 @@
 			});
 		}, this);
 
-		console.error('JBFormRelationController: getSaveCalls for %s returns %o', this.entityName, calls);
+		console.log('JBFormRelationController: getSaveCalls for %s returns %o', this.entityName, calls);
 		return calls;
 
 	};
@@ -3860,7 +3860,7 @@ angular
 			 */
 			self.generateSaveCalls = function () {
 				if(self.isReadonly) return [];
-				console.info('DetailView: generateSaveCalls for components %o', self.componentsRegistry);
+				console.log('DetailView: generateSaveCalls for components %o', self.componentsRegistry);
 				var saveCalls = self.componentsRegistry.getSaveCalls().reduce(function (calls, componentCalls) {
 					self.addCall(componentCalls, calls);
 					return calls;
