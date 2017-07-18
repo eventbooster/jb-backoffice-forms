@@ -474,7 +474,10 @@
 				}
 			});
 		}, this);
+
+		console.log('JBFormRelationController: getSaveCalls for %s returns %o', this.entityName, calls);
 		return calls;
+
 	};
 
 	/*JBFormRelationController.prototype.getSelectFields = function () {

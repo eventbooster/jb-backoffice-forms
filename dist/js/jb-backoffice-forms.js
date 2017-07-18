@@ -1942,7 +1942,10 @@
 				}
 			});
 		}, this);
+
+		console.error('JBFormRelationController: getSaveCalls for %s returns %o', this.entityName, calls);
 		return calls;
+
 	};
 
 	/*JBFormRelationController.prototype.getSelectFields = function () {
@@ -2374,16 +2377,23 @@
         return this.formView.isValid();
     };
 
+    /**
+    * All calls are made by beforeSaveTasks – this form view should only return calls
+    * that are made to the entity it represents (if an id cahnged or it was removed).
+    */
     JBFormViewAdapterReferenceStrategy.prototype.getSaveCalls = function(){
 
         var   calls    = this.formView.generateSaveCalls()
             , call     = {};
 
-        if(this.initialId == this.formView.getEntityId()) return calls;
+        if(this.initialId == this.formView.getEntityId()) {
+            console.log('JBFormViewAdapterReferenceStrategy: Id unchanged, return save calls %o for %o', calls, this.formView.getEntityName());
+            return [];
+        }
         // id has changed
         call.data   = {};
         call.data[ this.getReferencingFieldName() ] = this.formView.getEntityId();
-        return [ call ].concat(calls);
+        return [ call ];//.concat(calls);
     };
 
     JBFormViewAdapterReferenceStrategy.prototype.deleteRelation = function(){
@@ -3850,6 +3860,7 @@ angular
 			 */
 			self.generateSaveCalls = function () {
 				if(self.isReadonly) return [];
+				console.info('DetailView: generateSaveCalls for components %o', self.componentsRegistry);
 				var saveCalls = self.componentsRegistry.getSaveCalls().reduce(function (calls, componentCalls) {
 					self.addCall(componentCalls, calls);
 					return calls;

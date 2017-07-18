@@ -940,6 +940,7 @@
 			 */
 			self.generateSaveCalls = function () {
 				if(self.isReadonly) return [];
+				console.log('DetailView: generateSaveCalls for components %o', self.componentsRegistry);
 				var saveCalls = self.componentsRegistry.getSaveCalls().reduce(function (calls, componentCalls) {
 					self.addCall(componentCalls, calls);
 					return calls;
