@@ -4377,16 +4377,20 @@ angular
                     currentDate.getFullYear()
                   , pad(currentDate.getMonth() + 1)
                   , pad(currentDate.getDate())
-              ].join('-')
+              ].join('-');
             }
 
             timeString = [
                 pad(currentDate.getHours())
               , pad(currentDate.getMinutes())
               , pad(currentDate.getSeconds())
-            ].join(':')
-        } // else, date was deleted
-        call.data[this.name] = dateString+' '+timeString;
+            ].join(':');
+            call.data[this.name] = dateString+' '+timeString;
+        } 
+        // else, date was deleted
+        else {
+            call.data[this.name] = '';
+        }
         return [call];
     };
 
