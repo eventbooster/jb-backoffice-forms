@@ -1747,6 +1747,13 @@
 				, this.relationName
 				, data);
 		}
+
+		// Additionally filter by relationName if multiple specifications match the current field
+		if (fieldSpec.length > 1 && this.relationName) {
+			fieldSpec = fieldSpec.filter((item) => item.name === this.relationName);
+			console.log('JBFormRelationController: fieldSpec filtered by relationName returns %o', fieldSpec);
+		}
+
 		this.parentOptions = data;
 		if(this.adaptToSpec(fieldSpec)) {
 			return this.renderComponent();
