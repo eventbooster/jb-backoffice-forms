@@ -2112,6 +2112,7 @@
         this.componentsRegistry = this.componentsService.registryFor(scope);
         this.componentsRegistry.listen();
         scope.$on('removeElement', function(event, index){
+            console.log('JBFormRepeatingViewController: Remove item %o', index);
             event.stopPropagation();
             if(this.isReadonly === true) return;
             this.removeElement(index);
@@ -2209,11 +2210,11 @@
                     , function(error) {
                         console.error(error);
                     });
-        }.bind(this))
+        }.bind(this));
     };
 
     JBFormRepeatingViewController.prototype.removeElement = function(index){
-
+        
         if(this.isReadonly) return;
 
         var   component   = this.componentsRegistry.componentAt(index)
@@ -2226,7 +2227,11 @@
             })
             .then(function(success){
                 return self.$timeout(function(){
-                    return self.componentsRegistry.optionsDataHandler(self.optionData);
+                    // Update itemIndex on every registered component to match new index
+                    self.componentsRegistry.registeredComponents.forEach(function(component, index) {
+                        component.strategy.updateIndex(index);
+                    });
+                    //return self.componentsRegistry.optionsDataHandler(self.optionData);
                 });
             }.bind(this)).catch(function(error){
                 console.error(error);
@@ -2441,9 +2446,17 @@
     }
 
     JBFormViewAdapterInverseReferenceStrategy.prototype.setupListeners = function(scope) {
-        scope.$on('deletedDetailView', function(event) {
+
+        scope.$on('$destroy', function() {
+            this.removeDeletedDetailViewHandler();
+        }.bind(this));
+
+        this.removeDeletedDetailViewHandler = scope.$on('deletedDetailView', function(event) {
+            event.stopPropagation();
+            console.log('JBFormViewAdapterInverseReferenceStrategy: Caught deletedDetailView on %o, event %o', this, event);
             var currentScope = event.currentScope;
             event.stopPropagation();
+            console.log('JBFormViewAdapterInverseReferenceStrategy: itemIndex is %o, item %o, parent scope %o', this.itemIndex, this, currentScope.$parent);
             currentScope.$parent.$emit('removeElement', this.itemIndex);
         }.bind(this));
     };
@@ -2502,7 +2515,6 @@
      * @param data
      */
     JBFormViewAdapterInverseReferenceStrategy.prototype.handleGetData = function(data, index){
-
         var   content = (data) ? data[this.formView.getEntityName()] : data
             , id
             , parentId;
@@ -2519,6 +2531,10 @@
         this.initialParentId = parentId;
         this.formView.setEntityId(id);
         return this.formView.distributeData(content);
+    };
+
+    JBFormViewAdapterInverseReferenceStrategy.prototype.updateIndex = function(index){
+        this.itemIndex = index;
     };
 
     JBFormViewAdapterInverseReferenceStrategy.prototype.getEntityFromData = function(data){
@@ -2567,6 +2583,7 @@
 
     JBFormViewMappingStrategy.prototype.setupListeners = function(scope){
         scope.$on('deletedDetailView', function(event){
+            console.log('JBFormViewMappingStrategy: Caught deletedDetailView');
             var currentScope = event.currentScope;
             event.stopPropagation();
             this.deleteRelation()
@@ -2711,6 +2728,11 @@
      * @todo: switch into an error state if there are no options data
      */
     JBFormViewAdapter.prototype.handleOptionsData = function(data){
+
+        // If strategy exists, don't create another strategy. It will initialize everything from the start 
+        // and add multiple $on listeners (on init).
+        if (this.strategy) return;
+
         // the extraction of the options data works as long as there is no alias!
         var spec = this.formView.getSpecFromOptionsData(data);
         if(!spec) {
@@ -3101,6 +3123,7 @@ angular
 			 */
 
 			self.init = function (scope, el, attrs) {
+
 				var   promises = []
 					, element = el
 					, readonlyGetter;
@@ -3903,7 +3926,7 @@ angular
 					event.preventDefault();
 					event.stopPropagation();
 				}
-				console.log('DetailView: Delete');
+				console.log('DetailView: Delete %o', event);
 
 				var   confirmed         = false
 					, interactive       = !(angular.isDefined(self.isNonInteractive) ? self.isNonInteractive : nonInteractive)
@@ -3913,13 +3936,14 @@ angular
 					return $scope.$emit('deletedDetailView', self);
 				}
 
-				confirmMessage += '\n'+self.getEntityName() + '('+self.getEntityId()+')';
+				confirmMessage += '\n'+self.getEntityName() + '('+ (self.getEntityId() || 'new' ) +')';
 				confirmed = confirm(confirmMessage);
 
 				if (!confirmed) {
 					return;
 				}
 				if(self.isNew() && !self.isRoot){
+					console.log('DetailView: Is new, but not root');
 					return $scope.$emit('deletedDetailView', self);
 				}
 				return self

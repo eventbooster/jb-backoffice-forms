@@ -174,6 +174,7 @@
 			 */
 
 			self.init = function (scope, el, attrs) {
+
 				var   promises = []
 					, element = el
 					, readonlyGetter;
@@ -976,7 +977,7 @@
 					event.preventDefault();
 					event.stopPropagation();
 				}
-				console.log('DetailView: Delete');
+				console.log('DetailView: Delete %o', event);
 
 				var   confirmed         = false
 					, interactive       = !(angular.isDefined(self.isNonInteractive) ? self.isNonInteractive : nonInteractive)
@@ -986,13 +987,14 @@
 					return $scope.$emit('deletedDetailView', self);
 				}
 
-				confirmMessage += '\n'+self.getEntityName() + '('+self.getEntityId()+')';
+				confirmMessage += '\n'+self.getEntityName() + '('+ (self.getEntityId() || 'new' ) +')';
 				confirmed = confirm(confirmMessage);
 
 				if (!confirmed) {
 					return;
 				}
 				if(self.isNew() && !self.isRoot){
+					console.log('DetailView: Is new, but not root');
 					return $scope.$emit('deletedDetailView', self);
 				}
 				return self

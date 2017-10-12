@@ -145,9 +145,17 @@
     }
 
     JBFormViewAdapterInverseReferenceStrategy.prototype.setupListeners = function(scope) {
-        scope.$on('deletedDetailView', function(event) {
+
+        scope.$on('$destroy', function() {
+            this.removeDeletedDetailViewHandler();
+        }.bind(this));
+
+        this.removeDeletedDetailViewHandler = scope.$on('deletedDetailView', function(event) {
+            event.stopPropagation();
+            console.log('JBFormViewAdapterInverseReferenceStrategy: Caught deletedDetailView on %o, event %o', this, event);
             var currentScope = event.currentScope;
             event.stopPropagation();
+            console.log('JBFormViewAdapterInverseReferenceStrategy: itemIndex is %o, item %o, parent scope %o', this.itemIndex, this, currentScope.$parent);
             currentScope.$parent.$emit('removeElement', this.itemIndex);
         }.bind(this));
     };
@@ -206,7 +214,6 @@
      * @param data
      */
     JBFormViewAdapterInverseReferenceStrategy.prototype.handleGetData = function(data, index){
-
         var   content = (data) ? data[this.formView.getEntityName()] : data
             , id
             , parentId;
@@ -223,6 +230,10 @@
         this.initialParentId = parentId;
         this.formView.setEntityId(id);
         return this.formView.distributeData(content);
+    };
+
+    JBFormViewAdapterInverseReferenceStrategy.prototype.updateIndex = function(index){
+        this.itemIndex = index;
     };
 
     JBFormViewAdapterInverseReferenceStrategy.prototype.getEntityFromData = function(data){
@@ -271,6 +282,7 @@
 
     JBFormViewMappingStrategy.prototype.setupListeners = function(scope){
         scope.$on('deletedDetailView', function(event){
+            console.log('JBFormViewMappingStrategy: Caught deletedDetailView');
             var currentScope = event.currentScope;
             event.stopPropagation();
             this.deleteRelation()
@@ -415,6 +427,11 @@
      * @todo: switch into an error state if there are no options data
      */
     JBFormViewAdapter.prototype.handleOptionsData = function(data){
+
+        // If strategy exists, don't create another strategy. It will initialize everything from the start 
+        // and add multiple $on listeners (on init).
+        if (this.strategy) return;
+
         // the extraction of the options data works as long as there is no alias!
         var spec = this.formView.getSpecFromOptionsData(data);
         if(!spec) {

@@ -20,6 +20,7 @@
         this.componentsRegistry = this.componentsService.registryFor(scope);
         this.componentsRegistry.listen();
         scope.$on('removeElement', function(event, index){
+            console.log('JBFormRepeatingViewController: Remove item %o', index);
             event.stopPropagation();
             if(this.isReadonly === true) return;
             this.removeElement(index);
@@ -117,11 +118,11 @@
                     , function(error) {
                         console.error(error);
                     });
-        }.bind(this))
+        }.bind(this));
     };
 
     JBFormRepeatingViewController.prototype.removeElement = function(index){
-
+        
         if(this.isReadonly) return;
 
         var   component   = this.componentsRegistry.componentAt(index)
@@ -134,7 +135,11 @@
             })
             .then(function(success){
                 return self.$timeout(function(){
-                    return self.componentsRegistry.optionsDataHandler(self.optionData);
+                    // Update itemIndex on every registered component to match new index
+                    self.componentsRegistry.registeredComponents.forEach(function(component, index) {
+                        component.strategy.updateIndex(index);
+                    });
+                    //return self.componentsRegistry.optionsDataHandler(self.optionData);
                 });
             }.bind(this)).catch(function(error){
                 console.error(error);
