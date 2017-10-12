@@ -4787,8 +4787,8 @@ angular
      * @returns {boolean}
      */
     JBFormTextInputController.prototype.isValid = function () {
-        if(this.isRequired() && !this.isReadonly) return !!this.getValue();
-        return true;
+        if(!this.isRequired() || this.isReadonly) return true;
+        return this.getValue() !== '' && this.getValue() !== undefined;
     };
 
     JBFormTextInputController.prototype.registerAt = function(parent){
