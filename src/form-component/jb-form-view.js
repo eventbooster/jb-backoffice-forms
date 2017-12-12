@@ -319,6 +319,7 @@
 			self.internallyHandleOptionsData = function (data) {
 				self.optionData = data;
 				// todo: modifying data from cache is always a dumb ass idea!
+				// Why tf are we doing this?
 				(data.properties || []).forEach(function(property){
 					property.readonly = !!(data.permissions.update === false || self.isReadonly);
 				});

@@ -52,6 +52,7 @@
         if(!angular.isDefined(spec)) return console.error('No options data available for text-field %o', this.name);
         this.options    = spec;
         this.required   = spec.nullable === false;
+        console.log('JBFormTextInputController: Spec for %s is %o', this.name, spec);
         this.isReadonly = this.isReadonly === true || spec.readonly === true;
     };
 
