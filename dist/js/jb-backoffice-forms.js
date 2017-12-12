@@ -1795,13 +1795,13 @@
 	};
 
 	JBFormReferenceController.prototype.isDeletable = function(){
-		return this.options && !this.isRequired() && this.options.permissions && (this.options.permissions.deleteRelation === true || this.options.permissions.deleteOneRelation === true);
+		return this.options && !this.isRequired() && this.options.permissions && this.options.permissions.deleteLink === true;
 	};
 
 	JBFormReferenceController.prototype.isCreatable = function(){
 		// When data is missing, assume creatability
 		if (!this.options || !this.options.permissions) return true;
-		return this.options.permissions.createRelation === true;
+		return this.options.permissions.createLink === true;
 	};
 
 	JBFormReferenceController.prototype.getLabel = function () {
