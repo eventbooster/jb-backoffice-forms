@@ -73,7 +73,7 @@
     };
 
     JBFormIntervalInputController.prototype.updateData = function (data) {
-        this.originalData = this.getValue();
+        //console.error('distribute %o', data, this.getValue());
         var fieldData = data[this.name];
         if (!fieldData) {
         	this.setValue('');
@@ -85,6 +85,8 @@
         	return previous + fieldData[current] + ' ' + current + ' ';
         }, '').trim();
         this.setValue(valueString);
+        // Only set originalData after model was updated, as getValue takes data from model.
+        this.originalData = this.getValue();
     };
 
     JBFormIntervalInputController.prototype.displayLabel = function(){
@@ -93,6 +95,7 @@
 
     JBFormIntervalInputController.prototype.getSaveCalls = function () {
 
+        //console.error(this.originalData, this.getValue());
     	// originalData may be undefined, while getValue is '' – no change, therefore don't
     	// store anything.
     	if (this.originalData === undefined && !this.getValue()) return [];
@@ -100,8 +103,10 @@
         if (this.originalData === this.getValue() || this.isReadonly) return [];
 
         var data = {};
-        data[this.name] = this.getValue();
-
+        // If value is empty, explicitly store null (to make removals of a value possible),
+        // see https://github.com/eventbooster/eventbooster-issues/issues/1289
+        // Don't use null, but "null" as null won't be sent to the server
+        data[this.name] = this.getValue() || '';
         return [{
             data: data
         }];
